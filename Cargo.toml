@@ -14,7 +14,6 @@ pollster = "0.2"
 eframe = { version = "0.19.0" }
 tracing = "0.1"
 tracing-subscriber = "0.3.16"
-poll-promise = { version = "0.2", features = ["tokio"] }
 
 image = { version = "0.24.4", default-features = false }
 imageproc = { version = "0.23.0", default-features = false }
