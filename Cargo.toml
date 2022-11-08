@@ -7,6 +7,8 @@ edition = "2021"
 
 [dependencies]
 bytemuck = "1.12"
+egui = { git =  "https://github.com/emilk/egui", rev = "940b896c" }
+egui-wgpu = { git =  "https://github.com/emilk/egui", rev = "940b896c" }
 eframe = { git = "https://github.com/emilk/egui", rev = "940b896c", features = ["wgpu"] }
-egui_gpu_plot = { path = "src/egui_gpu_plot" }
+# egui_gpu_plot = { path = "src/egui_gpu_plot" }
 wgpu = "0.14"

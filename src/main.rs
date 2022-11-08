@@ -1,20 +1,14 @@
-use std::sync::Arc;
-
 use eframe::egui::plot::{Legend, PlotImage};
 use eframe::egui::{self, plot::PlotBounds};
 use eframe::emath::Vec2;
 use wgpu;
 
-use egui_gpu_plot::*;
-
-const MAX_POINTS: usize = 300000;
+mod gpu_draw;
+use gpu_draw::GPUDrawer;
 
 pub struct GpuPlot {
-  q: [f32; 3],
-
   dirty: bool,
-  texture_id: egui::TextureId,
-  points: Arc<Vec<Vertex>>,
+  texture_id: egui::TextureId
 }
 
 impl GpuPlot {
@@ -24,100 +18,29 @@ impl GpuPlot {
     let device = &wgpu_render_state.device;
     let target_format = wgpu_render_state.target_format;
 
-    let plot = GpuAcceleratedPlot::new(device, target_format);
+    let gpu_drawer = GPUDrawer::new(device, &wgpu_render_state.queue, target_format);
     let texture_id = {
       let mut renderer = wgpu_render_state.renderer.write();
-      renderer.register_native_texture(device, &plot.create_view(), wgpu::FilterMode::Linear)
+      renderer.register_native_texture(device, &gpu_drawer.create_view(), wgpu::FilterMode::Linear)
     };
 
     wgpu_render_state
       .renderer
       .write()
       .paint_callback_resources
-      .insert(plot);
+      .insert(gpu_drawer);
 
-    let q = [10.0, 28.0, 8.0 / 3.0];
     Some(Self {
-      q,
       dirty: true,
-      texture_id,
-      points: Arc::new(forward_euler(lorenz, q, MAX_POINTS)),
+      texture_id
     })
   }
-}
-
-fn lorenz(q: [f32; 3], s: [f32; 3]) -> [f32; 3] {
-  let sigma = q[0];
-  let rho = q[1];
-  let beta = q[2];
-
-  [
-    sigma * (s[1] - s[0]),
-    s[0] * (rho - s[2]) - s[1],
-    s[0] * s[1] - beta * s[2],
-  ]
-}
-
-fn forward_euler<F>(df: F, q: [f32; 3], n: usize) -> Vec<Vertex>
-  where
-    F: Fn([f32; 3], [f32; 3]) -> [f32; 3],
-{
-  let tf = 100.0;
-  let dt = tf / n as f32;
-
-  let mut s = [1.0, 0.0, 0.0];
-  let mut vs = Vec::with_capacity(n);
-
-  for i in 0..n {
-    let pct = i as f32 / n as f32;
-
-    let ds = df(q, s);
-    for j in 0..s.len() {
-      s[j] += ds[j] * dt;
-    }
-
-    let position = [s[0], s[2]];
-    let normal = egui::Vec2::new(ds[0], ds[2]).normalized().rot90();
-    let color = egui::color::Hsva::new(pct, 0.85, 0.5, 1.0).to_rgba_premultiplied();
-
-    vs.push(Vertex {
-      position,
-      normal: [normal.x, normal.y],
-      color,
-    });
-    // two vertices per
-    vs.push(Vertex {
-      position,
-      normal: [-normal.x, -normal.y],
-      color,
-    });
-  }
-
-  vs
 }
 
 impl eframe::App for GpuPlot {
   fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
     egui::CentralPanel::default().show(ctx, |ui| {
-      let mut new_sigma = self.q[0];
-      let mut new_rho = self.q[1];
-      let mut new_beta = self.q[2];
-
-      ui.horizontal(|ui| {
-        for (l, v, range) in [
-          ("σ", &mut new_sigma, 0.0..=20.0),
-          ("ρ", &mut new_rho, 0.0..=50.0),
-          ("β", &mut new_beta, 0.0..=10.0),
-        ] {
-          ui.label(l);
-          ui.add(egui::Slider::new(v, range).step_by(0.01));
-        }
-      });
-
-      if self.q != [new_sigma, new_rho, new_beta] {
-        self.q = [new_sigma, new_rho, new_beta];
-
-        self.points = Arc::new(forward_euler(lorenz, self.q, MAX_POINTS));
+      if ui.button("GPU execute").clicked() {
         self.dirty = true;
       }
 
@@ -129,10 +52,10 @@ impl eframe::App for GpuPlot {
         // Must set margins to zero or the image and plot bounds will
         // constantly fight, expanding the plot to infinity.
         .set_margin_fraction(Vec2::new(0.0, 0.0))
-        .include_x(-25.0)
-        .include_x(25.0)
-        .include_y(0.0)
-        .include_y(50.0)
+        .include_x(-1.0)
+        .include_x(1.0)
+        .include_y(-1.0)
+        .include_y(1.0)
         .show(ui, |ui| {
           bounds = ui.plot_bounds();
 
@@ -143,18 +66,16 @@ impl eframe::App for GpuPlot {
               bounds.center(),
               [bounds.width() as f32, bounds.height() as f32],
             )
-              .name("Lorenz attractor (GPU)"),
+              .name("Mandelbrot (GPU)"),
           );
         });
 
 
       // Add a callback to egui to render the plot contents to
       // texture.
-      ui.painter().add(egui_wgpu_callback(
+      ui.painter().add(gpu_draw::egui_wgpu_callback(
         bounds,
-        Arc::clone(&self.points),
-        resp.response.rect,
-        self.dirty,
+        resp.response.rect
       ));
 
       // Update the texture handle in egui from the previously
@@ -162,7 +83,7 @@ impl eframe::App for GpuPlot {
       let wgpu_render_state = frame.wgpu_render_state().unwrap();
       let mut renderer = wgpu_render_state.renderer.write();
 
-      let plot: &GpuAcceleratedPlot = renderer.paint_callback_resources.get().unwrap();
+      let plot: &GPUDrawer = renderer.paint_callback_resources.get().unwrap();
       let texture_view = plot.create_view();
 
       renderer.update_egui_texture_from_wgpu_texture(

@@ -543,16 +543,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "egui_gpu_plot"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "egui",
- "egui-wgpu",
- "wgpu",
-]
-
-[[package]]
 name = "emath"
 version = "0.19.0"
 source = "git+https://github.com/emilk/egui?rev=940b896c#940b896cbba39eb04757b975f81d9b80e7e198ed"
@@ -863,7 +853,8 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "eframe",
- "egui_gpu_plot",
+ "egui",
+ "egui-wgpu",
  "wgpu",
 ]
 
