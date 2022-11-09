@@ -842,6 +842,7 @@ name = "hutton32-gpu"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "cfg-if",
  "eframe",
  "egui",
  "egui-wgpu",

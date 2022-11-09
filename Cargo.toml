@@ -2,15 +2,13 @@
 name = "hutton32-gpu"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["FredericaBernkastel <bernkastel.frederica@protonmail.com>"]
 
 [dependencies]
+cfg-if = "1"
 bytemuck = "1.12"
 egui = { git =  "https://github.com/emilk/egui", rev = "940b896c", default-features = false }
 egui-wgpu = { git =  "https://github.com/emilk/egui", rev = "940b896c" }
 eframe = { git = "https://github.com/emilk/egui", rev = "940b896c", default-features = false, features = ["wgpu", "default_fonts"] }
-# egui_gpu_plot = { path = "src/egui_gpu_plot" }
 wgpu = { version = "0.14", default-features = false }
-
 image = { version = "0.24", default-features = false }

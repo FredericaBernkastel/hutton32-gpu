@@ -56,9 +56,19 @@ fn sim_boundary_check(xy: vec2<u32>) -> bool {
 }
 
 fn get_cell(xy: vec2<u32>) -> u32 {
+  /*                  simulation_buffer[i]: u32;
+
+          time % 2 == 0                           time % 2 != 0
+
+      unused                                unused
+        |    next iteration                   |  current iteration
+      - - -     |   current iteratiom       - - -     |  next iteratiom
+      |    |    |    |                      |    |    |    |
+     [u8] [u8] [u8] [u8]                   [u8] [u8] [u8] [u8]
+  */
   let offset = xy.y * uniforms.simulation_dimm.x + xy.x;
-  return
-    (u32(sim_boundary_check(xy)) * 0xffffffffu) & // if sim_boundary_check(xy)
+ return
+    //(u32(sim_boundary_check(xy)) * 0xffffffffu) & // if sim_boundary_check(xy)
     (simulation_buffer[offset] >> (u32(uniforms.time % 2u != 0u) * 8u)) &
     0xffu;
 }
@@ -78,55 +88,28 @@ fn set_cell(xy: vec2<u32>, state: u32) {
   );
 
   let uv = in.tex_coords * scale + vec2(uniforms.display_x_range[0], uniforms.display_y_range[0]);
-  if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
-    let uv = vec2<u32>(uv * vec2<f32>(uniforms.simulation_dimm));
-    //let offset = uv.y * uniforms.simulation_dimm.x + uv.x;
-    //let cell = simulation_buffer[offset];
-    let cell = get_cell(uv);
-    let color = vec4(vec3(f32(cell & 1u)), 1.0);
-    return color;
-  } else {
-    return vec4(0.0);
-  }
+  let boundary = u32(uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0);
+  let pixel = vec2<u32>(uv * vec2<f32>(uniforms.simulation_dimm));
+  //let offset = pixel.y * uniforms.simulation_dimm.x + pixel.x;
+  //let cell = simulation_buffer[offset];
+  let cell = get_cell(pixel) & (boundary * 0xffu);
+  return vec4(vec3(f32(cell & 1u)), f32(boundary));
 }
 
 
 
 // compute ---------------------
 
-fn mandelbrot(uv: vec2<f32>) -> f32 {
-  var z = vec2(0.0, 0.0);
-  let max_iter = 256;
-
-  for (var i: i32 = 0; i < max_iter; i++) {
-    z = vec2(z.x*z.x - z.y*z.y, 2.0 * z.x * z.y) + uv;
-    if(length(z) > 2.0) {
-      return f32(i) / f32(max_iter);
-    }
-  }
-
-  return 1.0;
-}
-
 fn game_of_life(xy: vec2<u32>) {
-
-  /* simulation_buffer[i]: u32; time % 2 == 0
-
-      unused
-        |    next iteration
-      - - -     |   current iteratiom
-      |    |    |    |
-     [u8] [u8] [u8] [u8]
-  */
   var moore_neighbourhood = array<vec2<i32>, 8> (
-    vec2<i32>(-1, -1),
-    vec2<i32>( 0, -1),
-    vec2<i32>( 1, -1),
-    vec2<i32>(-1,  0),
-    vec2<i32>( 1,  0),
-    vec2<i32>(-1,  1),
-    vec2<i32>( 0,  1),
-    vec2<i32>( 1,  1),
+    vec2(-1, -1),
+    vec2( 0, -1),
+    vec2( 1, -1),
+    vec2(-1,  0),
+    vec2( 1,  0),
+    vec2(-1,  1),
+    vec2( 0,  1),
+    vec2( 1,  1),
   );
 
   var neighbours = 0u;
@@ -144,7 +127,7 @@ fn game_of_life(xy: vec2<u32>) {
 
 @compute @workgroup_size(1) fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
   //let uv = vec2<f32>(global_id.xy) / vec2<f32>(uniforms.simulation_dimm);
-  game_of_life(vec2(global_id.xy));
+  game_of_life(global_id.xy);
   //let color = mandelbrot(uv) * 255.0;
   //simulation_buffer[offset] = u32(color);
 }

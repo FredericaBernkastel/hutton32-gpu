@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::fs;
+use std::{fs, mem};
 use std::sync::Arc;
 use wgpu::{util::DeviceExt, TextureViewDescriptor};
 use egui::plot::PlotBounds;
@@ -11,7 +11,7 @@ pub struct Uniform {
   pub display_y_range: [f32; 2],
 
   pub simulation_dimm: [u32; 2],
-  pub time: u64
+  pub time: u64,
 }
 
 impl Default for Uniform {
@@ -31,12 +31,14 @@ pub struct GPUDrawer {
   bind_group: wgpu::BindGroup,
 
   uniform_buffer: wgpu::Buffer,
-  //simulation_buffer: wgpu::Buffer,
+  simulation_buffer: wgpu::Buffer,
 
   texture: (wgpu::Texture, wgpu::TextureView),
-  texture_size: [u32; 2],
+  pub texture_size: [u32; 2],
 
-  uniforms: Uniform
+  pub uniforms: Uniform,
+
+  pub simulatiion_steps_per_call: u32,
 }
 
 impl GPUDrawer {
@@ -116,18 +118,13 @@ impl GPUDrawer {
       usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
     });
 
-    let mut simulation_init = image::RgbaImage::new(sim_dimm[0], sim_dimm[1]);
-    let glider = [[1, 0], [2, 1], [0, 2], [1, 2], [2, 2]];
-    glider.iter().for_each(|[x, y]| {
-      simulation_init.get_pixel_mut(x + 10, y + 10).0[0] = 0x01;
-    });
-
-    let simulation_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    let simulation_buffer = device.create_buffer(&wgpu::BufferDescriptor {
       label: Some("Simulation Buffer"),
-      contents: &simulation_init,
+      size: (sim_dimm[0] * sim_dimm[1] * mem::size_of::<u32>() as u32) as _,
       usage: wgpu::BufferUsages::STORAGE
         | wgpu::BufferUsages::COPY_DST
         | wgpu::BufferUsages::COPY_SRC,
+      mapped_at_creation: false
     });
 
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -153,11 +150,13 @@ impl GPUDrawer {
       bind_group,
 
       uniform_buffer,
-      //simulation_buffer,
+      simulation_buffer,
 
       texture,
       texture_size: [0, 0],
-      uniforms
+      uniforms,
+
+      simulatiion_steps_per_call: 1
     }
   }
 
@@ -270,8 +269,18 @@ impl GPUDrawer {
     rpass.draw(0..6, 0..1);
   }
 
-  pub fn simulation_advance(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, iterations: u32) {
-    for _ in 0..iterations {
+  pub fn load_simulation(&self, queue: &wgpu::Queue) {
+    let mut simulation_init = image::RgbaImage::new(self.uniforms.simulation_dimm[0], self.uniforms.simulation_dimm[1]);
+    //let glider = [[1, 0], [2, 1], [0, 2], [1, 2], [2, 2]];
+    let acorn = [[1, 0], [3, 1], [0, 2], [1, 2], [4, 2], [5, 2], [6, 2]];
+    acorn.iter().for_each(|[x, y]| {
+      simulation_init.get_pixel_mut(x + 128, y + 128).0[0] = 0x01;
+    });
+    queue.write_buffer(&self.simulation_buffer, 0, &simulation_init);
+  }
+
+  pub fn simulation_advance(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+    for _ in 0..self.simulatiion_steps_per_call {
       let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
@@ -300,7 +309,7 @@ pub fn egui_wgpu_callback(
       let gpu_drawer: &mut GPUDrawer = paint_callback_resources.get_mut().unwrap();
 
       if compute_requested {
-        gpu_drawer.simulation_advance(device, queue, 1);
+        gpu_drawer.simulation_advance(device, queue);
       }
 
       gpu_drawer.prepare(
