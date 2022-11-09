@@ -7,9 +7,11 @@ mod gpu_draw;
 use gpu_draw::GPUDrawer;
 
 pub struct GpuPlot {
-  dirty: bool,
+  compute_requested: bool,
   texture_id: egui::TextureId
 }
+
+const SIMULATION_DIMM: [u32; 2] = [256, 256];
 
 impl GpuPlot {
   pub fn new<'a>(cc: &'a eframe::CreationContext<'a>) -> Option<Self> {
@@ -18,7 +20,7 @@ impl GpuPlot {
     let device = &wgpu_render_state.device;
     let target_format = wgpu_render_state.target_format;
 
-    let gpu_drawer = GPUDrawer::new(device, &wgpu_render_state.queue, target_format);
+    let gpu_drawer = GPUDrawer::new(device, target_format, SIMULATION_DIMM);
     let texture_id = {
       let mut renderer = wgpu_render_state.renderer.write();
       renderer.register_native_texture(device, &gpu_drawer.create_view(), wgpu::FilterMode::Linear)
@@ -31,7 +33,7 @@ impl GpuPlot {
       .insert(gpu_drawer);
 
     Some(Self {
-      dirty: true,
+      compute_requested: false,
       texture_id
     })
   }
@@ -40,9 +42,11 @@ impl GpuPlot {
 impl eframe::App for GpuPlot {
   fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
     egui::CentralPanel::default().show(ctx, |ui| {
-      if ui.button("GPU execute").clicked() {
-        self.dirty = true;
-      }
+      ui.add_enabled_ui(!self.compute_requested , |ui| {
+        if ui.button("▶ Start simulation").clicked() {
+          self.compute_requested = true;
+        }
+      });
 
       let mut bounds = PlotBounds::NOTHING;
       let resp = egui::plot::Plot::new("my_plot")
@@ -52,10 +56,31 @@ impl eframe::App for GpuPlot {
         // Must set margins to zero or the image and plot bounds will
         // constantly fight, expanding the plot to infinity.
         .set_margin_fraction(Vec2::new(0.0, 0.0))
-        .include_x(-1.0)
+        .include_x(0.0)
         .include_x(1.0)
-        .include_y(-1.0)
+        .include_y(0.0)
         .include_y(1.0)
+        .x_grid_spacer(|grid| (egui::widgets::plot::log_grid_spacer(16))(grid))
+        .y_grid_spacer(|grid| (egui::widgets::plot::log_grid_spacer(16))(grid))
+        .coordinates_formatter(
+          egui::widgets::plot::Corner::LeftTop,
+          egui::widgets::plot::CoordinatesFormatter::new(|pt, _| {
+            format!(
+              "x = {}\ny = {}",
+              (pt.x * SIMULATION_DIMM[0] as f64) as i64,
+              (pt.y * SIMULATION_DIMM[1] as f64) as i64,
+            )
+          })
+        )
+        .show_x(false)
+        .show_y(false)
+        .allow_scroll(false)
+        .x_axis_formatter(|x, _| if x >= 0.0 && x <= 1.0 {
+            ((x * SIMULATION_DIMM[0] as f64) as i64).to_string()
+          } else { "".to_string() })
+        .y_axis_formatter(|y, _| if y >= 0.0 && y <= 1.0 {
+            ((y * SIMULATION_DIMM[1] as f64) as i64).to_string()
+          } else { "".to_string() })
         .show(ui, |ui| {
           bounds = ui.plot_bounds();
 
@@ -65,35 +90,35 @@ impl eframe::App for GpuPlot {
               self.texture_id,
               bounds.center(),
               [bounds.width() as f32, bounds.height() as f32],
-            )
-              .name("Mandelbrot (GPU)"),
+            ).name("Game of Life (GPU)"),
           );
         });
-
 
       // Add a callback to egui to render the plot contents to
       // texture.
       ui.painter().add(gpu_draw::egui_wgpu_callback(
         bounds,
-        resp.response.rect
+        resp.response.rect,
+        self.compute_requested
       ));
 
       // Update the texture handle in egui from the previously
       // rendered texture (from the last frame).
       let wgpu_render_state = frame.wgpu_render_state().unwrap();
       let mut renderer = wgpu_render_state.renderer.write();
+      {
+        let gpu_drawer: &GPUDrawer = renderer.paint_callback_resources.get().unwrap();
+        let texture_view = gpu_drawer.create_view();
 
-      let plot: &GPUDrawer = renderer.paint_callback_resources.get().unwrap();
-      let texture_view = plot.create_view();
-
-      renderer.update_egui_texture_from_wgpu_texture(
-        &wgpu_render_state.device,
-        &texture_view,
-        wgpu::FilterMode::Linear,
-        self.texture_id,
-      );
-
-      self.dirty = false;
+        renderer.update_egui_texture_from_wgpu_texture(
+          &wgpu_render_state.device,
+          &texture_view,
+          wgpu::FilterMode::Linear,
+          self.texture_id,
+        );
+      }
+      ctx.request_repaint();
+      //self.compute_requested = false;
     });
   }
 }
