@@ -1,3 +1,10 @@
+/*var<private> hutton32_colors: array<vec3<u32>, 32>
+  = array<vec3<u32>, 32>(
+    vec3<u32>(0, 0, 0),vec3<u32>(255, 0, 0),vec3<u32>(255, 125, 0),vec3<u32>(255, 150, 25),vec3<u32>(255, 175, 50),vec3<u32>(255, 200, 75),vec3<u32>(255, 225, 100),vec3<u32>(255, 250, 125),vec3<u32>(251, 255, 0),vec3<u32>(89, 89, 255),vec3<u32>(106, 106, 255),vec3<u32>(122, 122, 255),vec3<u32>(139, 139, 255),vec3<u32>(27, 176, 27),vec3<u32>(36, 200, 36),vec3<u32>(73, 255, 73),vec3<u32>(106, 255, 106),vec3<u32>(235, 36, 36),vec3<u32>(255, 56, 56),vec3<u32>(255, 73, 73),vec3<u32>(255, 89, 89),vec3<u32>(185, 56, 255),vec3<u32>(191, 73, 255),vec3<u32>(197, 89, 255),vec3<u32>(203, 106, 255),vec3<u32>(0, 255, 128),vec3<u32>(255, 128, 64),vec3<u32>(255, 255, 128),vec3<u32>(33, 215, 215),vec3<u32>(27, 176, 176),vec3<u32>(24, 156, 156),vec3<u32>(21, 137, 137),
+  );*/
+//!define hutton32_colors
+//!include ./kernel/hutton32.wgsl
+
 struct Uniforms {
   display_x_range: vec2<f32>,
   display_y_range: vec2<f32>,
@@ -40,7 +47,7 @@ struct VertexOutput {
   );
 
   let position = vertices[in_vertex_index];
-  out.position = vec4<f32>(position, 0.0, 1.0); // -1.0..1.0
+  out.position = vec4<f32>(position.xy, 0.0, 1.0); // -1.0..1.0
   out.tex_coords = position.xy / 2.0 + 0.5; // 0.0..1.0
   return out;
 }
@@ -83,51 +90,32 @@ fn set_cell(xy: vec2<u32>, state: u32) {
 
 @fragment fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
   let scale = vec2(
-    uniforms.display_x_range[1] - uniforms.display_x_range[0],
-    uniforms.display_y_range[1] - uniforms.display_y_range[0]
+     uniforms.display_x_range[1] - uniforms.display_x_range[0],
+    -uniforms.display_y_range[1] + uniforms.display_y_range[0]
   );
 
-  let uv = in.tex_coords * scale + vec2(uniforms.display_x_range[0], uniforms.display_y_range[0]);
-  let boundary = u32(uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0);
-  let pixel = vec2<u32>(uv * vec2<f32>(uniforms.simulation_dimm));
+  let xy = (in.tex_coords * scale + vec2(uniforms.display_x_range[0], -uniforms.display_y_range[0]))
+    / vec2<f32>(uniforms.simulation_dimm);
+  let boundary = u32(xy.x >= 0.0 && xy.x <= 1.0 && xy.y >= 0.0 && xy.y <= 1.0);
+  let pixel = vec2<u32>(xy * vec2<f32>(uniforms.simulation_dimm));
   //let offset = pixel.y * uniforms.simulation_dimm.x + pixel.x;
   //let cell = simulation_buffer[offset];
   let cell = get_cell(pixel) & (boundary * 0xffu);
-  return vec4(vec3(f32(cell & 1u)), f32(boundary));
+  return vec4(vec3<f32>(hutton32_colors[cell]) / 255.0, f32(boundary));
 }
 
 
 
 // compute ---------------------
 
-fn game_of_life(xy: vec2<u32>) {
-  var moore_neighbourhood = array<vec2<i32>, 8> (
-    vec2(-1, -1),
-    vec2( 0, -1),
-    vec2( 1, -1),
-    vec2(-1,  0),
-    vec2( 1,  0),
-    vec2(-1,  1),
-    vec2( 0,  1),
-    vec2( 1,  1),
-  );
-
-  var neighbours = 0u;
-  for (var i: i32 = 0; i < 8; i++) {
-    neighbours += get_cell(vec2<u32>(vec2<i32>(xy) + moore_neighbourhood[i])) & 1u;
-  }
-
-  var cell = get_cell(xy);
-  cell = u32(
-    (cell == 1u && (neighbours == 2u || neighbours == 3u)) ||
-    (cell == 0u && (neighbours == 3u))
-  );
-  set_cell(xy, cell);
-}
-
 @compute @workgroup_size(1) fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-  //let uv = vec2<f32>(global_id.xy) / vec2<f32>(uniforms.simulation_dimm);
-  game_of_life(global_id.xy);
-  //let color = mandelbrot(uv) * 255.0;
-  //simulation_buffer[offset] = u32(color);
+  let xy = vec2<i32>(global_id.xy);
+  let cell = hutton32(
+    get_cell(vec2<u32>(xy)),
+    get_cell(vec2<u32>(xy + vec2( 0, -1))),
+    get_cell(vec2<u32>(xy + vec2( 0,  1))),
+    get_cell(vec2<u32>(xy + vec2( 1,  0))),
+    get_cell(vec2<u32>(xy + vec2(-1,  0))),
+  );
+  set_cell(vec2<u32>(xy), cell);
 }

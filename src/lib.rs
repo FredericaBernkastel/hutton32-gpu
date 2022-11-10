@@ -1,4 +1,4 @@
-use eframe::egui::plot::{Legend, PlotImage};
+use eframe::egui::plot::{PlotImage};
 use eframe::egui::{self, plot::PlotBounds};
 use eframe::emath::Vec2;
 use egui::{RichText, TextStyle};
@@ -24,7 +24,7 @@ struct DebugWingows {
   memory: bool
 }
 
-const SIMULATION_DIMM: [u32; 2] = [256, 256];
+//const SIMULATION_DIMM: [u32; 2] = [256, 256];
 
 impl GpuPlot {
   pub fn new<'a>(cc: &'a eframe::CreationContext<'a>) -> Option<Self> {
@@ -33,8 +33,8 @@ impl GpuPlot {
     let device = &wgpu_render_state.device;
     let target_format = wgpu_render_state.target_format;
 
-    let gpu_drawer = GPUDrawer::new(device, target_format, SIMULATION_DIMM);
-    gpu_drawer.load_simulation(&wgpu_render_state.queue);
+    let mut gpu_drawer = GPUDrawer::new(device, target_format);
+    gpu_drawer.load_simulation(device, &wgpu_render_state.queue);
     let texture_id = {
       let mut renderer = wgpu_render_state.renderer.write();
       renderer.register_native_texture(device, &gpu_drawer.create_view(), wgpu::FilterMode::Linear)
@@ -66,16 +66,15 @@ impl eframe::App for GpuPlot {
     let mut renderer = render_state.renderer.write();
     let gpu_drawer = renderer.paint_callback_resources.get_mut::<GPUDrawer>().unwrap();
 
-    //if gpu_drawer.uniforms.time >= 5500 {
+    //if gpu_drawer.uniforms.time >= 1 {
     //  self.compute_requested = false;
     //}
 
     egui::SidePanel::left("left_panel")
       .default_width(164.0)
       .show(ctx, |ui| {
-
-        ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT), |ui| {
-          let label = if !self.compute_requested { "▶ Start simulation" } else { "⏸ Stop simulation" };
+        ui.horizontal_wrapped(|ui| {
+          let label = if !self.compute_requested { "▶ Start" } else { "⏸ Stop" };
           ui.button(label).clicked().then(|| {
             self.compute_requested = !self.compute_requested;
             self.t0 = if self.t0.is_none() {
@@ -86,108 +85,102 @@ impl eframe::App for GpuPlot {
           });
 
           ui.button("↺  Reset").clicked().then(|| {
-            gpu_drawer.load_simulation(queue);
+            gpu_drawer.load_simulation(&render_state.device, queue);
             gpu_drawer.uniforms.time = 0;
             self.t0 = None;
           });
-
-          ui.add_space(10.0);
-          ui.horizontal_wrapped(|ui| {
-            ui.label("iters / frame: ");
-            let input = ui.text_edit_singleline(&mut self.edit_iters_frame);
-            if input.lost_focus() {
-              match self.edit_iters_frame.parse::<u32>() {
-                Ok(step_zize @ 1..=256) => {
-                  gpu_drawer.simulatiion_steps_per_call = step_zize;
-                },
-                _ => ()
-              }
-            }
-          });
-
-          ui.add_space(10.0);
-          ui.label("\
-            LMB: pan\n\
-            Ctrl+Scroll: zoom\n\
-            RMB: boxed zoom mode\n"
-          );
-
-          ui.separator();
-          ui.add_space(10.0);
-          ui.collapsing("Statistics", |ui| ui.scope(|ui| {
-            ui.style_mut().wrap = Some(false);
-            ui.label(RichText::new(format!("\
-              generation: {}\n\
-              texture_size: {:?}\n\
-              simulation_size: {:?}\n\
-              T: {:.3}s",
-              gpu_drawer.uniforms.time,
-              gpu_drawer.texture_size,
-              gpu_drawer.uniforms.simulation_dimm,
-              self.t0.map(|t0| t0.elapsed().as_secs_f64()).unwrap_or(0.0)
-            )).text_style(TextStyle::Name("mono_small".into())));
-          }));
-
-          ui.add_space(10.0);
-          ui.checkbox(&mut self.debug_windows.ui_settings, "🔧 UI Settings");
-          ui.checkbox(&mut self.debug_windows.inspection, "🔍 Inspection");
-          ui.checkbox(&mut self.debug_windows.memory, "📝 Memory");
-
-          egui::Window::new("🔧 UI Settings")
-            .open(&mut self.debug_windows.ui_settings)
-            .vscroll(true)
-            .show(ctx, |ui| {
-              ctx.settings_ui(ui);
-            });
-          egui::Window::new("🔍 Inspection")
-            .open(&mut self.debug_windows.inspection)
-            .vscroll(true)
-            .show(ctx, |ui| {
-              ctx.inspection_ui(ui);
-            });
-          egui::Window::new("📝 Memory")
-            .open(&mut self.debug_windows.memory)
-            .resizable(false)
-            .show(ctx, |ui| {
-              ctx.memory_ui(ui);
-            });
         });
+
+        ui.add_space(10.0);
+        ui.horizontal_wrapped(|ui| {
+          ui.label("iters / frame: ");
+          let input = ui.text_edit_singleline(&mut self.edit_iters_frame);
+          if input.lost_focus() {
+            match self.edit_iters_frame.parse::<u32>() {
+              Ok(step_zize @ 1..=256) => {
+                gpu_drawer.simulatiion_steps_per_call = step_zize;
+              },
+              _ => ()
+            }
+          }
+        });
+
+        ui.add_space(10.0);
+        ui.label("\
+          LMB: pan\n\
+          Ctrl+Scroll: zoom\n\
+          RMB: boxed zoom mode\n"
+        );
+
+        ui.separator();
+        ui.add_space(10.0);
+        ui.collapsing("Statistics", |ui| ui.scope(|ui| {
+          ui.style_mut().wrap = Some(false);
+          ui.label(RichText::new(format!("\
+            generation: {}\n\
+            texture_size: {:?}\n\
+            simulation_size: {:?}\n\
+            T: {:.3}s",
+            gpu_drawer.uniforms.time,
+            gpu_drawer.texture_size,
+            gpu_drawer.uniforms.simulation_dimm,
+            self.t0.map(|t0| t0.elapsed().as_secs_f64()).unwrap_or(0.0)
+          )).text_style(TextStyle::Name("mono_small".into())));
+        }));
+
+        ui.add_space(10.0);
+        ui.checkbox(&mut self.debug_windows.ui_settings, "🔧 UI Settings");
+        ui.checkbox(&mut self.debug_windows.inspection, "🔍 Inspection");
+        ui.checkbox(&mut self.debug_windows.memory, "📝 Memory");
+
+        egui::Window::new("🔧 UI Settings")
+          .open(&mut self.debug_windows.ui_settings)
+          .vscroll(true)
+          .show(ctx, |ui| {
+            ctx.settings_ui(ui);
+          });
+        egui::Window::new("🔍 Inspection")
+          .open(&mut self.debug_windows.inspection)
+          .vscroll(true)
+          .show(ctx, |ui| {
+            ctx.inspection_ui(ui);
+          });
+        egui::Window::new("📝 Memory")
+          .open(&mut self.debug_windows.memory)
+          .resizable(false)
+          .show(ctx, |ui| {
+            ctx.memory_ui(ui);
+          });
       });
+
+    let simulation_dimm = gpu_drawer.uniforms.simulation_dimm;
 
     egui::CentralPanel::default().show(ctx, |ui| {
       let mut bounds = PlotBounds::NOTHING;
       let resp = egui::plot::Plot::new("my_plot")
-        .legend(Legend::default())
+        //.legend(Legend::default())
         .data_aspect(1.0)
-        //.view_aspect(1.0)
         // Must set margins to zero or the image and plot bounds will
         // constantly fight, expanding the plot to infinity.
         .set_margin_fraction(Vec2::new(0.0, 0.0))
-        .include_x(-0.2)
-        .include_x(1.2)
-        .include_y(-0.2)
-        .include_y(1.2)
-        .x_grid_spacer(|grid| (egui::widgets::plot::log_grid_spacer(16))(grid))
-        .y_grid_spacer(|grid| (egui::widgets::plot::log_grid_spacer(16))(grid))
+        .include_x(simulation_dimm[0] as f64 * -0.33)
+        .include_x(simulation_dimm[0] as f64 * 1.33)
+        .include_y(simulation_dimm[1] as f64 * 0.33)
+        .include_y(simulation_dimm[1] as f64 * -1.33)
+        .min_size(Vec2::new(1.0, 1.0))
+        .x_grid_spacer(egui::widgets::plot::log_grid_spacer(16))
+        .y_grid_spacer(egui::widgets::plot::log_grid_spacer(16))
         .coordinates_formatter(
           egui::widgets::plot::Corner::LeftTop,
-          egui::widgets::plot::CoordinatesFormatter::new(|pt, _| {
-            format!(
-              "x = {}\ny = {}",
-              (pt.x * SIMULATION_DIMM[0] as f64) as i64,
-              (pt.y * SIMULATION_DIMM[1] as f64) as i64,
-            )
+          egui::widgets::plot::CoordinatesFormatter::new(move |pt, _| {
+            format!("x = {}\ny = {}", pt.x as i64, pt.y as i64, )
           })
         )
         .show_x(false)
         .show_y(false)
         .allow_scroll(false)
-        .x_axis_formatter(|x, _| if x >= 0.0 && x <= 1.0 {
-          ((x * SIMULATION_DIMM[0] as f64) as i64).to_string()
-        } else { "".to_string() })
-        .y_axis_formatter(|y, _| if y >= 0.0 && y <= 1.0 {
-          ((y * SIMULATION_DIMM[1] as f64) as i64).to_string()
-        } else { "".to_string() })
+        .x_axis_formatter(move |x, _| if x >= 0.0 { x.to_string() } else { "".to_string() })
+        .y_axis_formatter(move |y, _| if y <= 0.0 { (-y).to_string() } else { "".to_string() })
         .show(ui, |ui| {
           bounds = ui.plot_bounds();
 

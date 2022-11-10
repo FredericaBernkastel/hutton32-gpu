@@ -11,4 +11,5 @@ egui = { git =  "https://github.com/emilk/egui", rev = "940b896c", default-featu
 egui-wgpu = { git =  "https://github.com/emilk/egui", rev = "940b896c" }
 eframe = { git = "https://github.com/emilk/egui", rev = "940b896c", default-features = false, features = ["wgpu", "default_fonts"] }
 wgpu = { version = "0.14", default-features = false }
-image = { version = "0.24", default-features = false }
+image = { version = "0.24", default-features = false, features = ["png"] }
+wgsl_preprocessor = { version = "1.1", features = ["array_vectors"] }

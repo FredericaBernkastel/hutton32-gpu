@@ -1,8 +1,8 @@
-use std::borrow::Cow;
-use std::{fs, mem};
+use std::{mem};
 use std::sync::Arc;
 use wgpu::{util::DeviceExt, TextureViewDescriptor};
 use egui::plot::PlotBounds;
+use image::{Pixel};
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -29,6 +29,7 @@ pub struct GPUDrawer {
 
   target_format: wgpu::TextureFormat,
   bind_group: wgpu::BindGroup,
+  bind_group_layout: wgpu::BindGroupLayout,
 
   uniform_buffer: wgpu::Buffer,
   simulation_buffer: wgpu::Buffer,
@@ -42,11 +43,16 @@ pub struct GPUDrawer {
 }
 
 impl GPUDrawer {
-  pub fn new(device: &wgpu::Device, target_format: wgpu::TextureFormat, sim_dimm: [u32; 2]) -> Self {
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-      label: Some("egui_display_shader"),
-      source: wgpu::ShaderSource::Wgsl(Cow::Owned(fs::read_to_string("./kernel/display_shader.wgsl").unwrap())),
-    });
+  pub fn new(device: &wgpu::Device, target_format: wgpu::TextureFormat) -> Self {
+    let shader = device.create_shader_module(
+      wgsl_preprocessor::ShaderBuilder::new("./kernel/main.wgsl")
+        .expect("Failed to load ./kernel/main.wgsl")
+        .put_array_definition("hutton32_colors",
+          &hutton32_colors().map(|x| x.map(|c| c as i32))
+            .iter().collect()
+        )
+        .build()
+    );
 
     // Allocate some stand-in textures since we don't know the final width
     // and height yet.
@@ -108,7 +114,7 @@ impl GPUDrawer {
     });
 
     let uniforms = Uniform {
-      simulation_dimm: sim_dimm,
+      simulation_dimm: [1, 1],
       ..Default::default()
     };
 
@@ -120,7 +126,7 @@ impl GPUDrawer {
 
     let simulation_buffer = device.create_buffer(&wgpu::BufferDescriptor {
       label: Some("Simulation Buffer"),
-      size: (sim_dimm[0] * sim_dimm[1] * mem::size_of::<u32>() as u32) as _,
+      size: (/*sim_dimm[0] * sim_dimm[1]*/ 1 * mem::size_of::<u32>() as u32) as _,
       usage: wgpu::BufferUsages::STORAGE
         | wgpu::BufferUsages::COPY_DST
         | wgpu::BufferUsages::COPY_SRC,
@@ -148,6 +154,7 @@ impl GPUDrawer {
 
       target_format,
       bind_group,
+      bind_group_layout,
 
       uniform_buffer,
       simulation_buffer,
@@ -269,14 +276,42 @@ impl GPUDrawer {
     rpass.draw(0..6, 0..1);
   }
 
-  pub fn load_simulation(&self, queue: &wgpu::Queue) {
-    let mut simulation_init = image::RgbaImage::new(self.uniforms.simulation_dimm[0], self.uniforms.simulation_dimm[1]);
-    //let glider = [[1, 0], [2, 1], [0, 2], [1, 2], [2, 2]];
-    let acorn = [[1, 0], [3, 1], [0, 2], [1, 2], [4, 2], [5, 2], [6, 2]];
-    acorn.iter().for_each(|[x, y]| {
-      simulation_init.get_pixel_mut(x + 128, y + 128).0[0] = 0x01;
+  pub fn load_simulation(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+    //TODO: Pattern reader
+    let mut pattern = image::open("./doc/test_pattern.png")
+      .expect("./doc/test_pattern.png")
+      .to_rgba8();
+    self.uniforms.simulation_dimm = [pattern.width(), pattern.height()];
+    let color_table = hutton32_colors();
+    pattern.pixels_mut().for_each(|pixel| {
+      let pixel_rgb = pixel.to_rgb().0;
+      for (i, color) in color_table.into_iter().enumerate() {
+        if color == pixel_rgb {
+          pixel.0[0] = i as u8;
+        }
+      }
     });
-    queue.write_buffer(&self.simulation_buffer, 0, &simulation_init);
+    self.simulation_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+      label: Some("Simulation Buffer"),
+      size: (pattern.width() * pattern.height() * mem::size_of::<u32>() as u32) as _,
+      usage: wgpu::BufferUsages::STORAGE
+        | wgpu::BufferUsages::COPY_DST
+        | wgpu::BufferUsages::COPY_SRC,
+      mapped_at_creation: false
+    });
+    self.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+      label: Some("egui_plot_bind_group"),
+      layout: &self.bind_group_layout,
+      entries: &[wgpu::BindGroupEntry {
+        binding: 0,
+        resource: self.uniform_buffer.as_entire_binding(),
+      },
+      wgpu::BindGroupEntry {
+        binding: 1,
+        resource: self.simulation_buffer.as_entire_binding(),
+      }],
+    });
+    queue.write_buffer(&self.simulation_buffer, 0, &pattern);
   }
 
   pub fn simulation_advance(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
@@ -328,4 +363,41 @@ pub fn egui_wgpu_callback(
     rect,
     callback: Arc::new(cb),
   }
+}
+
+fn hutton32_colors() -> [[u8; 3]; 32] {
+  [
+   [ 0 ,   0,   0],    // 0  dark gray
+   [255,   0,   0],    // 1  red
+   [255, 125,   0],    // 2  orange (to match red and yellow)
+   [255, 150,  25],    // 3   lighter
+   [255, 175,  50],    // 4    lighter
+   [255, 200,  75],    // 5     lighter
+   [255, 225, 100],    // 6      lighter
+   [255, 250, 125],    // 7       lighter
+   [251, 255,   0],    // 8  yellow
+   [ 89,  89, 255],    // 9  blue
+   [106, 106, 255],    // 10  lighter
+   [122, 122, 255],    // 11   lighter
+   [139, 139, 255],    // 12    lighter
+   [ 27, 176,  27],    // 13 green
+   [ 36, 200,  36],    // 14  lighter
+   [ 73, 255,  73],    // 15   lighter
+   [106, 255, 106],    // 16    lighter
+   [235,  36,  36],    // 17 red
+   [255,  56,  56],    // 18  lighter
+   [255,  73,  73],    // 19   lighter
+   [255,  89,  89],    // 20    lighter
+   [185,  56, 255],    // 21 purple
+   [191,  73, 255],    // 22  lighter
+   [197,  89, 255],    // 23   lighter
+   [203, 106, 255],    // 24    lighter
+   [  0, 255, 128],    // 25 light green
+   [255, 128,  64],    // 26 light orange
+   [255, 255, 128],    // 27 light yellow
+   [ 33, 215, 215],    // 28 cyan
+   [ 27, 176, 176],    // 29  darker
+   [ 24, 156, 156],    // 30   darker
+   [ 21, 137, 137]     // 31    darker
+  ]
 }
