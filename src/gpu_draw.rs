@@ -24,6 +24,7 @@ impl Default for Uniform {
     }}}
 
 pub struct GPUDrawer {
+  shader: wgpu::ShaderModule,
   render_pipeline: wgpu::RenderPipeline,
   compute_pipeline: wgpu::ComputePipeline,
 
@@ -33,6 +34,7 @@ pub struct GPUDrawer {
 
   uniform_buffer: wgpu::Buffer,
   simulation_buffer: wgpu::Buffer,
+  lut_buffer: wgpu::Buffer,
 
   texture: (wgpu::Texture, wgpu::TextureView),
   pub texture_size: [u32; 2],
@@ -43,7 +45,7 @@ pub struct GPUDrawer {
 }
 
 impl GPUDrawer {
-  pub fn new(device: &wgpu::Device, target_format: wgpu::TextureFormat) -> Self {
+  pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, target_format: wgpu::TextureFormat) -> Self {
     let shader = device.create_shader_module(
       wgsl_preprocessor::ShaderBuilder::new("./kernel/main.wgsl")
         .expect("Failed to load ./kernel/main.wgsl")
@@ -75,6 +77,16 @@ impl GPUDrawer {
       wgpu::BindGroupLayoutEntry { // simulation_buffer
         binding: 1,
         visibility: wgpu::ShaderStages::FRAGMENT | wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Buffer {
+          ty: wgpu::BufferBindingType::Storage { read_only: false },
+          has_dynamic_offset: false,
+          min_binding_size: None,
+        },
+        count: None,
+      },
+      wgpu::BindGroupLayoutEntry { // LUT
+        binding: 2,
+        visibility: wgpu::ShaderStages::COMPUTE,
         ty: wgpu::BindingType::Buffer {
           ty: wgpu::BufferBindingType::Storage { read_only: false },
           has_dynamic_offset: false,
@@ -133,22 +145,24 @@ impl GPUDrawer {
       mapped_at_creation: false
     });
 
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-      label: Some("egui_plot_bind_group"),
-      layout: &bind_group_layout,
-      entries: &[wgpu::BindGroupEntry {
-        binding: 0,
-        resource: uniform_buffer.as_entire_binding(),
-      },
-      wgpu::BindGroupEntry {
-        binding: 1,
-        resource: simulation_buffer.as_entire_binding(),
-      }],
+    let lut_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+      label: Some("Simulation Buffer"),
+      // c(5)-n(5)-e(5)-s(5)-w(5) = r(8)
+      size: 2u32.pow(25) as _, // 32MB
+      usage: wgpu::BufferUsages::STORAGE,
+      mapped_at_creation: false
     });
+
+    let bind_group = Self::create_bind_group(
+      &device, &bind_group_layout,
+      &uniform_buffer, &simulation_buffer, &lut_buffer
+    );
 
     let compute_pipeline = Self::create_compute_pipeline(device, &[&bind_group_layout], &shader, None);
 
-    Self {
+    let this = Self {
+      shader,
+
       render_pipeline,
       compute_pipeline,
 
@@ -158,13 +172,40 @@ impl GPUDrawer {
 
       uniform_buffer,
       simulation_buffer,
+      lut_buffer,
 
       texture,
       texture_size: [0, 0],
       uniforms,
 
       simulatiion_steps_per_call: 1
+    };
+
+    this.initialize_ca_lut(&device, &queue);
+    this
+  }
+
+  fn initialize_ca_lut(&self, device: &wgpu::Device, queue: &wgpu::Queue) {
+    let mut encoder =  device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+      label: Some("lut layout"),
+      bind_group_layouts: &[&self.bind_group_layout],
+      push_constant_ranges: &[],
+    });
+    let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+      label: Some("lut pipeline"),
+      layout: Some(&layout),
+      module: &self.shader,
+      entry_point: "compute_lut",
+    });
+    {
+      let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
+      cpass.set_pipeline(&pipeline);
+      cpass.set_bind_group(0, &self.bind_group, &[]);
+      cpass.insert_debug_marker("compute lut");
+      cpass.dispatch_workgroups(2u32.pow(13), 2u32.pow(12), 1);
     }
+    queue.submit(std::iter::once(encoder.finish()));
   }
 
   fn create_texture(
@@ -220,6 +261,32 @@ impl GPUDrawer {
     pipeline
   }
 
+  fn create_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    uniform_buffer: &wgpu::Buffer,
+    simulation_buffer: &wgpu::Buffer,
+    lut_buffer: &wgpu::Buffer,
+  ) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+      label: Some("egui_plot_bind_group"),
+      layout,
+      entries: &[wgpu::BindGroupEntry {
+          binding: 0,
+          resource: uniform_buffer.as_entire_binding(),
+        },
+        wgpu::BindGroupEntry {
+          binding: 1,
+          resource: simulation_buffer.as_entire_binding(),
+        },
+        wgpu::BindGroupEntry {
+          binding: 2,
+          resource: lut_buffer.as_entire_binding(),
+        }
+      ],
+    })
+  }
+
   pub fn prepare(
     &mut self,
     device: &wgpu::Device,
@@ -241,33 +308,27 @@ impl GPUDrawer {
     queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[self.uniforms]));
   }
 
-  pub fn render(&self, device: &wgpu::Device, queue: &wgpu::Queue) {
-    let mut encoder =
-      device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-    {
-      let view = self.create_view();
+  pub fn render(&self, encoder: &mut wgpu::CommandEncoder) {
+    let view = self.create_view();
 
-      // Render directly to the texture if no MSAA, or use the
-      // multisampled buffer and resolve to the texture if using MSAA.
-      let rpass_color_attachment = wgpu::RenderPassColorAttachment {
-        view: &view,
-        resolve_target: None,
-        ops: wgpu::Operations {
-          load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
-          store: true,
-        },
-      };
+    // Render directly to the texture if no MSAA, or use the
+    // multisampled buffer and resolve to the texture if using MSAA.
+    let rpass_color_attachment = wgpu::RenderPassColorAttachment {
+      view: &view,
+      resolve_target: None,
+      ops: wgpu::Operations {
+        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+        store: true,
+      },
+    };
 
-      let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: None,
-        color_attachments: &[Some(rpass_color_attachment)],
-        depth_stencil_attachment: None,
-      });
+    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+      label: None,
+      color_attachments: &[Some(rpass_color_attachment)],
+      depth_stencil_attachment: None,
+    });
 
-      self.render_onto_renderpass(&mut rpass);
-    }
-
-    queue.submit(std::iter::once(encoder.finish()));
+    self.render_onto_renderpass(&mut rpass);
   }
 
   pub fn render_onto_renderpass<'rp>(&'rp self, rpass: &mut wgpu::RenderPass<'rp>) {
@@ -299,26 +360,15 @@ impl GPUDrawer {
         | wgpu::BufferUsages::COPY_SRC,
       mapped_at_creation: false
     });
-    self.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-      label: Some("egui_plot_bind_group"),
-      layout: &self.bind_group_layout,
-      entries: &[wgpu::BindGroupEntry {
-        binding: 0,
-        resource: self.uniform_buffer.as_entire_binding(),
-      },
-      wgpu::BindGroupEntry {
-        binding: 1,
-        resource: self.simulation_buffer.as_entire_binding(),
-      }],
-    });
+    self.bind_group = Self::create_bind_group(
+      &device, &self.bind_group_layout,
+      &self.uniform_buffer, &self.simulation_buffer, &self.lut_buffer
+    );
     queue.write_buffer(&self.simulation_buffer, 0, &pattern);
   }
 
-  pub fn simulation_advance(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+  pub fn simulation_advance(&mut self, encoder: &mut wgpu::CommandEncoder) {
     for _ in 0..self.simulatiion_steps_per_call {
-      let mut encoder =
-        device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
       {
         let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None });
         cpass.set_pipeline(&self.compute_pipeline);
@@ -327,9 +377,8 @@ impl GPUDrawer {
         cpass.dispatch_workgroups(self.uniforms.simulation_dimm[0], self.uniforms.simulation_dimm[1], 1);
       }
 
-      queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[self.uniforms]));
-      queue.submit(std::iter::once(encoder.finish()));
       self.uniforms.time = self.uniforms.time.wrapping_add(1);
+      //queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[self.uniforms]));
     }
   }
 }
@@ -343,8 +392,11 @@ pub fn egui_wgpu_callback(
     egui_wgpu::CallbackFn::new().prepare(move |device, queue, _encoder, paint_callback_resources| {
       let gpu_drawer: &mut GPUDrawer = paint_callback_resources.get_mut().unwrap();
 
+      let mut encoder =
+        device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
       if compute_requested {
-        gpu_drawer.simulation_advance(device, queue);
+        gpu_drawer.simulation_advance(&mut encoder);
       }
 
       gpu_drawer.prepare(
@@ -354,9 +406,9 @@ pub fn egui_wgpu_callback(
         &bounds,
       );
 
-      gpu_drawer.render(device, queue);
+      gpu_drawer.render(&mut encoder);
 
-      vec![]
+      vec![encoder.finish()]
     });
 
   egui::PaintCallback {

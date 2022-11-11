@@ -8,6 +8,7 @@ mod gpu_draw;
 use gpu_draw::GPUDrawer;
 
 pub struct GpuPlot {
+  adapter_info: Option<wgpu::AdapterInfo>,
   compute_requested: bool,
   texture_id: egui::TextureId,
 
@@ -30,10 +31,14 @@ impl GpuPlot {
   pub fn new<'a>(cc: &'a eframe::CreationContext<'a>) -> Option<Self> {
     let wgpu_render_state = cc.wgpu_render_state.as_ref()?;
 
+    let adapter_info = wgpu::Instance::new(wgpu::Backends::all())
+      .enumerate_adapters(wgpu::Backends::all())
+      .next().map(|a| a.get_info());
+
     let device = &wgpu_render_state.device;
     let target_format = wgpu_render_state.target_format;
 
-    let mut gpu_drawer = GPUDrawer::new(device, target_format);
+    let mut gpu_drawer = GPUDrawer::new(device, &wgpu_render_state.queue, target_format);
     gpu_drawer.load_simulation(device, &wgpu_render_state.queue);
     let texture_id = {
       let mut renderer = wgpu_render_state.renderer.write();
@@ -49,6 +54,7 @@ impl GpuPlot {
     configure_text_styles(&cc.egui_ctx);
 
     Some(Self {
+      adapter_info,
       compute_requested: false,
       texture_id,
 
@@ -66,12 +72,23 @@ impl eframe::App for GpuPlot {
     let mut renderer = render_state.renderer.write();
     let gpu_drawer = renderer.paint_callback_resources.get_mut::<GPUDrawer>().unwrap();
 
-    //if gpu_drawer.uniforms.time >= 1 {
-    //  self.compute_requested = false;
-    //}
+    /*
+     * profiling for {
+     *   simulation_dimm: 633x449,
+     *   generations: 8192,
+     *   iters/frame: 32
+     * }
+     *
+     * hutton32, naive branching -> 7.803s
+     * hutton32, LUT 32MB        -> 5.695s (memory bound)
+     */
+    /*if gpu_drawer.uniforms.time >= 8192 && self.compute_requested {
+      self.compute_requested = false;
+      self.t0.map(|t0| println!("{:.3}s", t0.elapsed().as_secs_f64()));
+    }*/
 
     egui::SidePanel::left("left_panel")
-      .default_width(164.0)
+      .default_width(180.0)
       .show(ctx, |ui| {
         ui.horizontal_wrapped(|ui| {
           let label = if !self.compute_requested { "▶ Start" } else { "⏸ Stop" };
@@ -111,22 +128,25 @@ impl eframe::App for GpuPlot {
           Ctrl+Scroll: zoom\n\
           RMB: boxed zoom mode\n"
         );
-
         ui.separator();
         ui.add_space(10.0);
-        ui.collapsing("Statistics", |ui| ui.scope(|ui| {
-          ui.style_mut().wrap = Some(false);
-          ui.label(RichText::new(format!("\
-            generation: {}\n\
-            texture_size: {:?}\n\
-            simulation_size: {:?}\n\
-            T: {:.3}s",
-            gpu_drawer.uniforms.time,
-            gpu_drawer.texture_size,
-            gpu_drawer.uniforms.simulation_dimm,
-            self.t0.map(|t0| t0.elapsed().as_secs_f64()).unwrap_or(0.0)
-          )).text_style(TextStyle::Name("mono_small".into())));
-        }));
+        egui::CollapsingHeader::new("Statistics")
+          .default_open(true)
+          .show(ui, |ui| ui.scope(|ui| {
+            //ui.style_mut().wrap = Some(false);
+            ui.label(RichText::new(format!("\
+              device: {}\n\
+              generation: {}\n\
+              texture_size: {:?}\n\
+              simulation_size: {:?}\n\
+              T: {:.3}s",
+              self.adapter_info.as_ref().map(|a| a.name.as_ref()).unwrap_or(""),
+              gpu_drawer.uniforms.time,
+              gpu_drawer.texture_size,
+              gpu_drawer.uniforms.simulation_dimm,
+              self.t0.map(|t0| t0.elapsed().as_secs_f64()).unwrap_or(0.0)
+            )).text_style(TextStyle::Name("mono_small".into())))
+          }));
 
         ui.add_space(10.0);
         ui.checkbox(&mut self.debug_windows.ui_settings, "🔧 UI Settings");
@@ -167,7 +187,6 @@ impl eframe::App for GpuPlot {
         .include_x(simulation_dimm[0] as f64 * 1.33)
         .include_y(simulation_dimm[1] as f64 * 0.33)
         .include_y(simulation_dimm[1] as f64 * -1.33)
-        .min_size(Vec2::new(1.0, 1.0))
         .x_grid_spacer(egui::widgets::plot::log_grid_spacer(16))
         .y_grid_spacer(egui::widgets::plot::log_grid_spacer(16))
         .coordinates_formatter(
