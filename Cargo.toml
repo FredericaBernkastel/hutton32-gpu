@@ -9,7 +9,7 @@ cfg-if = "1"
 bytemuck = "1.12"
 egui = { git =  "https://github.com/emilk/egui", rev = "940b896c", default-features = false }
 egui-wgpu = { git =  "https://github.com/emilk/egui", rev = "940b896c" }
-eframe = { git = "https://github.com/emilk/egui", rev = "940b896c", default-features = false, features = ["wgpu", "default_fonts"] }
+eframe = { git = "https://github.com/emilk/egui", rev = "940b896c", default-features = false, features = ["wgpu", "default_fonts", "persistence"] }
 wgpu = { version = "0.14", default-features = false }
 image = { version = "0.24", default-features = false, features = ["png"] }
 wgsl_preprocessor = { version = "1.1", features = ["array_vectors"] }

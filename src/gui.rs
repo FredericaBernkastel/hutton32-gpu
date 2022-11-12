@@ -1,19 +1,27 @@
-use eframe::egui::plot::{PlotImage};
-use eframe::egui::{self, plot::PlotBounds};
-use eframe::emath::Vec2;
-use egui::{RichText, TextStyle};
-use wgpu;
+use {
+  eframe::{
+    CreationContext,
+    egui::{
+      self,
+      plot::{self, Plot, PlotImage, PlotBounds},
+      Key, KeyboardShortcut, Modifiers, RichText, TextStyle, TextureId,
+      TopBottomPanel, CollapsingHeader, CentralPanel, SidePanel
+    },
+    emath::Vec2,
+    Storage,
+  },
+  wgpu,
+  crate::gpu::{self, GPUDriver}
+};
 
-mod gpu_draw;
-use gpu_draw::GPUDrawer;
-
-pub struct GpuPlot {
+pub struct GUI {
   adapter_info: Option<wgpu::AdapterInfo>,
   compute_requested: bool,
-  texture_id: egui::TextureId,
+  texture_id: TextureId,
 
   edit_iters_frame: String,
   t0: Option<std::time::Instant>,
+  generation: u64,
 
   debug_windows: DebugWingows
 }
@@ -25,10 +33,8 @@ struct DebugWingows {
   memory: bool
 }
 
-//const SIMULATION_DIMM: [u32; 2] = [256, 256];
-
-impl GpuPlot {
-  pub fn new<'a>(cc: &'a eframe::CreationContext<'a>) -> Option<Self> {
+impl GUI {
+  pub fn new<'a>(cc: &'a CreationContext<'a>) -> Option<Self> {
     let wgpu_render_state = cc.wgpu_render_state.as_ref()?;
 
     let adapter_info = wgpu::Instance::new(wgpu::Backends::all())
@@ -38,18 +44,23 @@ impl GpuPlot {
     let device = &wgpu_render_state.device;
     let target_format = wgpu_render_state.target_format;
 
-    let mut gpu_drawer = GPUDrawer::new(device, &wgpu_render_state.queue, target_format);
-    gpu_drawer.load_simulation(device, &wgpu_render_state.queue);
+    let edit_iters_frame = cc.storage.map(|s| s.get_string("edit_iters_frame"))
+      .flatten().unwrap_or("1".to_string());
+
+    let mut gpu_driver = GPUDriver::new(device, &wgpu_render_state.queue, target_format);
+    gpu_driver.load_simulation(device, &wgpu_render_state.queue);
+    gpu_driver.simulatiion_steps_per_call = edit_iters_frame.parse().unwrap_or(1);
+
     let texture_id = {
       let mut renderer = wgpu_render_state.renderer.write();
-      renderer.register_native_texture(device, &gpu_drawer.create_view(), wgpu::FilterMode::Linear)
+      renderer.register_native_texture(device, &gpu_driver.create_view(), wgpu::FilterMode::Linear)
     };
 
     wgpu_render_state
       .renderer
       .write()
       .paint_callback_resources
-      .insert(gpu_drawer);
+      .insert(gpu_driver);
 
     configure_text_styles(&cc.egui_ctx);
 
@@ -58,19 +69,45 @@ impl GpuPlot {
       compute_requested: false,
       texture_id,
 
-      edit_iters_frame: "1".to_string(),
+      edit_iters_frame,
       t0: None,
+      generation: 0,
       debug_windows: DebugWingows::default()
     })
   }
+
+  fn on_start_click(&mut self) {
+    self.compute_requested = !self.compute_requested;
+    self.t0 = if self.t0.is_none() {
+      Some(std::time::Instant::now())
+    } else {
+      None
+    };
+  }
+
+  fn on_reset_click(&mut self, gpu_driver: &mut GPUDriver, device: &wgpu::Device, queue: &wgpu::Queue) {
+    gpu_driver.load_simulation(device, queue);
+    self.generation = 0;
+    self.t0 = None;
+  }
+
+  fn on_edit_iters_frame_changed(&self, gpu_driver: &mut GPUDriver) {
+    match self.edit_iters_frame.parse::<u64>() {
+      Ok(step_zize @ 1..=512) => {
+        gpu_driver.simulatiion_steps_per_call = step_zize;
+      },
+      _ => ()
+    }
+  }
 }
 
-impl eframe::App for GpuPlot {
+impl eframe::App for GUI {
   fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    frame.set_window_title("GPU Accelerated CA");
+
     let render_state = frame.wgpu_render_state().unwrap();
-    let queue = render_state.queue.as_ref();
     let mut renderer = render_state.renderer.write();
-    let gpu_drawer = renderer.paint_callback_resources.get_mut::<GPUDrawer>().unwrap();
+    let gpu_driver = renderer.paint_callback_resources.get_mut::<GPUDriver>().unwrap();
 
     /*
      * profiling for {
@@ -82,44 +119,38 @@ impl eframe::App for GpuPlot {
      * hutton32, naive branching -> 7.803s
      * hutton32, LUT 32MB        -> 5.695s (memory bound)
      */
-    /*if gpu_drawer.uniforms.time >= 8192 && self.compute_requested {
+    /*if gpu_driver.uniforms.time >= 8192 && self.compute_requested {
       self.compute_requested = false;
       self.t0.map(|t0| println!("{:.3}s", t0.elapsed().as_secs_f64()));
     }*/
 
-    egui::SidePanel::left("left_panel")
+    TopBottomPanel::top("control buttons").show(ctx, |ui|
+      ui.horizontal_wrapped(|ui| {
+        (
+          ui.button(if !self.compute_requested { "▶ Start" } else { "⏸ Stop" })
+            .on_hover_text_at_pointer("Space")
+            .clicked() || ui.input_mut().consume_shortcut(&KeyboardShortcut { modifiers: Default::default(), key: Key::Space })
+        ).then(|| self.on_start_click());
+
+        (
+          ui.button("↺  Reset")
+            .on_hover_text_at_pointer("Ctrl+R")
+            .clicked() || ui.input_mut().consume_shortcut(&KeyboardShortcut {
+            modifiers: Modifiers { ctrl: true, ..Default::default() },
+            key: Key::R
+          })
+        ).then(|| self.on_reset_click(gpu_driver, &render_state.device, &render_state.queue));
+      })
+    );
+
+    SidePanel::left("left_panel")
       .default_width(180.0)
       .show(ctx, |ui| {
-        ui.horizontal_wrapped(|ui| {
-          let label = if !self.compute_requested { "▶ Start" } else { "⏸ Stop" };
-          ui.button(label).clicked().then(|| {
-            self.compute_requested = !self.compute_requested;
-            self.t0 = if self.t0.is_none() {
-              Some(std::time::Instant::now())
-            } else {
-              None
-            };
-          });
-
-          ui.button("↺  Reset").clicked().then(|| {
-            gpu_drawer.load_simulation(&render_state.device, queue);
-            gpu_drawer.uniforms.time = 0;
-            self.t0 = None;
-          });
-        });
-
         ui.add_space(10.0);
         ui.horizontal_wrapped(|ui| {
           ui.label("iters / frame: ");
-          let input = ui.text_edit_singleline(&mut self.edit_iters_frame);
-          if input.lost_focus() {
-            match self.edit_iters_frame.parse::<u32>() {
-              Ok(step_zize @ 1..=256) => {
-                gpu_drawer.simulatiion_steps_per_call = step_zize;
-              },
-              _ => ()
-            }
-          }
+          ui.text_edit_singleline(&mut self.edit_iters_frame)
+            .lost_focus().then(|| self.on_edit_iters_frame_changed(gpu_driver));
         });
 
         ui.add_space(10.0);
@@ -130,7 +161,7 @@ impl eframe::App for GpuPlot {
         );
         ui.separator();
         ui.add_space(10.0);
-        egui::CollapsingHeader::new("Statistics")
+        CollapsingHeader::new("Statistics")
           .default_open(true)
           .show(ui, |ui| ui.scope(|ui| {
             //ui.style_mut().wrap = Some(false);
@@ -141,9 +172,9 @@ impl eframe::App for GpuPlot {
               simulation_size: {:?}\n\
               T: {:.3}s",
               self.adapter_info.as_ref().map(|a| a.name.as_ref()).unwrap_or(""),
-              gpu_drawer.uniforms.time,
-              gpu_drawer.texture_size,
-              gpu_drawer.uniforms.simulation_dimm,
+              self.generation,
+              gpu_driver.texture_size,
+              gpu_driver.uniforms.simulation_dimm,
               self.t0.map(|t0| t0.elapsed().as_secs_f64()).unwrap_or(0.0)
             )).text_style(TextStyle::Name("mono_small".into())))
           }));
@@ -173,11 +204,11 @@ impl eframe::App for GpuPlot {
           });
       });
 
-    let simulation_dimm = gpu_drawer.uniforms.simulation_dimm;
+    let simulation_dimm = gpu_driver.uniforms.simulation_dimm;
 
-    egui::CentralPanel::default().show(ctx, |ui| {
+    CentralPanel::default().show(ctx, |ui| {
       let mut bounds = PlotBounds::NOTHING;
-      let resp = egui::plot::Plot::new("my_plot")
+      let resp = Plot::new("my_plot")
         //.legend(Legend::default())
         .data_aspect(1.0)
         // Must set margins to zero or the image and plot bounds will
@@ -187,14 +218,13 @@ impl eframe::App for GpuPlot {
         .include_x(simulation_dimm[0] as f64 * 1.33)
         .include_y(simulation_dimm[1] as f64 * 0.33)
         .include_y(simulation_dimm[1] as f64 * -1.33)
-        .x_grid_spacer(egui::widgets::plot::log_grid_spacer(16))
-        .y_grid_spacer(egui::widgets::plot::log_grid_spacer(16))
+        .x_grid_spacer(plot::log_grid_spacer(16))
+        .y_grid_spacer(plot::log_grid_spacer(16))
         .coordinates_formatter(
-          egui::widgets::plot::Corner::LeftTop,
-          egui::widgets::plot::CoordinatesFormatter::new(move |pt, _| {
+          plot::Corner::LeftTop,
+          plot::CoordinatesFormatter::new(move |pt, _|
             format!("x = {}\ny = {}", pt.x as i64, pt.y as i64, )
-          })
-        )
+          ))
         .show_x(false)
         .show_y(false)
         .allow_scroll(false)
@@ -215,31 +245,35 @@ impl eframe::App for GpuPlot {
 
       // Add a callback to egui to render the plot contents to
       // texture.
-      ui.painter().add(gpu_draw::egui_wgpu_callback(
+      ui.painter().add(gpu::egui_wgpu_callback(
         bounds,
         resp.response.rect,
         self.compute_requested
       ));
-
-      // Update the texture handle in egui from the previously
-      // rendered texture (from the last frame).
-      drop(renderer); // reacquire lifetime
-      let mut renderer = render_state.renderer.write();
-      let gpu_drawer = renderer.paint_callback_resources.get::<GPUDrawer>().unwrap();
-      let texture_view = gpu_drawer.create_view();
-
-      renderer.update_egui_texture_from_wgpu_texture(
-        &render_state.device,
-        &texture_view,
-        wgpu::FilterMode::Linear,
-        self.texture_id,
-      );
-
-      if self.compute_requested {
-        ctx.request_repaint();
-      }
-      //self.compute_requested = false;
     });
+
+    self.compute_requested.then(|| {
+      self.generation = self.generation.wrapping_add(gpu_driver.simulatiion_steps_per_call);
+    });
+
+    // Update the texture handle in egui from the previously
+    // rendered texture (from the last frame).
+    let texture_view = gpu_driver.create_view();
+    renderer.update_egui_texture_from_wgpu_texture(
+      &render_state.device,
+      &texture_view,
+      wgpu::FilterMode::Linear,
+      self.texture_id,
+    );
+
+    self.compute_requested.then(||
+      ctx.request_repaint()
+    );
+  }
+
+  // save app state on exit
+  fn save(&mut self, storage: &mut dyn Storage) {
+    storage.set_string("edit_iters_frame", self.edit_iters_frame.clone());
   }
 }
 
