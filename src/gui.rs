@@ -17,6 +17,7 @@ use {
 pub struct GUI {
   adapter_info: Option<wgpu::AdapterInfo>,
   compute_requested: bool,
+  is_step: bool,
   texture_id: TextureId,
 
   edit_iters_frame: String,
@@ -67,6 +68,7 @@ impl GUI {
     Some(Self {
       adapter_info,
       compute_requested: false,
+      is_step: false,
       texture_id,
 
       edit_iters_frame,
@@ -76,9 +78,10 @@ impl GUI {
     })
   }
 
-  fn on_start_click(&mut self) {
+  fn on_start_click(&mut self, gpu_driver: &mut GPUDriver) {
+    self.on_edit_iters_frame_changed(gpu_driver);
     self.compute_requested = !self.compute_requested;
-    self.t0 = if self.t0.is_none() {
+    self.t0 = if self.t0.is_none() && self.compute_requested {
       Some(std::time::Instant::now())
     } else {
       None
@@ -87,8 +90,26 @@ impl GUI {
 
   fn on_reset_click(&mut self, gpu_driver: &mut GPUDriver, device: &wgpu::Device, queue: &wgpu::Queue) {
     gpu_driver.load_simulation(device, queue);
+    self.on_edit_iters_frame_changed(gpu_driver);
     self.generation = 0;
     self.t0 = None;
+  }
+
+  fn on_step_click(&mut self, gpu_driver: &mut GPUDriver) {
+    gpu_driver.simulatiion_steps_per_call = 1;
+    self.compute_requested = true;
+    self.is_step = true;
+  }
+
+  fn on_recomple_click(
+    &mut self,
+    gpu_driver: &mut GPUDriver,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    target_format: wgpu::TextureFormat
+  ) {
+    *gpu_driver = GPUDriver::new(device, queue, target_format);
+    self.on_reset_click(gpu_driver, device, queue);
   }
 
   fn on_edit_iters_frame_changed(&self, gpu_driver: &mut GPUDriver) {
@@ -107,41 +128,55 @@ impl eframe::App for GUI {
 
     let render_state = frame.wgpu_render_state().unwrap();
     let mut renderer = render_state.renderer.write();
+    let device = render_state.device.as_ref();
+    let queue = render_state.queue.as_ref();
     let gpu_driver = renderer.paint_callback_resources.get_mut::<GPUDriver>().unwrap();
 
-    /*
-     * profiling for {
-     *   simulation_dimm: 633x449,
-     *   generations: 8192,
-     *   iters/frame: 32
-     * }
-     *
-     * hutton32, naive branching -> 7.803s
-     * hutton32, LUT 32MB        -> 5.695s (memory bound)
-     */
-    /*if gpu_driver.uniforms.time >= 8192 && self.compute_requested {
+    if self.is_step && self.compute_requested {
       self.compute_requested = false;
-      self.t0.map(|t0| println!("{:.3}s", t0.elapsed().as_secs_f64()));
-    }*/
+      self.is_step = false;
+      //self.t0.map(|t0| println!("{:.3}s", t0.elapsed().as_secs_f64()));
+    }
 
-    TopBottomPanel::top("control buttons").show(ctx, |ui|
+    TopBottomPanel::top("control buttons").show(ctx, |ui| {
+      ui.add_space(1.0);
+
       ui.horizontal_wrapped(|ui| {
+        ui.style_mut().visuals.button_frame = false;
+
         (
           ui.button(if !self.compute_requested { "▶ Start" } else { "⏸ Stop" })
             .on_hover_text_at_pointer("Space")
-            .clicked() || ui.input_mut().consume_shortcut(&KeyboardShortcut { modifiers: Default::default(), key: Key::Space })
-        ).then(|| self.on_start_click());
+            .clicked() || ui.input_mut().consume_shortcut(&KeyboardShortcut { modifiers: Modifiers::NONE, key: Key::Space })
+        ).then(|| self.on_start_click(gpu_driver));
+
+        ui.label("|");
 
         (
           ui.button("↺  Reset")
+            .on_hover_text_at_pointer("R")
+            .clicked() || ui.input_mut().consume_shortcut(&KeyboardShortcut { modifiers: Modifiers::NONE, key: Key::R })
+        ).then(|| self.on_reset_click(gpu_driver, device, queue));
+
+        ui.label("|");
+
+        (
+          ui.button("▶|| Step")
+            .on_hover_text_at_pointer("S")
+            .clicked() || ui.input_mut().consume_shortcut(&KeyboardShortcut { modifiers: Modifiers::NONE, key: Key::S })
+        ).then(|| self.on_step_click(gpu_driver));
+
+        ui.label("|");
+
+        (
+          ui.button("< / > Recompile")
             .on_hover_text_at_pointer("Ctrl+R")
-            .clicked() || ui.input_mut().consume_shortcut(&KeyboardShortcut {
-            modifiers: Modifiers { ctrl: true, ..Default::default() },
-            key: Key::R
-          })
-        ).then(|| self.on_reset_click(gpu_driver, &render_state.device, &render_state.queue));
-      })
-    );
+            .clicked() || ui.input_mut().consume_shortcut(&KeyboardShortcut { modifiers: Modifiers::CTRL, key: Key::R })
+        ).then(|| self.on_recomple_click(gpu_driver, device, queue, render_state.target_format));
+      });
+
+      ui.add_space(1.0);
+    });
 
     SidePanel::left("left_panel")
       .default_width(180.0)

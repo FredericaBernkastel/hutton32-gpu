@@ -32,8 +32,9 @@ impl super::GPUDriver {
 
   pub fn load_simulation(&mut self, device: &Device, queue: &Queue) {
     //TODO: RLE/Macrocell Pattern reader
-    let mut pattern = image::open("./doc/test_pattern.png")
-      .expect("./doc/test_pattern.png")
+    let path = "./doc/hutton32_squares.png";
+    let mut pattern = image::open(path)
+      .expect("Failed to load {path}")
       .to_rgba8();
     self.uniforms.simulation_dimm = [pattern.width(), pattern.height()];
     pattern.pixels_mut().for_each(|pixel| {

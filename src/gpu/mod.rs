@@ -49,9 +49,10 @@ pub struct GPUDriver {
 
 impl GPUDriver {
   pub fn new(device: &Device, queue: &Queue, target_format: TextureFormat) -> Self {
+    // We need a non-panicking version...
     let shader = device.create_shader_module(
-      wgsl_preprocessor::ShaderBuilder::new("./kernel/main.wgsl")
-        .expect("Failed to load ./kernel/main.wgsl")
+      wgsl_preprocessor::ShaderBuilder::new("./src/kernel/main.wgsl")
+        .expect("Failed to load ./src/kernel/main.wgsl")
         .put_array_definition("hutton32_colors",
           &gpu_automata::HUTTON32_COLORS.map(|x| x.map(|c| c as i32))
             .iter().collect()

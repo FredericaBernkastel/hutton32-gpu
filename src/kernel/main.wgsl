@@ -20,7 +20,7 @@ struct VertexOutput {
 
 //!define hutton32_colors
 
-//!include ./kernel/util.wgsl
-//!include ./kernel/vertex.wgsl
-//!include ./kernel/fragment.wgsl
-//!include ./kernel/compute.wgsl
+//!include ./src/kernel/util.wgsl
+//!include ./src/kernel/vertex.wgsl
+//!include ./src/kernel/fragment.wgsl
+//!include ./src/kernel/compute.wgsl

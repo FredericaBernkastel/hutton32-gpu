@@ -1,4 +1,4 @@
-//!include ./kernel/rules/hutton32.rule.wgsl
+//!include ./src/kernel/rules/hutton32b.rule.wgsl
 
 @compute @workgroup_size(1) fn compute_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
   let xy = vec2<i32>(global_id.xy);
@@ -6,7 +6,6 @@
   let current_record = simulation_buffer[offset];
   let parity = bool(current_record >> 16u);
 
-  //let cell = game_of_life(xy, parity);
   let c = get_cell(vec2<u32>(xy), parity);
   let n = get_cell(vec2<u32>(xy + vec2( 0, -1)), parity);
   let s = get_cell(vec2<u32>(xy + vec2( 0,  1)), parity);
@@ -31,7 +30,7 @@
   let e = (offset >> 10u) & 0x1Fu;
   let n = (offset >> 15u) & 0x1Fu;
   let c = (offset >> 20u) & 0x1Fu;
-  var cell = hutton32(c, n, s, e, w);
+  var cell = hutton32b(c, n, s, e, w);
 
   // u32            u32
   // u8 u8 u8 u8    u8 u8 u8 u8
