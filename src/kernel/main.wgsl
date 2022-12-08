@@ -15,7 +15,8 @@ struct VertexOutput {
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var<storage, read_write> simulation_buffer: array<u32>;
-@group(0) @binding(2) var<storage, read_write> hutton32_lut: array<atomic<u32>>;
+@group(0) @binding(2) var<storage> simulation_buffer_tex: array<u32>;
+@group(0) @binding(3) var<storage, read_write> hutton32_lut: array<atomic<u32>>;
 
 
 //!define hutton32_colors

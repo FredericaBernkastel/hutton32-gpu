@@ -38,9 +38,12 @@ impl GUI {
   pub fn new<'a>(cc: &'a CreationContext<'a>) -> Option<Self> {
     let wgpu_render_state = cc.wgpu_render_state.as_ref()?;
 
-    let adapter_info = wgpu::Instance::new(wgpu::Backends::all())
-      .enumerate_adapters(wgpu::Backends::all())
-      .next().map(|a| a.get_info());
+    #[cfg(not(target_arch = "wasm32"))]
+      let adapter_info = wgpu::Instance::new(wgpu::Backends::all())
+        .enumerate_adapters(wgpu::Backends::all())
+        .next().map(|a| a.get_info());
+    #[cfg(target_arch = "wasm32")]
+      let adapter_info = None;
 
     let device = &wgpu_render_state.device;
     let target_format = wgpu_render_state.target_format;
@@ -124,7 +127,8 @@ impl GUI {
 
 impl eframe::App for GUI {
   fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-    frame.set_window_title("GPU Accelerated CA");
+    #[cfg(not(target_arch = "wasm32"))]
+      frame.set_window_title("GPU Accelerated CA");
 
     let render_state = frame.wgpu_render_state().unwrap();
     let mut renderer = render_state.renderer.write();

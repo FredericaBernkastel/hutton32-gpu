@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use {
   std::{mem, sync::Arc},
   wgpu::{
@@ -40,6 +41,7 @@ pub struct GPUDriver {
 
   uniform_buffer: Buffer,
   simulation_buffer: Buffer,
+  simulation_buffer_tex: Buffer,
   lut_buffer: Buffer,
 
   pub texture_size: [u32; 2],
@@ -49,16 +51,16 @@ pub struct GPUDriver {
 
 impl GPUDriver {
   pub fn new(device: &Device, queue: &Queue, target_format: TextureFormat) -> Self {
+    #[cfg(not(target_arch = "wasm32"))]
+      let src = Cow::Owned(hutton32_gpu::compile_shader());
+    #[cfg(target_arch = "wasm32")]
+      let src = Cow::Borrowed(include_str!(concat!(env!("OUT_DIR"), "/gpu_kernel.wgsl")));
+
     // We need a non-panicking version...
-    let shader = device.create_shader_module(
-      wgsl_preprocessor::ShaderBuilder::new("./src/kernel/main.wgsl")
-        .expect("Failed to load ./src/kernel/main.wgsl")
-        .put_array_definition("hutton32_colors",
-          &gpu_automata::HUTTON32_COLORS.map(|x| x.map(|c| c as i32))
-            .iter().collect()
-        )
-        .build()
-    );
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+      label: None,
+      source: wgpu::ShaderSource::Wgsl(src),
+    });
 
     // Allocate some stand-in textures since we don't know the final width
     // and height yet.
@@ -81,7 +83,7 @@ impl GPUDriver {
       },
       wgpu::BindGroupLayoutEntry { // simulation_buffer
         binding: 1,
-        visibility: ShaderStages::FRAGMENT | ShaderStages::COMPUTE,
+        visibility: ShaderStages::COMPUTE,
         ty: BindingType::Buffer {
           ty: BufferBindingType::Storage { read_only: false },
           has_dynamic_offset: false,
@@ -89,8 +91,18 @@ impl GPUDriver {
         },
         count: None,
       },
-      wgpu::BindGroupLayoutEntry { // LUT
+      wgpu::BindGroupLayoutEntry { // simulation_buffer_tex
         binding: 2,
+        visibility: ShaderStages::FRAGMENT,
+        ty: BindingType::Buffer {
+          ty: BufferBindingType::Storage { read_only: true },
+          has_dynamic_offset: false,
+          min_binding_size: None,
+        },
+        count: None,
+      },
+      wgpu::BindGroupLayoutEntry { // LUT
+        binding: 3,
         visibility: ShaderStages::COMPUTE,
         ty: BindingType::Buffer {
           ty: BufferBindingType::Storage { read_only: false },
@@ -150,6 +162,15 @@ impl GPUDriver {
       mapped_at_creation: false
     });
 
+    let simulation_buffer_tex = device.create_buffer(&BufferDescriptor {
+      label: Some("Simulation Buffer"),
+      size: (/*sim_dimm[0] * sim_dimm[1]*/ 1 * mem::size_of::<u32>() as u32) as _,
+      usage: BufferUsages::STORAGE
+        | BufferUsages::COPY_DST
+        | BufferUsages::COPY_SRC,
+      mapped_at_creation: false
+    });
+
     let lut_buffer = device.create_buffer(&BufferDescriptor {
       label: Some("Simulation Buffer"),
       // c(5)-n(5)-e(5)-s(5)-w(5) = r(8)
@@ -160,7 +181,7 @@ impl GPUDriver {
 
     let bind_group = Self::create_bind_group(
       &device, &bind_group_layout,
-      &uniform_buffer, &simulation_buffer, &lut_buffer
+      &uniform_buffer, &simulation_buffer, &simulation_buffer_tex, &lut_buffer
     );
 
     let compute_pipeline = Self::create_compute_pipeline(device, &[&bind_group_layout], &shader, None);
@@ -177,6 +198,7 @@ impl GPUDriver {
 
       uniform_buffer,
       simulation_buffer,
+      simulation_buffer_tex,
       lut_buffer,
 
       texture,
@@ -245,6 +267,7 @@ impl GPUDriver {
     layout: &BindGroupLayout,
     uniform_buffer: &Buffer,
     simulation_buffer: &Buffer,
+    simulation_buffer_tex: &Buffer,
     lut_buffer: &Buffer,
   ) -> BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -260,6 +283,10 @@ impl GPUDriver {
         },
         wgpu::BindGroupEntry {
           binding: 2,
+          resource: simulation_buffer_tex.as_entire_binding(),
+        },
+        wgpu::BindGroupEntry {
+          binding: 3,
           resource: lut_buffer.as_entire_binding(),
         }
       ],
@@ -299,6 +326,8 @@ impl GPUDriver {
         store: true,
       },
     };
+
+    encoder.copy_buffer_to_buffer(&self.simulation_buffer, 0, &self.simulation_buffer_tex, 0, self.simulation_buffer.size());
 
     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
       label: None,
