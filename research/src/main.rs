@@ -85,6 +85,7 @@ fn main() {
     "gpu-brute2" => cmd_brute2::run(rest),
     "gpu-bitslice" => cmd_bitslice::run(rest),
     "gpu-window" => cmd_bitslice::window(rest),
+    "gpu-tile" => cmd_bitslice::tile(rest),
     "gpu-sparse" => cmd_sparse::run(rest),
     _ => {
       eprintln!(
@@ -107,6 +108,7 @@ fn main() {
           "  gpu-brute2 [--side N --pattern P --same-src] hostile content; full vs class-compressed LUT",
           "  gpu-bitslice [--side N --pattern P --wgsl F]  bit-plane kernel from a synthesised circuit (no table)",
           "  gpu-window [--windows N --pattern P --wgsl F]  32x32 windows, 8 generations in one dispatch (miss path)",
+          "  gpu-tile [--k K --tw W --th H --side N --pattern P]  K generations per pass in workgroup-shared memory",
           "  gpu-probe [--log2-slots a,b,c]               random table-entry fetch rate vs table size (to 8 GiB)",
           "  gpu-insert [--log2-slots N --n N]            concurrent find-or-insert with 32-bit CAS",
           "  gpu-latency [--n N]                          dispatch / pass / submit / readback costs",

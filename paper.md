@@ -21,7 +21,7 @@ The resulting design is HashLife with three changes: a *memo floor* (no memoizat
 | Regime | Example (your patterns) | Golly HashLife | Archived GPU kernel | This work | Status |
 |---|---|---|---|---|---|
 | Dense, brute force only | 169–268 M cells, tiled counter | — | 1.08·10⁹ | **1.86·10¹¹** (byte LUT), **3.0·10¹¹** (bit-planes, §13) | measured, verified |
-| Dense, small and active | `squares.rle` 650×423 | 3.7–8.2·10⁹ | 1.16·10⁹ | **5.0·10¹⁰** (177 k gens/s) | measured, verified |
+| Dense, small and active | `squares.rle` 650×423 | 3.7–8.2·10⁹ (13–30 k gens/s) | 1.16·10⁹ (4.2 k gens/s) | 5.0·10¹⁰ (177 k gens/s); **1.6·10¹¹ (560 k gens/s)** with 16 generations per dispatch (§13.4) | measured, verified |
 | Dense, circulating ROM | `lotr1.ANSI-1M` 3095×3059 | 2.4·10⁷ (**2.5 gens/s**, GC thrash) | 1.18·10⁹ (125 gens/s) | brute: 1.81·10¹¹ (19 k gens/s), 3.9·10¹¹ as bit-planes (41 k gens/s); memo hit path: **469 k gens/s** (16×16 tiles), **1.61 M gens/s** (32×32) | measured, verified |
 | Dense, 100k × 100k | 1024 phase-shifted ROMs, 1.0·10¹⁰ cells | not attempted (single ROM already thrashes) | does not fit VRAM | **858 gens/s** (16×16 tiles), **20 349 gens/s** (32×32) | measured, verified tile-exact |
 | Sparse, 100k × 100k | 2304 phase-shifted counters, 1.0·10¹⁰ cells | 4.3 k gens/s (first 16 k gens), 97 k gens/s (1 M gens) | does not fit VRAM | **279 k gens/s** | measured, same final state as Golly |
@@ -32,7 +32,7 @@ Against the stated targets: dense patterns gain 43–280× from the brute-force 
 
 **Follow-up on adaptive tiles and engine choice (§12).** Letting the tile size follow recurrence takes the same 100k × 100k ROM universe from 858 to 6.7·10⁶ generations per second (tiles of 16 to 256 cells, measured on the GPU). Subdivision should stop at 16×16 windows; below that hashing costs more than the cells. A second engine, plain cells under a coarse memo, is 2.6–4× faster on content that is new at every small scale and 3–74× slower on everything else, so it is an escape hatch, not a default. The signal that separates the two is novelty, not density.
 
-**Follow-up on a table-free rule (§13).** Turning the rule table into plain bit operations is feasible and pays in its bit-sliced form. Canonical Hutton32b is 367 gates, checked on all 2²⁵ neighbourhoods; applied to five bit-planes they run at 3.0·10¹¹ cell-updates/s on the GPU whatever the content (1.6–1.8× the LUT kernel on real patterns, 22× on random states) at 5 bits per cell. Applied to one cell at a time they lose to the table by 2.5–34×, and tables small enough for an L1 cache lose to bit-planes too. The kernel is memory-bound, so neither a smaller circuit nor several generations per dispatch would add anything.
+**Follow-up on a table-free rule (§13).** Turning the rule table into plain bit operations is feasible and pays in its bit-sliced form. Canonical Hutton32b is 367 gates, checked on all 2²⁵ neighbourhoods; applied to five bit-planes they run at 3.0·10¹¹ cell-updates/s on the GPU whatever the content (1.6–1.8× the LUT kernel on real patterns, 22× on random states) at 5 bits per cell. Applied to one cell at a time they lose to the table by 2.5–34×, and tables small enough for an L1 cache lose to bit-planes too. On large grids the kernel is memory-bound, so a smaller circuit adds nothing there. On small grids it is latency-bound, and a variant that steps a shared tile 16 generations per dispatch runs the single counter at 780 k generations/s, 2.9× the plain kernel and above Golly.
 
 **What is not yet built.** The GPU numbers for memoized stepping are *hit-path* measurements: the memo table was learned by the CPU reference engine and the GPU then ran pure probe sweeps. The on-GPU *miss path* (compute a missing transition, hash-cons the result, insert it) is specified in §3.3 and its two critical primitives are measured (lock-free insert: 10⁹/s; brute kernel: 1.86·10¹¹/s), but it has not been assembled into one pipeline. §5 gives the projection and §9 the plan.
 
@@ -393,7 +393,7 @@ The on-GPU miss path is a composition of measured parts. Per tile-step at 16×16
 | `chaotic`-like | 25 % | 1.6·10¹¹ → use brute kernel, 1.8·10¹¹ | 180× | 170× |
 | ROM during its first period | 96 % | 4·10¹⁰ for 0.12 s | | |
 
-The Golly column compares with Golly's measured rate on a single instance of the pattern (§1.3). The projections hold when a sweep contains enough tiles to hide dispatch latency, roughly 10⁵ tiles or 2.6·10⁷ cells. Below that the latency bound of §2.6 applies: a sweep that has misses needs about 16 chained dispatches (probe, claim, commit, expand, 8 × evaluate, intern, commit, publish, re-probe). Dispatched with fixed capacities that is 51–55 µs per 8 generations as measured in §2.6, so **≈145 k gens/s for small active patterns**, slightly below the brute kernel's 177–275 k gens/s. Folding the eight evaluation dispatches into one does not help: a kernel that steps a whole window through 8 generations in a single dispatch was built and takes 630 µs per wave (§13.4).
+The Golly column compares with Golly's measured rate on a single instance of the pattern (§1.3). The projections hold when a sweep contains enough tiles to hide dispatch latency, roughly 10⁵ tiles or 2.6·10⁷ cells. Below that the latency bound of §2.6 applies: a sweep that has misses needs about 16 chained dispatches (probe, claim, commit, expand, 8 × evaluate, intern, commit, publish, re-probe). Dispatched with fixed capacities that is 51–55 µs per 8 generations as measured in §2.6, so **≈145 k gens/s for small active patterns**, slightly below the brute kernel's 177–275 k gens/s. Folding the eight evaluation dispatches into one helps only if the work stays spread over threads: one thread per window takes 630 µs per wave, while a workgroup sharing a tile does 8 generations in about 12 µs on a small grid (§13.4). The latter was not tried on an atlas; it would take a wave from about 54 µs to about 37 µs.
 
 For the Hutton replicator the reference engine counts 1.45·10⁹ node probes and 262 k waves for 262 144 generations. On the GPU that is 0.4 s of probes plus 5–15 s of wave latency against Golly's 111 s.
 
@@ -413,7 +413,7 @@ Three things would move these numbers and are not modelled: batches that overflo
 | | 100k × 100k sparse on the GPU: 279 k gens/s vs 4.3–97 k | measured hit path |
 | | Novel sparse activity (replicator): 5–15 s projected vs 111 s | model |
 
-The one case where neither target is beaten outright is a small universe (under ~10⁵ cells) with constant novelty, such as a single counter: Golly runs it at 5.8·10⁵ gens/s, the CPU engine at 6.5·10⁵, the GPU brute kernel at 2.7·10⁵. That is parity through the CPU engine, and a regime where the GPU has nothing to add.
+The closest case is a small universe (under ~10⁵ cells) with constant novelty, such as a single counter: Golly runs it at 5.8·10⁵ gens/s, the CPU engine at 6.5·10⁵, the GPU brute kernel at 2.7·10⁵. With 16 generations per dispatch on a shared tile the GPU reaches 7.8·10⁵ (§13.4), 1.35× Golly. That margin is small and rests on one machine.
 
 ---
 
@@ -450,7 +450,7 @@ Each stage ends with a check that already exists in `research/`.
 | Stage | Work | Result | Check |
 |---|---|---|---|
 | 0 | Canonical rules. Done in this revision: the WGSL rule files in `archive/src/kernel/rules` are corrected in place (§10). The new app takes them as they are, or builds its LUT from the Golly table as `rulespec.rs` does | GPU app runs the patterns as Golly does | `lut --rule … --against table:…` reports 0 mismatches |
-| 1 | Replace the compute kernel with the bit-plane kernel of §13 (`research/bitslice/step_planes.wgsl`): five bits per cell, no table, zero ring, 8×8 workgroups, one pass per frame. The byte-LUT kernel (`gpu-brute`) is the fallback for rules without a circuit. Add RLE and macrocell loading | 3.0·10¹¹ on large grids for any content; default counter 24 k → 273 k gens/s | `gpu-bitslice --verify` |
+| 1 | Replace the compute kernel with the bit-plane kernel of §13 (`research/bitslice/step_planes.wgsl`): five bits per cell, no table, zero ring, 8×8 workgroups, one pass per frame. The byte-LUT kernel (`gpu-brute`) is the fallback for rules without a circuit. Add RLE and macrocell loading | 3.0·10¹¹ on large grids for any content; default counter 24 k → 273 k gens/s, and → 780 k with the shared-tile variant for small grids (§13.4) | `gpu-bitslice --verify`, `gpu-tile --verify` |
 | 2 | Tile sweep with a CPU learner: ID grids and memo table in VRAM, `gpu-sweep` kernel, misses resolved by the reference engine and uploaded. Run bursts of sweeps; on a miss, restore the snapshot, let the CPU learn the affected region, replay | 10¹²–10¹⁴ once content recurs; 100k × 100k dense universes in VRAM | tile-exact comparison in `gpu-sweep` |
 | 3 | Learner on the GPU: miss compaction, the claim protocol (`gpu-insert`), atlas evaluation, tile interning. Per §12: 8×8 base tiles, the recursion across levels with missed 16×16 windows brute-forced, 16-generation steps while learning | ≈2·10⁷ misses/s; ≈10¹² on non-repeating logic | `adapt` operation counts must match the GPU's counters |
 | 4 | Sparse: active-block list (`gpu-sparse` kernel) with activation on border contact; sweep tile raised while it hits; plain cells under a region memo as second engine with the §12.5 controller; choice between host engine, plain kernel and recursion by active area (§12.6); cycle detection | 100k × 100k sparse at 10⁵ gens/s, 10⁶–10⁷ once large tiles hit; CPU parity elsewhere | fingerprint equality with `bgolly` |
@@ -459,7 +459,7 @@ Each stage ends with a check that already exists in `research/`.
 Engineering notes that came out of the measurements:
 
 * Keep everything inside one compute pass per frame; a pass is 15–30× a dispatch, and a read-back 30–700×.
-* **One generation per dispatch.** Width is cheap on a GPU and depth is not: a thread needs about half a microsecond per rule-circuit evaluation when evaluations follow one another. A kernel that steps a 32×32 window through 8 generations in one dispatch takes 630 µs however few windows there are; eight chained dispatches over an atlas take 29 µs (§13.4). The same arithmetic limits two generations per dispatch on a small grid to a gain of about 1.3×, and makes it a loss on a large one.
+* **Generations per dispatch: keep the width.** A thread needs about half a microsecond per rule-circuit evaluation when evaluations follow one another, so one thread stepping a 32×32 window through 8 generations takes 630 µs however few windows there are, against 29 µs for eight chained dispatches. A workgroup that shares a tile and gives each thread one evaluation per generation pays about 1.1 µs per extra generation instead of 3.65 µs per dispatch: use it (k = 8 to 16) whenever the grid is small enough to be latency-bound, and the plain kernel otherwise (§13.4).
 * **Decision for stage 3: no indirect dispatch.** The miss path's dispatch sizes depend on counts computed on the GPU. Sized with indirect calls, a wave costs 260–490 µs in wgpu (135–165 µs with indirect validation switched off); sized as fixed capacities with early exit it costs 51–55 µs, which is what this report's estimates assume (§2.6). Stage 3 therefore stays in wgpu: every miss-path stage is dispatched for a capacity taken from stale, asynchronously read miss counters, overflow is detected by a flag and repaired by replaying from a snapshot. Raw Vulkan would remove the pass boundary and make indirect dispatch viable, but it is not needed.
 * One binding holds at most 2 GiB; shard tables by the top hash bits.
 * On an 8 GB RTX 5060 the brute and out-of-cache probe rates should be about the same (same 448 GB/s bus; both are memory-bound) and memo capacity halves. Some listings give it a 24 MB L2 instead of 32 MB, which would lower the table size that still probes at the in-cache rate. None of this was measured on that card.
@@ -661,7 +661,7 @@ A missed floor window needs about seven dispatches plus one per brute-forced gen
 | F16 | 4 | ≈4 | 7.3·10⁴ |
 | F8 | 2 | ≈7 | 4.2·10⁴ |
 
-These bounds cannot be bought down by running a window's generations inside one dispatch. That lowers the dispatch count and raises the time: measured, 630 µs per wave against 29 µs for eight chained dispatches (§13.4).
+Running a window's generations inside one dispatch buys these bounds down only when a workgroup shares the work. One thread per window raises the time instead: 630 µs per wave against 29 µs for eight chained dispatches. A shared tile stepped 16 generations per dispatch lifts the plain-cells row from 2.7·10⁵ to 5.6–7.8·10⁵ on small grids (§13.4); the other rows and the thresholds below were not recomputed for it.
 
 Work is local and latency is global: one region at a shallow floor makes the whole universe pay that floor's dispatches. The universe-wide choice is therefore the depth f that minimises L(f) + Σ over regions of w_r(f), and regions may only go coarser than that. With the counter's measured work per region (38 ns per generation at F16, 81 ns at F32, 575 ns as isolated plain cells):
 
@@ -693,7 +693,7 @@ A third refinement was proposed: pack the centre and its four neighbours into on
 * Evaluated one cell at a time, as proposed, the gates lose to the table lookup by 2.5–34× (CPU). Applied to **bit-planes** the same gates update 32 cells per operation, and that is the fastest kernel in this report: **3.0·10¹¹ cell-updates/s on any content**, 1.6–1.8× the byte-LUT kernel on real patterns and 22× on random states, at 5 bits per cell and with no 32 MiB table.
 * On large grids that kernel is memory-bound: a circuit that returns its input unchanged is no faster. Synthesis was stopped at 367 gates for that reason.
 * Small tables exist down to 10–15 KB at four or five loads per cell. They beat the big table only on hostile content and lose to bit-planes everywhere.
-* Depth is expensive on a GPU. A kernel that steps a 32×32 window through 8 generations in one dispatch takes 0.63 ms however few windows there are; eight chained dispatches take 0.03 ms. One generation per dispatch stays.
+* Several generations per dispatch pay on small grids and only there, and only with the work spread over a workgroup. A tile held in workgroup-shared memory and stepped 16 generations per dispatch runs the single counter at **780 k generations/s** and `squares` at 560 k, 2.9× and 3.3× the plain kernel; on large grids the same kernel is 18–45 % slower. One thread stepping a whole window alone is 21× slower than chained dispatches.
 * On one CPU core the circuit does 0.9–1.7·10⁹ cell-updates/s in plain `u64` and 2.7–4.5·10⁹ with AVX2: 2–8× the table on real content.
 
 ### 13.1 Three readings of the idea
@@ -754,12 +754,14 @@ The two largest rows are steady-state rates over 256 and 512 generations. Buffer
 
 * *Memory.* A cell-update reads 5 bits and writes 5: 1.25 bytes, against 2 for the byte kernel. 2.97·10¹¹ × 1.25 B is 371 GB/s; the byte kernel's 1.86·10¹¹ × 2 B is 372 GB/s. Both sit at 83 % of the card's 448 GB/s, and the gain on real content is exactly the saving in bytes.
 * *Not the gates.* With a circuit that returns the centre unchanged, the same harness gives 3.0·10¹¹ at 16 384² and 2.8·10¹¹ at 32 768²: the same as the real circuit. Cache-resident grids go to 4.3·10¹¹ (4096², where the identity circuit gives 3.8·10¹¹).
-* *Headroom.* Evaluating the circuit k times per invocation, each evaluation feeding the next, the pass rate at 16 384² is 3.0, 2.4, 1.4 and 0.76·10¹¹ for k = 1, 2, 4, 8. The gates alone therefore sustain 5.4–6.1·10¹¹ cell-evaluations/s, twice what memory lets through. Halving the traffic by computing two generations per pass does not cash that in: it needs five evaluations per word instead of two (three rows of the first generation, the two edge bits, one of the second), which caps the rate near 2.3·10¹¹.
+* *Headroom.* Evaluating the circuit k times per invocation, each evaluation feeding the next, the pass rate at 16 384² is 3.0, 2.4, 1.4 and 0.76·10¹¹ for k = 1, 2, 4, 8. The gates alone therefore sustain 5.4–6.1·10¹¹ cell-evaluations/s, twice what memory lets through. Computing several generations per pass would cut the traffic, but neither way of doing it cashes the headroom in. Threads working alone need five evaluations per word for two generations instead of two, which would cap the rate near 2.3·10¹¹ (estimated). Threads sharing a tile were built and measured: 2.5·10¹¹ at best (§13.4).
 * *Content.* None of it matters any more. The byte kernel's collapse on random states was a table that no longer fitted L2; there is no table.
 
-### 13.4 One generation per dispatch
+### 13.4 Several generations per dispatch
 
-Earlier versions of §5 and §12.6 held out a kernel that steps a missed window through all its generations inside one dispatch as a way to halve the dispatch count of the miss path. `gpu-window` is that kernel: one invocation per 32×32 window, 8 generations in private arrays, the central 16×16 written out, verified against per-cell stepping.
+Two kernels were built. They differ in who does the work, and they come out on opposite sides.
+
+**One thread per window: no.** Earlier versions of §5 and §12.6 held out a kernel that steps a missed window through all its generations inside one dispatch as a way to halve the dispatch count of the miss path. `gpu-window` is that kernel: one invocation per 32×32 window, 8 generations in private arrays, the central 16×16 written out, verified against per-cell stepping.
 
 | Windows per dispatch | Window kernel, time per dispatch | Atlas: 8 chained dispatches of the plain kernel |
 |---|---|---|
@@ -774,7 +776,20 @@ The atlas column is the plain kernel's time per generation on a grid of that man
 
 The reason is serial depth. One thread performs 240 circuit evaluations in sequence, and a GPU thread is slow in sequence. Measured directly on a 64×64 grid, with k evaluations per invocation that depend on one another, a dispatch takes 3.65, 3.66, 5.7, 5.7, 7.7 and 18.0 µs for k = 1, 2, 4, 8, 16, 32: the first two hide in what a dispatch costs anyway, and beyond that an evaluation costs about half a microsecond even with all state in registers. In the window kernel, whose state lives in private arrays, it costs 2.6 µs.
 
-So width goes into threads and depth into dispatches. Two generations per dispatch on a small grid would be five evaluations, about 5.7 µs against 2 × 3.65 µs: 1.3× at best where the grid is small enough to be latency-bound, and a loss on large grids (§13.3).
+**One workgroup per tile: yes, on small grids.** `gpu-tile` keeps the width. A workgroup owns a tile of bit-plane words. Each thread loads one word group of the tile or of its halo (k rows above and below, one group left and right) into workgroup-shared memory, then all threads step k generations there, one circuit evaluation per thread per generation with a barrier in between, and the tile is written once. A thread's depth is k evaluations, not k times the window. Cell-exact against the CPU for k = 1, 2, 3, 4, 8 and 16 on random states, the counter, `chaotic`, `squares` and a full ROM period.
+
+| Grid | Plain kernel | Tile kernel, best setting | Gain |
+|---|---|---|---|
+| one counter, 224 × 205 | 273 k gens/s | **770–785 k gens/s** (k = 16, tiles of 224 × 16 cells; 20.5 µs per dispatch) | 2.9× |
+| `squares`, 672 × 431 | 172 k gens/s | **556–563 k gens/s** (k = 16, tiles of 192 × 48) | 3.3× |
+| one ROM, 3104 × 3067 | 41 k gens/s (3.9·10¹¹) | 23 k gens/s (2.2·10¹¹), k = 4 | 0.57× |
+| 16 384², random states | 3.0·10¹¹ | 2.5·10¹¹ (k = 3; 1.7·10¹¹ at k = 1, 1.8·10¹¹ at k = 8) | 0.82× |
+
+On a small grid a dispatch costs 3.65 µs whatever it does, and a further generation inside it costs about 1.1 µs, so sixteen generations take 20 µs instead of 58. That makes the GPU the fastest engine on the single counter: Golly runs it at 580 k generations/s and the CPU reference engine at 650 k (§6). On `squares` Golly does 13–30 k.
+
+On a large grid the kernel loses. With k = 1 it does the plain kernel's job through shared memory and reaches 55 % of its rate, so the detour itself costs more than the bus traffic it saves at k = 2 to 4; beyond that the halo eats the tile. The plain kernel therefore stays for anything that is not latency-bound. The crossover was not located; it lies between 3·10⁵ and 9.5·10⁶ cells.
+
+Rates depend on the tile shape by up to 1.6× at a given k (`squares` at k = 16: 342 k, 373 k and 563 k for tiles 16, 32 and 48 rows high), and only a handful of shapes were tried. k is limited to 32 by the one-word halo. An atlas of missed windows is a small grid too, so the miss path's eight evaluation dispatches should shrink to one the same way (about 12 µs against 29 µs); that was not run.
 
 ### 13.5 On the CPU
 
@@ -796,10 +811,10 @@ Within any one run, bit-planes are 2.0–3.5× the table on real content in port
 * **Worst case.** Dense content that never recurs runs at 3.0·10¹¹ whatever it is: 280× the archived kernel, where the byte kernel managed 13× on random states.
 * **§12.5 re-priced** (`adapt --cell-rate 2.9e11`). No ranking changes. Over the eight contents uniform F16 costs 29.1 ms instead of 35.1 and the best engine per content 15.2 instead of 19.4. Plain cells lead F16 on the ROM by 3.0× instead of 2.6×; everywhere else F16 leads by 2.7–56× instead of 3.3–74×.
 * **§12.6 thresholds.** The counter's work per generation becomes 33 ns at F16, 59 ns at F32 and 377 ns as plain cells. The plain kernel is then the best engine up to about 1.0 M active cells (was 0.7 M) and F32 up to about 13 M (was 8 M).
-* **Small active patterns.** Unchanged: 273 k against 275 k generations per second on the single counter. Both kernels wait for the dispatch.
+* **Small active patterns.** The plain bit-plane kernel changes nothing: 273 k against 275 k generations per second on the single counter, both waiting for the dispatch. The shared-tile variant does: 780 k on the counter and 560 k on `squares` (§13.4), which also raises the active area up to which plain cells are the best engine in §12.6.
 * **Memory.** The 32 MiB table leaves VRAM and, more to the point, the L2 cache, which is then free for memo tables; a probe into a table that fits L2 is 9× cheaper than one that does not (§2.1). The two were not measured together. Cells cost 5 bits instead of 8: a 100k × 100k universe is 6.3 GB per buffer and fits the card as plain cells, where brute force would step it about 28 times a second. That size was not run; one binding holds 2 GiB, so the kernel would first have to span several.
 * **Tile store.** A 16×16 tile is 160 bytes either way. Stored as five planes of sixteen 16-bit rows it is already in this kernel's format, so the miss path's expand and intern steps become word copies and the atlas is evaluated in place.
-* **Plan.** Stage 1 of §9 uses this kernel. The single-dispatch window kernel is dropped from §5, §9 and §12.6.
+* **Plan.** Stage 1 of §9 uses this kernel, with the shared-tile variant for small grids. The one-thread-per-window kernel is dropped from §5, §9 and §12.6.
 
 Not done: the kernel is a benchmark, not yet the app's kernel; there is no circuit for Hutton32; no small-table scheme other than the 2 MiB one was run on the GPU.
 
@@ -874,6 +889,9 @@ bash tools/bitslice_series.sh ./target/release/ca-research.exe                  
 & $R gpu-bitslice --side 16384 --gens 64 --same-src --verify                      # one line of it: random states, held constant
 & $R gpu-bitslice --side 3104 --gens 528 --pattern "$P\misc\extra\lotr1.ANSI-1M.rle" --verify
 & $R gpu-window --windows 64 --iters 4096
+& $R gpu-tile --k 16 --tw 7 --th 16 --side 200 --gens 65536 --pattern "$P\advanced counter v2.rle" --verify   # shared tile, 16 generations per dispatch
+& $R gpu-tile --k 16 --tw 6 --th 48 --side 672 --gens 65536 --pattern "$P\misc\squares.rle"
+& $R gpu-tile --k 3 --side 16384 --gens 48 --same-src                                                          # large grid: slower than gpu-bitslice
 bash tools/engine_choice.sh ./target/release/ca-research.exe 4096 --cell-rate 2.9e11   # section 12.5 at the new kernel's rate
 & $R adapt --pattern "$P\advanced counter v2.rle" --gens 16384 --a 3 --cell-rate 2.9e11  # work per generation for the thresholds
 ```
@@ -901,7 +919,7 @@ The mixed universe of §12.5 is a `--compose` string of `file@x,y[+pre-run gens]
 | `cmd_insert.rs` | lock-free find-or-insert with 32-bit CAS |
 | `cmd_sparse.rs` | sparse universe, active-block sweep, macrocell writer |
 | `cmd_adapt.rs` | §12: per-region floors and engines on the position-aware recursion (`hl.rs: result_at`), cost model, controller, `--compose` universes |
-| `cmd_bitslice.rs` | §13: the bit-plane kernel (`gpu-bitslice`) and the single-dispatch window kernel (`gpu-window`) |
+| `cmd_bitslice.rs` | §13: the bit-plane kernel (`gpu-bitslice`), the shared-tile kernel with several generations per dispatch (`gpu-tile`) and the one-thread-per-window kernel (`gpu-window`) |
 | `bitslice/` | §13: the rule as a gate network. `rule_circuit.py` (hand-written network), `resub.py`, `abc_flow.py`, `xag.py`, `optimize.py` (optimiser), `emit.py`; artifacts `circuit.netlist`, `step_planes.wgsl`, `step_planes.rs`; `verify.py`; `scalar.py` and `tables.py` (forms A and C); `bench/` (CPU benchmark) |
 | `tools/bitslice_series.sh` | every GPU measurement of §13 |
 | `tools/time_golly.py`, `tools/head2head.py`, `tools/engine_choice.sh` | `bgolly` timing, head-to-head, engine-per-content table |
