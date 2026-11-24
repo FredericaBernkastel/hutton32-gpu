@@ -1,0 +1,1 @@
+FROZEN step_planes.wgsl / step_planes.rs / circuit.netlist: 367 gates (AND 165, OR 137, XOR 14, NOT 51), depth 25 (20 not counting NOT); exhaustive check vs lut_table_Hutton32b.bin (verify.py, all three files): 0 mismatches of 2^25; source: hand-structured network + resubstitution + ABC (resyn2, deepsyn) + resubstitution; optimisation stopped

@@ -51,15 +51,17 @@ doc/                       presets (1 px = 1 cell), screenshot, component sheet
 ### Rules
 To switch rules, change the `//!include` on the first line of `src/kernel/compute.wgsl` and the function called in `compute_lut`, then press Ctrl+R.
 
-- `hutton32.rule.wgsl` — Tim Hutton's Hutton32: Nobili32 with write-and-retract, rotation-invariant construction.
-- `hutton32b.rule.wgsl` — **active**; Hutton32 with the changes below.
+- `hutton32.rule.wgsl` — Tim Hutton's Hutton32: Nobili32 with write-and-retract, rotation-invariant construction. Equal to his [`Hutton32.table`](http://gollygang.github.io/ruletablerepository/downloads/Hutton32.table), and so to Golly's built-in Hutton32, on all 2²⁵ neighbourhoods.
+- `hutton32b.rule.wgsl` — **active**; Hutton32 with the changes below. Equal to [`Hutton32b.rule`](https://github.com/FredericaBernkastel/Hutton32-Computer/blob/master/doc/Hutton32b.rule) on all 2²⁵ neighbourhoods.
 - `hutton32-branchless.rule.wgsl` — branch-free rewrite of Hutton32's helper functions; not used.
 - `game_of_life.rule.wgsl` — predates the LUT and needs the 8-cell Moore neighbourhood, so it doesn't fit the current kernel.
 
 Changes in hutton32b relative to hutton32:
-- **XNOR confluent** — a quiescent confluent (25) with two head-on transmission inputs, and transmission cells on the other two sides that don't point into it, fires when both OTS inputs match: both quiescent or both excited (`xnor_crossing`, `xnor_output`; applied in states 25–28).
-- **Crossings** — states 29–31 revert to 25 once `is_crossing` no longer holds.
+- **XNOR confluent** — a quiescent confluent (25) with two head-on ordinary transmission inputs, and transmission cells on the other two sides that don't point into it, fires when both OTS inputs match: both quiescent or both excited (`xnor_crossing`, `xnor_output`; applied in states 25–28).
+- **Crossings** — states 29–31 revert to 25 when a neighbour is the ground state. An incoming excited STS is tested first and still destroys the cell.
 - **End-of-line STS** — an excited STS with an empty output also stays excited when fed by an excited confluent or crossing state (`excited_STS_to_us` instead of `excited_STS_arrow_to_us`).
+
+The two rule files were corrected against the tables on 2026-11-24. As first archived (commit 256ef91) they differed from them in 2 430 000 and 3 082 794 of the 2²⁵ neighbourhoods: a sensitised cell 5, 7 or 8 with no excited arrow pointing at it took a different state (WGSL `u32` wrap-around where Golly's C++ has a negative remainder), the XNOR gate accepted special transmission inputs, and crossings reverted whenever `is_crossing` failed. Details and the check are in `paper.md` §10; `research/tools/fix_rules.py` holds the edits.
 
 ### Presets
 Patterns are PNGs in `doc/`, one pixel per cell, and every colour must exactly match an entry of `HUTTON32_COLORS`. The pattern path is hardcoded in `load_simulation`.

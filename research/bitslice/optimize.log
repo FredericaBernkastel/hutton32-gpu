@@ -1,0 +1,31 @@
+[      0s] === optimize.py budget 25 min, seed 1
+[      0s] hand-structured network: xag {'and': 399, 'xor': 22} -> {'NOT': 52, 'AND': 197, 'OR': 202, 'XOR': 22, 'total': 473} depth 26/23
+[      2s]   -> new best 473 gates written
+[    307s]   resub: 421 -> 352 nodes in 303s {'accepted': 40, 'rejected_full': 2, 'points_added': 128}
+[    347s] hand-structured network + resubstitution: xag {'and': 313, 'xor': 39} -> {'NOT': 48, 'AND': 181, 'OR': 132, 'XOR': 39, 'total': 400} depth 31/27 (inverter placement not proven optimal)
+[    348s]   -> new best 400 gates written
+[    351s] round 1: ABC resyn2rs: 352 -> 367 nodes (3s)
+[    497s]   resub: 367 -> 347 nodes in 144s {'accepted': 14, 'rejected_full': 3, 'points_added': 158}
+[    503s] hand-structured network + resubstitution + ABC resyn2rs + resubstitution (round 1): xag {'and': 318, 'xor': 29} -> {'NOT': 54, 'AND': 171, 'OR': 147, 'XOR': 29, 'total': 401} depth 27/22
+[    505s] round 2: ABC compress2rs: 352 -> 370 nodes (2s)
+[    651s]   resub: 370 -> 346 nodes in 145s {'accepted': 17, 'rejected_full': 3, 'points_added': 192}
+[    691s] hand-structured network + resubstitution + ABC compress2rs + resubstitution (round 2): xag {'and': 317, 'xor': 29} -> {'NOT': 55, 'AND': 175, 'OR': 142, 'XOR': 29, 'total': 401} depth 28/23 (inverter placement not proven optimal)
+[    693s] round 3: ABC dc2: 352 -> 353 nodes (2s)
+[    852s]   resub: 353 -> 338 nodes in 157s {'accepted': 10, 'rejected_full': 0, 'points_added': 0}
+[    856s] hand-structured network + resubstitution + ABC dc2 + resubstitution (round 3): xag {'and': 310, 'xor': 28} -> {'NOT': 51, 'AND': 177, 'OR': 133, 'XOR': 28, 'total': 389} depth 30/27
+[    857s]   -> new best 389 gates written
+[    859s] round 4: ABC resyn2: 338 -> 356 nodes (2s)
+[    989s]   resub: 356 -> 336 nodes in 128s {'accepted': 13, 'rejected_full': 1, 'points_added': 64}
+[   1029s] hand-structured network + resubstitution + ABC resyn2 + resubstitution (round 4): xag {'and': 305, 'xor': 31} -> {'NOT': 49, 'AND': 153, 'OR': 152, 'XOR': 31, 'total': 385} depth 30/27 (inverter placement not proven optimal)
+[   1030s]   -> new best 385 gates written
+[   1062s] round 5: ABC deepsyn: 336 -> 323 nodes (32s)
+[   1181s]   resub: 323 -> 317 nodes in 118s {'accepted': 6, 'rejected_full': 0, 'points_added': 0}
+[   1221s] hand-structured network + resubstitution + ABC deepsyn + resubstitution (round 5): xag {'and': 303, 'xor': 14} -> {'NOT': 54, 'AND': 161, 'OR': 142, 'XOR': 14, 'total': 371} depth 24/20 (inverter placement not proven optimal)
+[   1223s]   -> new best 371 gates written
+[   1225s] round 6: ABC balance-rewrite: 317 -> 325 nodes (2s)
+[      2s] === optimize_more.py: start from circuit.netlist, 371 gates, 317 nodes
+[     66s] extra round 1: ABC deepsyn -T 60: 317 -> 322 nodes (64s)
+[    200s]   resub: 322 -> 316 nodes in 131s {'accepted': 5, 'rejected_full': 0, 'points_added': 0}
+[    219s] hand-structured network + resubstitution + ABC (resyn2, deepsyn) + resubstitution (extra round 1): xag {'and': 302, 'xor': 14} -> {'NOT': 51, 'AND': 165, 'OR': 137, 'XOR': 14, 'total': 367} depth 25/20
+[    221s]   -> new best 367 gates written
+[    265s] extra round 2: ABC deepsyn -T 42: 316 -> 321 nodes (45s)

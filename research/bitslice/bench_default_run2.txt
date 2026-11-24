@@ -1,0 +1,6 @@
+cell-updates per second, single thread:
+content                            cells byte LUT 32MiB     scalar (A)   small tables bit-sliced u64   u64/LUT bit-sliced 256
+uniform random states             262144        6.792e7        1.502e7        4.423e8        1.173e9     17.27              -
+hutton32b_8bit_counter x4         262144        4.764e8        1.476e7        4.425e8        1.156e9      2.43              -
+uniform random states           16777216        6.629e7        1.498e7        3.879e8        1.662e9     25.07              -
+hutton32b_8bit_counter x380     16777216        4.795e8        1.434e7        4.016e8        1.640e9      3.42              -

@@ -1,0 +1,17 @@
+target features: baseline x86-64 (sse2); single thread
+exhaustive check of step_planes (u64) against lut_table_Hutton32b.bin: 0 mismatches of 33554432 entries (0.15s)
+small tables (form C): 4 x 1024 u16 + 6779 final entries = 14971 bytes; check against the table: 0 mismatches (0.35s)
+exhaustive check of scalar_step (form A) against the table: 0 mismatches of 33554432 entries (2.16s)
+grid 512x512 = 262144 cells, 1024 generations per timed run, best of 5
+  [uniform random states] 16 generations, all engines, grids compared after every generation: 0 differing cells
+  [hutton32b_8bit_counter x4] 64 generations, all engines, grids compared after every generation: 0 differing cells
+grid 4096x4096 = 16777216 cells, 16 generations per timed run, best of 5
+  [uniform random states] 16 generations, all engines, grids compared after every generation: 0 differing cells
+  [hutton32b_8bit_counter x380] 16 generations, all engines, grids compared after every generation: 0 differing cells
+
+cell-updates per second, single thread:
+content                            cells byte LUT 32MiB     scalar (A)   small tables bit-sliced u64   u64/LUT bit-sliced 256
+uniform random states             262144        6.734e7        1.497e7        4.436e8        1.179e9     17.51              -
+hutton32b_8bit_counter x4         262144        4.758e8        1.496e7        4.430e8        1.166e9      2.45              -
+uniform random states           16777216        6.499e7        1.478e7        3.920e8        1.526e9     23.48              -
+hutton32b_8bit_counter x380     16777216        4.707e8        1.500e7        3.983e8        1.655e9      3.51              -

@@ -1,0 +1,15 @@
+[package]
+name = "bitslice-bench"
+version = "0.1.0"
+edition = "2021"
+description = "CPU micro-benchmark: byte-per-cell LUT step vs bit-sliced u64 step (Hutton32b)"
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+debug = false
+codegen-units = 1
+
+# standalone crate: not a member of the research workspace/crate next door
+[workspace]

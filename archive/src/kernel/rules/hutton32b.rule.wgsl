@@ -1,3 +1,6 @@
+// Equal to the canonical Hutton32b on all 2^25 neighbourhoods:
+// https://github.com/FredericaBernkastel/Hutton32-Computer/blob/master/doc/Hutton32b.rule
+// (checked on the GPU with `ca-research lut --rule hutton32b --against table:<file>` in research/; paper.md, section 10).
 	/***
 
 Motivation: In the original von Neumann transition rules, lines of transmission states can
@@ -195,8 +198,8 @@ fn is_crossing(n: u32,s: u32,e: u32,w: u32) -> bool
 
 fn xnor_crossing(n: u32,s: u32,e: u32,w: u32) -> bool {
   return
-    (is_south(n) && is_north(s) && (is_west (w) || is_north(w) || is_south(w)) && (is_east(e)  || is_north(e) || is_south(e))) || // vertical inputs
-    (is_east(w)  && is_west (e) && (is_north(n) || is_west(n)  || is_east (n)) && (is_south(s) || is_west (s) || is_east (s))); // horizontal inputs
+    (is_OTS(n) && is_OTS(s) && is_south(n) && is_north(s) && (is_west (w) || is_north(w) || is_south(w)) && (is_east(e)  || is_north(e) || is_south(e))) || // vertical inputs
+    (is_OTS(w) && is_OTS(e) && is_east(w)  && is_west (e) && (is_north(n) || is_west(n)  || is_east (n)) && (is_south(s) || is_west (s) || is_east (s))); // horizontal inputs
 }
 
 // returns true if gate should emit signal
@@ -242,9 +245,9 @@ fn hutton32b(c: u32,n: u32,s: u32,e: u32,w: u32) -> u32
 	}
 	else if(is_STS(c))
 	{
-	  let output = output(c,n,s,e,w);
+	  let out_state = output(c,n,s,e,w);
 
-		if(is_excited(c) && is_sensitized(output) && OTS_arrow_to_us(n,s,e,w))
+		if(is_excited(c) && is_sensitized(out_state) && OTS_arrow_to_us(n,s,e,w))
 		{
 			// this cell is the special mark at the end of an OTS wire, so it behaves differently
 			// if output is about to finalize, we revert to ground or quiescent OTS, depending on next signal
@@ -263,7 +266,7 @@ fn hutton32b(c: u32,n: u32,s: u32,e: u32,w: u32) -> u32
 					{return quiesce(c) - 8u;}	// revert to quiescent OTS
 			}
 		}
-		else if(is_excited(c) && output==0u){
+		else if(is_excited(c) && out_state==0u){
 			if(excited_STS_to_us(c,n,s,e,w))
 				{return c;}	// we remain excited
 			else
@@ -314,7 +317,8 @@ fn hutton32b(c: u32,n: u32,s: u32,e: u32,w: u32) -> u32
 	else if(c==5u)
 	{
 		if(!excited_OTS_arrow_to_us(c,n,s,e,w))
-			{return ( (quiesce(input(n,s,e,w)) - 9u+3u) % 4u )+9u;} 	// 1010: turn right
+			{ if(input(n,s,e,w)==0u) {return 7u;}	// nothing points at us: (0-9+3)%4 is -2 in C++
+			  return ( (quiesce(input(n,s,e,w)) - 9u+3u) % 4u )+9u; } 	// 1010: turn right
 		else
 			{return quiesce(input(n,s,e,w))+8u;}	// 1011: STS forward
 	}
@@ -328,14 +332,16 @@ fn hutton32b(c: u32,n: u32,s: u32,e: u32,w: u32) -> u32
 	else if(c==7u)
 	{
 		if(!excited_OTS_arrow_to_us(c,n,s,e,w))
-			{return ( (quiesce(input(n,s,e,w)) - 9u+3u) % 4u )+17u;} 	// 1110: STS turn left
+			{ if(input(n,s,e,w)==0u) {return 15u;}	// nothing points at us: (0-9+3)%4 is -2 in C++
+			  return ( (quiesce(input(n,s,e,w)) - 9u+3u) % 4u )+17u; } 	// 1110: STS turn left
 		else	
 			{return 25u;}	// 1111
 	}
 	else if(c==8u)
 	{
 		if(!excited_OTS_arrow_to_us(c,n,s,e,w))
-			 {return 9u+dir(input(n,s,e,w));} 	// 10000: move forward
+			 { if(input(n,s,e,w)==0u) {return 8u;}	// nothing points at us: (0-9)%4 is -1 in C++
+			  return 9u+dir(input(n,s,e,w)); } 	// 10000: move forward
 			//{ return 8u; }
 		else
 			{return 9u+dir(input(n,s,e,w)+1u);}	// 10001: turn left
@@ -371,7 +377,7 @@ fn hutton32b(c: u32,n: u32,s: u32,e: u32,w: u32) -> u32
 		if(excited_STS_arrow_to_us(c,n,s,e,w))
 			{return 0u;	}// we get destroyed by the incoming excited STS
 
-		else if(all_inputs_on(n,s,e,w) || xnor_crossing(n,s,e,w) && xnor_output(n,s,e,w))
+		else if(all_inputs_on(n,s,e,w) || (xnor_crossing(n,s,e,w) && xnor_output(n,s,e,w)))
 			{return 28u;}
 		else
 			{return 27u;}
@@ -380,7 +386,7 @@ fn hutton32b(c: u32,n: u32,s: u32,e: u32,w: u32) -> u32
 	{
 		if(excited_STS_arrow_to_us(c,n,s,e,w))
 			{return 0u;	}// we get destroyed by the incoming excited STS
-		else if(all_inputs_on(n,s,e,w) || xnor_crossing(n,s,e,w) && xnor_output(n,s,e,w))
+		else if(all_inputs_on(n,s,e,w) || (xnor_crossing(n,s,e,w) && xnor_output(n,s,e,w)))
 			{return 26u;}
 		else
 			{return 25u;}
@@ -389,18 +395,17 @@ fn hutton32b(c: u32,n: u32,s: u32,e: u32,w: u32) -> u32
 	{
 		if(excited_STS_arrow_to_us(c,n,s,e,w))
 			{return 0u;	}// we get destroyed by the incoming excited STS
-		else if(all_inputs_on(n,s,e,w) || xnor_crossing(n,s,e,w) && xnor_output(n,s,e,w))
+		else if(all_inputs_on(n,s,e,w) || (xnor_crossing(n,s,e,w) && xnor_output(n,s,e,w)))
 			{return 28u;}
 		else
 			{return 27u;}
 	}
 	else if(c==29u || c==30u || c==31u)
 	{
-	  if(!is_crossing(n,s,e,w)) {
-	    {return 25u;} // no longer a valid crossing
-	  }
-		else if(excited_STS_arrow_to_us(c,n,s,e,w))
+		if(excited_STS_arrow_to_us(c,n,s,e,w))
 			{return 0u;	}// we get destroyed by the incoming excited STS
+		else if(n==0u || s==0u || e==0u || w==0u)
+			{return 25u;}	// no longer a crossing: a neighbour is the ground state
 		else if((n==16u||s==14u)&&(e==15u||w==13u))
 			{return 31u;}	// double crossing
 		else if(n==16u||s==14u)

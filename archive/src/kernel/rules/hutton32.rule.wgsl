@@ -1,3 +1,6 @@
+// Equal to the canonical Hutton32 on all 2^25 neighbourhoods:
+// http://gollygang.github.io/ruletablerepository/downloads/Hutton32.table
+// (checked on the GPU with `ca-research lut --rule hutton32 --against table:<file>` in research/; paper.md, section 10).
 	/***
 
 Motivation: In the original von Neumann transition rules, lines of transmission states can
@@ -298,7 +301,8 @@ fn hutton32(c: u32,n: u32,s: u32,e: u32,w: u32) -> u32
 	else if(c==5u)
 	{
 		if(!excited_OTS_arrow_to_us(c,n,s,e,w))
-			{return ( (quiesce(input(n,s,e,w)) - 9u+3u) % 4u )+9u;} 	// 1010: turn right
+			{ if(input(n,s,e,w)==0u) {return 7u;}	// nothing points at us: (0-9+3)%4 is -2 in C++
+			  return ( (quiesce(input(n,s,e,w)) - 9u+3u) % 4u )+9u; } 	// 1010: turn right
 		else
 			{return quiesce(input(n,s,e,w))+8u;}	// 1011: STS forward
 	}
@@ -312,14 +316,16 @@ fn hutton32(c: u32,n: u32,s: u32,e: u32,w: u32) -> u32
 	else if(c==7u)
 	{
 		if(!excited_OTS_arrow_to_us(c,n,s,e,w))
-			{return ( (quiesce(input(n,s,e,w)) - 9u+3u) % 4u )+17u;} 	// 1110: STS turn left
+			{ if(input(n,s,e,w)==0u) {return 15u;}	// nothing points at us: (0-9+3)%4 is -2 in C++
+			  return ( (quiesce(input(n,s,e,w)) - 9u+3u) % 4u )+17u; } 	// 1110: STS turn left
 		else	
 			{return 25u;}	// 1111
 	}
 	else if(c==8u)
 	{
 		if(!excited_OTS_arrow_to_us(c,n,s,e,w))
-			{return 9u+dir(input(n,s,e,w));} 	// 10000: move forward
+			{ if(input(n,s,e,w)==0u) {return 8u;}	// nothing points at us: (0-9)%4 is -1 in C++
+			  return 9u+dir(input(n,s,e,w)); } 	// 10000: move forward
 			//{ return 8u; }
 		else
 			{return 9u+dir(input(n,s,e,w)+1u);}	// 10001: turn left

@@ -1,0 +1,10 @@
+[package]
+name = "wgsl-check"
+version = "0.1.0"
+edition = "2021"
+description = "Parse + validate research/bitslice/step_planes.wgsl with naga (the WGSL front end wgpu 30 uses)"
+
+[dependencies]
+naga = { version = "=30.0.2", features = ["wgsl-in"] }
+
+[workspace]
