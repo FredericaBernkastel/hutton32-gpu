@@ -35,7 +35,7 @@ src/kernel/compute.wgsl    compute_main (one step), compute_lut (LUT build); sel
 src/kernel/util.wgsl       get_cell / set_cell (double-buffered cell record)
 src/kernel/vertex.wgsl     full-screen quad
 src/kernel/fragment.wgsl   plot bounds → cell → palette colour
-src/kernel/rules/          hutton32, hutton32b (active), hutton32-branchless, game_of_life
+src/kernel/rules/          hutton32, hutton32b (active), game_of_life
 doc/                       presets (1 px = 1 cell), screenshot, component sheet
 ```
 
@@ -53,7 +53,6 @@ To switch rules, change the `//!include` on the first line of `src/kernel/comput
 
 - `hutton32.rule.wgsl` — Tim Hutton's Hutton32: Nobili32 with write-and-retract, rotation-invariant construction. Equal to his [`Hutton32.table`](http://gollygang.github.io/ruletablerepository/downloads/Hutton32.table), and so to Golly's built-in Hutton32, on all 2²⁵ neighbourhoods.
 - `hutton32b.rule.wgsl` — **active**; Hutton32 with the changes below. Equal to [`Hutton32b.rule`](https://github.com/FredericaBernkastel/Hutton32-Computer/blob/master/doc/Hutton32b.rule) on all 2²⁵ neighbourhoods.
-- `hutton32-branchless.rule.wgsl` — branch-free rewrite of Hutton32's helper functions; not used.
 - `game_of_life.rule.wgsl` — predates the LUT and needs the 8-cell Moore neighbourhood, so it doesn't fit the current kernel.
 
 Changes in hutton32b relative to hutton32:
