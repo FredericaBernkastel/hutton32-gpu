@@ -1,14 +1,20 @@
 """Head-to-head: Golly HashLife (bgolly) vs the reference engine (`ca-research root`), same pattern,
 same step size, same number of generations. Also checks that both end in the same state.
 
-usage: python head2head.py <gens> <k> [--a A] [--timeout S] <pattern> [<pattern> ...]
+usage: python head2head.py <gens> <k> [--a A] [--timeout S] [--v1] <pattern> [<pattern> ...]
+--v1 runs the engine with the WGSL port as first archived (hutton32-v1 / hutton32b-v1, paper
+section 10) while Golly keeps the canonical rule, to show which patterns notice the difference.
+bgolly is taken from $BGOLLY (default: Golly 5.1's install path, else bgolly on PATH); the rule
+folder is research/rules.
 """
-import os, re, subprocess, sys, time
+import os, re, shutil, subprocess, sys, time
 
-BGOLLY = r"C:\Program Files\golly-5.1-win-64bit\bgolly.exe"
-RULES = r"D:/Program Files/golly-3.2-win/Rules/"
 HERE = os.path.dirname(os.path.abspath(__file__))
-ENGINE = os.path.join(HERE, "..", "target", "release", "ca-research.exe")
+_WIN_BGOLLY = r"C:\Program Files\golly-5.1-win-64bit\bgolly.exe"
+BGOLLY = os.environ.get("BGOLLY") or (_WIN_BGOLLY if os.path.exists(_WIN_BGOLLY) else shutil.which("bgolly") or "bgolly")
+RULES = os.path.join(HERE, "..", "rules") + os.sep
+_EXE = os.path.join(HERE, "..", "target", "release", "ca-research")
+ENGINE = _EXE + ".exe" if os.path.exists(_EXE + ".exe") else _EXE
 OUT = os.path.join(HERE, "..", "out", "golly")
 
 
@@ -39,6 +45,9 @@ def main():
             return v
         return default
 
+    v1 = "--v1" in argv
+    if v1:
+        argv.remove("--v1")
     a = take("--a", "2")
     timeout = float(take("--timeout", "300"))
     gens, k = int(argv[0]), int(argv[1])
@@ -53,7 +62,8 @@ def main():
         if os.path.exists(out_mc):
             os.remove(out_mc)
         tg, _ = timed(base + ["-m", str(gens), "-i", str(1 << k), "-o", out_mc, pat], timeout)
-        te, eout = timed([ENGINE, "root", "--pattern", pat, "--k", str(k), "--gens", str(gens), "--a", a], timeout)
+        erule = ["--rule", rule.lower() + "-v1"] if v1 else []
+        te, eout = timed([ENGINE, "root", "--pattern", pat, "--k", str(k), "--gens", str(gens), "--a", a] + erule, timeout)
         same = "?"
         if tg is not None and te is not None:
             _, fout = timed([ENGINE, "fingerprint", "--pattern", out_mc], timeout)

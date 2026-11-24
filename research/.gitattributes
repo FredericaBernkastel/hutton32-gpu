@@ -1,0 +1,4 @@
+# Patterns and rule tables are kept byte for byte (no line-ending conversion), so that
+# `cmp` against the upstream files holds on every checkout.
+patterns/** -text
+rules/** -text

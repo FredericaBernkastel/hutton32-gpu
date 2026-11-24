@@ -4,11 +4,14 @@ usage: python time_golly.py <pattern> <gens> <step> [<step> ...]
          [--algo RuleLoader|JvN|RuleTree] [--maxmem MB] [--cells N] [--timeout S] [--rules DIR]
 Prints wall-clock seconds (minus load-only time), generations/s, cell-updates/s (for --cells N)
 and the number of garbage collections Golly reported.
+bgolly is taken from $BGOLLY (default: Golly 5.1's install path, else bgolly on PATH); the default
+rule folder is research/rules.
 """
-import subprocess, sys, time
+import os, shutil, subprocess, sys, time
 
-BGOLLY = r"C:\Program Files\golly-5.1-win-64bit\bgolly.exe"
-RULES = r"D:/Program Files/golly-3.2-win/Rules/"
+_WIN_BGOLLY = r"C:\Program Files\golly-5.1-win-64bit\bgolly.exe"
+BGOLLY = os.environ.get("BGOLLY") or (_WIN_BGOLLY if os.path.exists(_WIN_BGOLLY) else shutil.which("bgolly") or "bgolly")
+RULES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rules") + os.sep
 
 
 def run(args, timeout):

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Model cost of four engine configurations on each kind of content, one pattern at a time.
-# usage: tools/engine_choice.sh <ca-research exe> <gens> [extra adapt options, e.g. --cell-rate 2.9e11]
+# usage (from research/): bash tools/engine_choice.sh <ca-research exe> <gens> [extra adapt options, e.g. --cell-rate 2.9e11]
 #   F16 : memoise everything, brute-force missed 16x16 windows   (64-gen macro-steps)
 #   F32 : memoise everything, brute-force missed 32x32 windows   (64-gen macro-steps)
 #   C64 : plain cells per 256x256 region + memo above the region (64-gen macro-steps)
 #   C16 : the same with 16-gen macro-steps
 R="$1"; G="${2:-4096}"; EXTRA=("${@:3}")
-P="D:/Program Files/golly-3.2-win/Patterns/Hutton32"
+P="$(dirname "$0")/../patterns"
 C="$P/misc/chaotic.rle"; K="$P/advanced counter v2.rle"
 declare -a NAMES=("ROM lotr1.PPMd" "chaotic (perturbed)" "counter" "32x32 movie" "squares" "serial display" "Segmented ROM" "16x16 movie")
 declare -a ARGS=(

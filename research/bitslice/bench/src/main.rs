@@ -515,7 +515,7 @@ fn main() {
   let here = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
   let lut_path = opt(&args, "--lut").map(PathBuf::from).unwrap_or(here.join("../../out/lut_table_Hutton32b.bin"));
   let pat_path =
-    opt(&args, "--pattern").map(PathBuf::from).unwrap_or(here.join("../patterns/hutton32b_8bit_counter.rle"));
+    opt(&args, "--pattern").map(PathBuf::from).unwrap_or(here.join("../../patterns/presets/hutton32b_8bit_counter.rle"));
   let sizes: Vec<usize> = opt(&args, "--size")
     .map(|s| s.split(',').map(|t| t.parse().expect("bad --size")).collect())
     .unwrap_or(vec![512, 4096]);

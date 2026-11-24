@@ -58,7 +58,7 @@ fn grid_fingerprint(g: &Grid) -> hl::Fingerprint {
 
 /// `selftest`: the reference engine must agree with per-cell stepping.
 pub fn selftest(args: &[String]) {
-  let default = crate::repo_root().join("archive/doc/hutton32b_8bit_counter.png");
+  let default = crate::patterns_dir().join("presets/hutton32b_8bit_counter.png");
   let path = opt(args, "--pattern").map(Into::into).unwrap_or(default);
   let (loaded, file_rule) = load_pattern(&path);
   let Loaded::Dense(pat) = loaded else { panic!("selftest needs a dense pattern") };

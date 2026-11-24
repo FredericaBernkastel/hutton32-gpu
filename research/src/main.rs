@@ -23,6 +23,10 @@ use std::path::PathBuf;
 pub fn repo_root() -> PathBuf {
   PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf()
 }
+/// `research/patterns`: every pattern the report uses (see its README).
+pub fn patterns_dir() -> PathBuf {
+  PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("patterns")
+}
 pub fn out_dir() -> PathBuf {
   let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("out");
   std::fs::create_dir_all(&p).unwrap();
@@ -116,6 +120,8 @@ fn main() {
           "  gpu-sparse --pattern P [--pitch F --reps N --export-mc F]  sparse universe: flat vs active blocks",
           "rules (--rule, --a, --b, --against): hutton32 | hutton32b (canonical; the WGSL files in archive/src/kernel/rules),",
           "  hutton32-v1 | hutton32b-v1 (those files as archived in commit 256ef91), table:<Golly .rule or .table file>",
+          "  (the canonical tables: table:rules/Hutton32.table, table:rules/Hutton32b.rule)",
+          "patterns (--pattern): palette PNG, RLE or macrocell; the report's are in patterns/ (default: the counter preset)",
         ]
         .join("\n")
       );
