@@ -10,9 +10,9 @@
 
 ## I. Introduction
 
-HashLife [1] represents a universe as a hash-consed quadtree and memoizes the future of every node, so that regions which recur cost nothing to advance again. Golly [2] implements it for arbitrary rule tables, and for most patterns built in such rules it is the fastest simulator available: it advances idle circuits of up to millions of cells at up to $5.4 \cdot 10^{14}$ cell-updates/s ($10^{9}$ generations/s), because every block in them has been seen before.
+HashLife [\[1\]] represents a universe as a hash-consed quadtree and memoizes the future of every node, so that regions which recur cost nothing to advance again. Golly [\[2\]] implements it for arbitrary rule tables, and for most patterns built in such rules it is the fastest simulator available: it advances idle circuits of up to millions of cells at up to $5.4 \cdot 10^{14}$ cell-updates/s ($10^{9}$ generations/s), because every block in them has been seen before.
 
-This paper concerns two rules of the von Neumann family that Golly runs: Hutton32 [3], which Golly also implements natively [2], and Hutton32b [4], a variant with a 3×3 XNOR gate and two added rule sets in which the Hutton32-Computer project builds counters, ROMs, displays and a CPU. Both have 32 states and a five-cell neighbourhood, so a rule table has $2^{25}$ entries. Their patterns are dense. A circulating ROM of 9.5 million cells has a period of 528 generations, and every 16×16 block of it differs from every other at every moment of the period. On it Golly reaches $2.4 \cdot 10^{7}$ cell-updates/s (2.5 generations/s) and collects garbage 18 times in 180 s, while one CPU core stepping cells through a lookup table does $3.0 \cdot 10^{8}$ cell-updates/s, 13× more. Brute-force stepping on a GPU reaches $1.86 \cdot 10^{11}$ cell-updates/s on any pattern (Section III-B) but cannot exploit recurrence at all.
+This paper concerns two rules of the von Neumann family that Golly runs: Hutton32 [\[3\]], which Golly also implements natively [\[2\]], and Hutton32b [\[4\]], a variant with a 3×3 XNOR gate and two added rule sets in which the Hutton32-Computer project builds counters, ROMs, displays and a CPU. Both have 32 states and a five-cell neighbourhood, so a rule table has $2^{25}$ entries. Their patterns are dense. A circulating ROM of 9.5 million cells has a period of 528 generations, and every 16×16 block of it differs from every other at every moment of the period. On it Golly reaches $2.4 \cdot 10^{7}$ cell-updates/s (2.5 generations/s) and collects garbage 18 times in 180 s, while one CPU core stepping cells through a lookup table does $3.0 \cdot 10^{8}$ cell-updates/s, 13× more. Brute-force stepping on a GPU reaches $1.86 \cdot 10^{11}$ cell-updates/s on any pattern (Section III-B) but cannot exploit recurrence at all.
 
 We ask what HashLife should look like when its memo table lives in GPU memory, and answer with measurements. The contributions are:
 
@@ -28,23 +28,23 @@ Section II reviews related work. Section III measures the costs and derives the 
 
 ### A. HashLife and Golly
 
-Gosper's HashLife [1] memoizes, for each quadtree node of side $2s$, its centre $s/2$ generations later, and obtains a node's result from thirteen overlapping sub-results. Golly's generic implementation, [`ghashbase`] [2], uses 2×2 leaves, nodes of six pointers (48 B), scalar rule evaluation and a mark-and-sweep collector that runs when a memory limit is reached and keeps what is reachable from the current root. Its bottom memo entry, a 4×4 block advanced one generation, is worth four cell-updates. lifelib [5] uses 16×16 bit-plane leaves and a bit-sliced SIMD leaf kernel on a single CPU thread; it is the closest relative of the memo floor proposed here.
+Gosper's HashLife [\[1\]] memoizes, for each quadtree node of side $2s$, its centre $s/2$ generations later, and obtains a node's result from thirteen overlapping sub-results. Golly's generic implementation, [`ghashbase`] [\[2\]], uses 2×2 leaves, nodes of six pointers (48 B), scalar rule evaluation and a mark-and-sweep collector that runs when a memory limit is reached and keeps what is reachable from the current root. Its bottom memo entry, a 4×4 block advanced one generation, is worth four cell-updates. lifelib [\[5\]] uses 16×16 bit-plane leaves and a bit-sliced SIMD leaf kernel on a single CPU thread; it is the closest relative of the memo floor proposed here.
 
 ### B. Parallel HashLife
 
-Rokicki sketched a level-by-level ("lockstep") order of the recursion in pseudocode in 2014 [6]; no implementation was found. In 2018 he observed that "no parallel versions of hashlife have been seen that outperform a single-threaded version" [7]. LaForest [8] used a $2^{16}$-entry 4×4 → 2×2 lookup table on a GPU and reported 1.18× over plain Life; a static hash table with eviction was proposed and not built. gol_engines [9] is the only measured parallel HashLife found: CPU work stealing, Life only, between 31× and below 1× depending on the pattern.
+Rokicki sketched a level-by-level ("lockstep") order of the recursion in pseudocode in 2014 [\[6\]]; no implementation was found. In 2018 he observed that "no parallel versions of hashlife have been seen that outperform a single-threaded version" [\[7\]]. LaForest [\[8\]] used a $2^{16}$-entry 4×4 → 2×2 lookup table on a GPU and reported 1.18× over plain Life; a static hash table with eviction was proposed and not built. gol_engines [\[9\]] is the only measured parallel HashLife found: CPU work stealing, Life only, between 31× and below 1× depending on the pattern.
 
 ### C. Brute-force stepping on GPUs
 
-Bit-sliced Life kernels on GPUs reach $10^{12}\text{–}10^{13}$ cell-updates/s [10], [11]. Bit-plane and multi-state kernels in wgpu are described in [12], and von Neumann's 29-state automaton was simulated on a SIMD machine in [13]. No throughput figure for a von Neumann-family rule on a GPU was found.
+Bit-sliced Life kernels on GPUs reach $10^{12}\text{–}10^{13}$ cell-updates/s [\[10\]], [\[11\]]. Bit-plane and multi-state kernels in wgpu are described in [\[12\]], and von Neumann's 29-state automaton was simulated on a SIMD machine in [\[13\]]. No throughput figure for a von Neumann-family rule on a GPU was found.
 
 ### D. Hash tables on GPUs
 
-GPU hash tables reach $2\text{–}4 \cdot 10^{9}$ lookups/s out of cache on large cards [14]–[17]. Address-translation effects on GPUs are characterised in [18], and dispatch overheads in WebGPU are measured in [19].
+GPU hash tables reach $2\text{–}4 \cdot 10^{9}$ lookups/s out of cache on large cards [\[14\]]–[\[17\]]. Address-translation effects on GPUs are characterised in [\[18\]], and dispatch overheads in WebGPU are measured in [\[19\]].
 
 ### E. Approaches not pursued
 
-FFT convolution computes neighbour sums in *O*(*N* log *N*) time independent of radius and is used by SmoothLife and Lenia for radii of 10–30 [20], [21]. At radius 1 it loses: FFT Life is 3× slower than direct convolution in one benchmark [22], and convolution-based Life in PyTorch is 121× slower than a bit-packed CUDA kernel in another [23]. For a non-totalistic 32-state rule the only linear statistic from which the next state follows is an injective code of the neighbourhood, which is the table index a direct kernel builds anyway. Generations can be skipped in closed form only for additive rules [24] and rules that decompose into linear ones [25]; predicting general automata is P-complete [26]. Coarse-graining [27] looks for automata on blocks of cells; the tile automaton of Section IV-D is an exact instance whose alphabet is discovered lazily.
+FFT convolution computes neighbour sums in *O*(*N* log *N*) time independent of radius and is used by SmoothLife and Lenia for radii of 10–30 [\[20\]], [\[21\]]. At radius 1 it loses: FFT Life is 3× slower than direct convolution in one benchmark [\[22\]], and convolution-based Life in PyTorch is 121× slower than a bit-packed CUDA kernel in another [\[23\]]. For a non-totalistic 32-state rule the only linear statistic from which the next state follows is an injective code of the neighbourhood, which is the table index a direct kernel builds anyway. Generations can be skipped in closed form only for additive rules [\[24\]] and rules that decompose into linear ones [\[25\]]; predicting general automata is P-complete [\[26\]]. Coarse-graining [\[27\]] looks for automata on blocks of cells; the tile automaton of Section IV-D is an exact instance whose alphabet is discovered lazily.
 
 Not found in the literature searched: a memo table of CA block transitions held in GPU memory; a bounded-depth HashLife that falls back to a brute-force kernel on a miss; a tile automaton swept positionally; a measured level-synchronous HashLife. The search could not reach forum threads behind logins.
 
@@ -328,7 +328,7 @@ Keys are compared in full and tiles by content. There is no probabilistic hashin
 
 ### A. Baseline
 
-The state-of-the-art baseline is Golly 5.1's command-line `bgolly` without rendering, with an 8 GB memory limit and the best of several step sizes per pattern. Golly 5.1 is the official 64-bit Windows release of November 2026, built from branch `master` of Golly's repository [2]. The release is not tagged and its build commit is not recorded, but Golly's source is the same in every commit from 9a7079a8 ("updated version to 5.1", 2026-11-06) to 53bdb74e (2026-11-15), the head of `master`; the commits in between change only patterns and the change log. All references to Golly's source are to commit 53bdb74e. Hutton32b patterns run under RuleLoader with the published [`Hutton32b.rule`][Hutton32b.rule] [4] and Hutton32 patterns under Golly's native JvN algorithm, which is equal to [`Hutton32.table`] [3] on all $2^{25}$ neighbourhoods (Appendix B). Load time is subtracted. On the GPU, the byte-LUT brute-force kernel of Section III-B is the baseline.
+The state-of-the-art baseline is Golly 5.1's command-line `bgolly` without rendering, with an 8 GB memory limit and the best of several step sizes per pattern. Golly 5.1 is the official 64-bit Windows release of November 2026, built from branch `master` of Golly's repository [\[2\]]. The release is not tagged and its build commit is not recorded, but Golly's source is the same in every commit from 9a7079a8 ("updated version to 5.1", 2026-11-06) to 53bdb74e (2026-11-15), the head of `master`; the commits in between change only patterns and the change log. All references to Golly's source are to commit 53bdb74e. Hutton32b patterns run under RuleLoader with the published [`Hutton32b.rule`][Hutton32b.rule] [\[4\]] and Hutton32 patterns under Golly's native JvN algorithm, which is equal to [`Hutton32.table`] [\[3\]] on all $2^{25}$ neighbourhoods (Appendix B). Load time is subtracted. On the GPU, the byte-LUT brute-force kernel of Section III-B is the baseline.
 
 ### B. Patterns
 
@@ -715,8 +715,8 @@ Each rule has one authoritative table (Table XXVI). The harness's CPU rule imple
 
 | Rule | Canonical table | Verified identical to it: 0 of $2^{25}$ neighbourhoods differ |
 |---|---|---|
-| **Hutton32** | [`Hutton32.table`] in Golly's rule table repository [3] | Golly's built-in Hutton32: the harness's transcription of [`jvnalgo.cpp`] [2] with C integer semantics, which also reproduces `bgolly` on [`squares`] and on the Hutton replicator |
-| **Hutton32b** (a 3×3 XNOR gate and two added rule sets) | [`Hutton32b.rule`][Hutton32b.rule 2] in the Hutton32-Computer repository [4] | the copy in Golly's `Rules` folder, which differs from it only by one blank line and its line endings and was the copy `bgolly` loaded for the measurements; [`rules/`] holds the published file |
+| **Hutton32** | [`Hutton32.table`] in Golly's rule table repository [\[3\]] | Golly's built-in Hutton32: the harness's transcription of [`jvnalgo.cpp`] [\[2\]] with C integer semantics, which also reproduces `bgolly` on [`squares`] and on the Hutton replicator |
+| **Hutton32b** (a 3×3 XNOR gate and two added rule sets) | [`Hutton32b.rule`][Hutton32b.rule 2] in the Hutton32-Computer repository [\[4\]] | the copy in Golly's `Rules` folder, which differs from it only by one blank line and its line endings and was the copy `bgolly` loaded for the measurements; [`rules/`] holds the published file |
 
 ## Appendix C. Harness Map
 
@@ -742,7 +742,32 @@ Each rule has one authoritative table (Table XXVI). The harness's CPU rule imple
 | [`rules/`] | [`Hutton32.table`] and [`Hutton32b.rule`][Hutton32b.rule], byte for byte as published; also `bgolly`'s rule folder |
 
 <!-- link targets -->
+[\[1\]]: #references
+[\[2\]]: #references
+[\[3\]]: #references
+[\[4\]]: #references
 [`ghashbase`]: https://sourceforge.net/p/golly/code/ci/53bdb74e48cd0792f87a2e3e6a5bb0c5d7d5af0e/tree/gollybase/ghashbase.h
+[\[5\]]: #references
+[\[6\]]: #references
+[\[7\]]: #references
+[\[8\]]: #references
+[\[9\]]: #references
+[\[10\]]: #references
+[\[11\]]: #references
+[\[12\]]: #references
+[\[13\]]: #references
+[\[14\]]: #references
+[\[17\]]: #references
+[\[18\]]: #references
+[\[19\]]: #references
+[\[20\]]: #references
+[\[21\]]: #references
+[\[22\]]: #references
+[\[23\]]: #references
+[\[24\]]: #references
+[\[25\]]: #references
+[\[26\]]: #references
+[\[27\]]: #references
 [`lotr1.ANSI-1M`]: research/patterns/misc/extra/lotr1.ANSI-1M.rle
 [`advanced counter v2`]: research/patterns/advanced%20counter%20v2.rle
 [`32x32 movie`]: research/patterns/32x32%20movie/32x32%20movie.mc
