@@ -16,7 +16,7 @@ fn uniform(gpu: &Gpu, words: &[u32]) -> wgpu::Buffer {
 }
 
 fn dense_pattern(args: &[String]) -> (Grid, Vec<u8>, String) {
-  let default = crate::patterns_dir().join("presets/hutton32b_8bit_counter.png");
+  let default = crate::patterns_dir().join("presets/hutton32b_8bit_counter.rle");
   let path: std::path::PathBuf = opt(args, "--pattern").map(Into::into).unwrap_or(default);
   let (loaded, file_rule) = cmd_stats::load_pattern(&path);
   let variant = cmd_stats::variant_for(args, &file_rule);

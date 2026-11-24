@@ -49,8 +49,8 @@ CHA=$P/misc/chaotic.rle
 SQ=$P/misc/squares.rle
 ROM=$P/misc/extra/lotr1.ANSI-1M.rle
 PPMD=$P/misc/extra/lotr1.PPMd-244K.rle
-NEW=$P/presets/hutton32b_8bit_counter.png
-OLD=$P/presets/hutton32_8bit_counter_old.png
+NEW=$P/presets/hutton32b_8bit_counter.rle
+OLD=$P/presets/hutton32_8bit_counter_old.rle
 # eight perturbed copies of chaotic on a 512-cell pitch
 CH8="$CHA@64,64;$CHA@576,64~1;$CHA@1088,64~2;$CHA@1600,64~3;$CHA@64,576~4;$CHA@576,576~5;$CHA@1088,576~6;$CHA@1600,576~7"
 
@@ -96,12 +96,12 @@ run() {
   lut-kernel)
     $R gpu-brute --pattern $NEW --gens 65536 --per-submit 1024 --verify
     $R gpu-brute --pattern $SQ --gens 65536 --per-submit 1024 --verify
-    $R gpu-brute --pattern $OLD --rule hutton32 --reps 8 --gens 2048 --per-submit 64 --verify
-    $R gpu-brute --pattern $OLD --rule hutton32 --reps 24 --gens 512 --per-submit 32
+    $R gpu-brute --pattern $OLD --reps 8 --gens 2048 --per-submit 64 --verify
+    $R gpu-brute --pattern $OLD --reps 24 --gens 512 --per-submit 32
     for s in "8 8" "16 16" "32 8" "64 4"; do
-      set -- $s; $R gpu-brute --pattern $OLD --rule hutton32 --reps 24 --gens 512 --per-submit 32 --wgx $1 --wgy $2
+      set -- $s; $R gpu-brute --pattern $OLD --reps 24 --gens 512 --per-submit 32 --wgx $1 --wgy $2
     done
-    $R gpu-brute --pattern $OLD --rule hutton32 --reps 24 --gens 512 --per-submit 32 --backend dx12 ;;
+    $R gpu-brute --pattern $OLD --reps 24 --gens 512 --per-submit 32 --backend dx12 ;;
   lut-content)
     $R gpu-brute2 --side 8192 --gens 64 --pattern $CHA --verify
     $R gpu-brute2 --side 8192 --gens 64 --verify

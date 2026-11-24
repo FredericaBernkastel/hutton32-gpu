@@ -21,12 +21,11 @@ A pattern runs under the rule named in its header (`cmd_stats.rs: variant_for`),
 | `misc/extra/lotr1.ANSI-1M.rle` | Hutton32b | 3095 × 3059 | golly, rom-kernels, miss-rates, sweep, sweep-tiles, bitplane-content, bitplane-sizes, tile |
 | `misc/extra/lotr1.PPMd-244K.rle` | Hutton32b | 1548 × 1461 | miss-rates, sweep-ops, floors, cond-miss, engine-choice, controller, reprice |
 | `replicators/Hutton-replicator.rle` | Hutton32 | 3129 × 4 at generation 0 | golly, batches, head2head |
-| `presets/hutton32b_8bit_counter.png` | Hutton32b (no header; the harness default) | 191 × 197 | lut-kernel |
-| `presets/hutton32_8bit_counter_old.png` | Hutton32, given as `--rule hutton32` | 633 × 449 | lut-kernel |
-| `presets/hutton32b_8bit_counter.rle` | Hutton32b | 191 × 197 | cpu-bench (default input of `bitslice/bench`) |
+| `presets/hutton32b_8bit_counter.rle` | Hutton32b | 191 × 197 | lut-kernel, cpu-bench; the default pattern of the harness and of `bitslice/bench` |
+| `presets/hutton32_8bit_counter_old.rle` | Hutton32 | 633 × 449 | lut-kernel (tiled into the large grids) |
 
 Sources:
 
 * Everything outside `presets/` comes from the Hutton32 folder of the Golly installation the paper used (`Patterns/Hutton32`), which is a clone of the Hutton32-Computer repository at commit `f767939`. `misc/extra/` is not committed in that repository. `replicators/Hutton-replicator.rle` is Tim Hutton's and ships with Golly.
-* `presets/*.png` are presets of the archived app, identical to the files in `archive/doc`; the copies keep `research/` self-contained. One pixel is one cell; every colour is an entry of the app's palette.
-* `presets/hutton32b_8bit_counter.rle` is `hutton32b_8bit_counter.png` converted by `bitslice/png_to_rle.py`; `ca-research fingerprint` gives both the same population, bounding box and hash.
+* `presets/*.rle` are the two palette-PNG presets of the archived app (`archive/doc/hutton32b_8bit_counter.png`, `archive/doc/hutton32_8bit_counter_old.png`; one pixel per cell) converted to Golly RLE with `ca-research export` (the first one earlier with `bitslice/png_to_rle.py`, which gives the same file). For each, `ca-research fingerprint` gives the PNG and the RLE the same population, bounding box and hash, and `tools/head2head.py` shows Golly and the reference engine in the same state after 65,536 generations, so Golly loads them as the harness does.
+* The two presets are different patterns from `advanced counter v2`: the Hutton32b one has the same bounding box but 24,449 live cells against 24,058.

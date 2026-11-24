@@ -332,7 +332,7 @@ The state-of-the-art baseline is Golly 5.1's command-line `bgolly` without rende
 
 ### B. Patterns
 
-Fifteen patterns of the Hutton32-Computer collection and two counters stored as palette PNG images, a [Hutton32b counter] of the same size as `advanced counter v2` (191×197) and a [Hutton32 counter] (633×449) that is tiled into the large brute-force grids, all listed with their rules and bounding boxes in [`README.md`]: an 8-bit counter ([`advanced counter v2`], 191×197, period 513,024), an active display ([`squares`], 650×423), a chaotic circuit ([`chaotic`], 151×132), two circulating ROMs ([`lotr1.ANSI-1M`], 3095×3059, and [`lotr1.PPMd-244K`], 1548×1461, period 528), circuits that are idle most of the time ([serial] and [parallel] displays, a [segmented ROM], a [demultiplexer], two movies, [16×16] and [32×32], a [CPU], a [BCD converter], a [component sheet]) and Tim Hutton's [replicator], which grows to 6813×6691. Large universes are built from phase-shifted copies, so that no two large blocks are equal.
+Fifteen patterns of the Hutton32-Computer collection and two further 8-bit counters, a [Hutton32b counter] of the same size as `advanced counter v2` (191×197) and a [Hutton32 counter] (633×449) that is tiled into the large brute-force grids, all listed with their rules and bounding boxes in [`README.md`]: an 8-bit counter ([`advanced counter v2`], 191×197, period 513,024), an active display ([`squares`], 650×423), a chaotic circuit ([`chaotic`], 151×132), two circulating ROMs ([`lotr1.ANSI-1M`], 3095×3059, and [`lotr1.PPMd-244K`], 1548×1461, period 528), circuits that are idle most of the time ([serial] and [parallel] displays, a [segmented ROM], a [demultiplexer], two movies, [16×16] and [32×32], a [CPU], a [BCD converter], a [component sheet]) and Tim Hutton's [replicator], which grows to 6813×6691. Large universes are built from phase-shifted copies, so that no two large blocks are equal.
 
 ### C. Verification
 
@@ -391,7 +391,7 @@ Table XI places GHL against both baselines on every workload class. The GHL colu
 | Idle circuits | $1.2 \cdot 10^{5}\text{–}5.7 \cdot 10^{6}$ | $4.9 \cdot 10^{12}\text{–}5.4 \cdot 10^{14}$ ($4.8 \cdot 10^{6}\text{–}9.9 \cdot 10^{8}$) | — | host recursion | $5.8 \cdot 10^{12}\text{–}1.0 \cdot 10^{15}$ ($5.3 \cdot 10^{6}\text{–}1.7 \cdot 10^{9}$) | 0.57–1.9× | CPU, same final states |
 | [Hutton replicator], 262,144 gens | at most $4.6 \cdot 10^{7}$ | at most $1.1 \cdot 10^{11}$ (2,351) | — | memoized recursion | at most $5.5 \cdot 10^{10}$ (1,196) on the CPU | 0.51× (CPU); 7–21× projected on the GPU | CPU; model |
 
-ᵃ On the [Hutton32b PNG counter], a different counter of the same size; at this size every kernel waits for the dispatch, not for the content. The byte LUT needs 1 B per cell in each of two buffers, which does not fit $10^{10}$ cells in 16 GB. Idle circuits: $2^{24}$ generations at step 1024 (Table XVIII); the ratio is per pattern. Rates count every cell of the bounding box, empty ones included; the sparse universe and the idle circuits are therefore credited far above the brute-force ceiling of $3.0 \cdot 10^{11}$, and their rows compare engines on the same cells, not work done.
+ᵃ On the [Hutton32b counter], a different counter of the same size; at this size every kernel waits for the dispatch, not for the content. The byte LUT needs 1 B per cell in each of two buffers, which does not fit $10^{10}$ cells in 16 GB. Idle circuits: $2^{24}$ generations at step 1024 (Table XVIII); the ratio is per pattern. Rates count every cell of the bounding box, empty ones included; the sparse universe and the idle circuits are therefore credited far above the brute-force ceiling of $3.0 \cdot 10^{11}$, and their rows compare engines on the same cells, not work done.
 
 GHL is faster than Golly on every workload measured on the GPU, by 1.3× on the small active counter and by four to six orders of magnitude on dense novel content. The hit-path rates assume a table that the CPU learned (80–90 s per ROM period at 16×16 tiles, 3.2 s for the counter's cycle); Section VII-A projects the on-GPU learning time. Where Golly is at its best, on idle circuits and small universes with little novelty, GHL hands the work to the host recursion, which is HashLife and runs at Golly's speed within a factor of two.
 
@@ -410,7 +410,7 @@ GHL is faster than Golly on every workload measured on the GPU, by 1.3× on the 
 | Random states, $5.4 \cdot 10^{8}$ cells | | $2.3 \cdot 10^{11}$ | |
 | Random states, $1.07 \cdot 10^{9}$ cells | | $2.8 \cdot 10^{11}$ | |
 
-ᵃ On the Hutton32b PNG counter of the same size. The tiled grids are copies of the [Hutton32 counter]. Each kernel pads a single pattern differently (the counter is stepped as 199×205 cells by the byte-LUT kernel and 224×205 by the bit-plane kernels); only the pattern's bounding box is counted. The largest bit-plane rows are steady-state rates over 256 and 512 generations; the first 32 generations after upload averaged $1.3\text{–}1.8 \cdot 10^{11}$.
+ᵃ On the Hutton32b counter of the same size. The tiled grids are copies of the [Hutton32 counter]. Each kernel pads a single pattern differently (the counter is stepped as 199×205 cells by the byte-LUT kernel and 224×205 by the bit-plane kernels); only the pattern's bounding box is counted. The largest bit-plane rows are steady-state rates over 256 and 512 generations; the first 32 generations after upload averaged $1.3\text{–}1.8 \cdot 10^{11}$.
 
 On small grids every kernel waits for the dispatch: 3.65 µs, whatever it does. A further generation inside a shared tile costs about 1.1 µs, so sixteen take 20 µs instead of 58, which makes the shared-tile kernel 2.9× the plain kernel on the counter and 3.3× on [`squares`]. Tile shape matters by up to 1.6× ([`squares`] at $k = 16$: $9.4 \cdot 10^{10}$, $1.0 \cdot 10^{11}$ and $1.5 \cdot 10^{11}$ cell-updates/s, or 342 k, 373 k and 563 k gens/s, for tiles 16, 32 and 48 rows high). On large grids the same kernel loses: at $k = 1$ it reaches 55 % of the plain kernel, so the detour through shared memory costs more than the traffic it saves; at $16384^{2}$ it does $1.7 \cdot 10^{11}$ at $k = 1$, $2.5 \cdot 10^{11}$ at $k = 3$ and $1.8 \cdot 10^{11}$ at $k = 8$, and on the ROM $2.2 \cdot 10^{11}$ (23 k gens/s, $k = 4$). The crossover lies between $3 \cdot 10^{5}$ and $9.5 \cdot 10^{6}$ cells and was not located, which is why Algorithm 1 races the two kernels.
 
@@ -786,8 +786,8 @@ Each rule has one authoritative table (Table XXVI). The harness's CPU rule imple
 [counter]: research/patterns/advanced%20counter%20v2.rle
 [Hutton32b.rule]: research/rules/Hutton32b.rule
 [`Hutton32.table`]: research/rules/Hutton32.table
-[Hutton32b counter]: research/patterns/presets/hutton32b_8bit_counter.png
-[Hutton32 counter]: research/patterns/presets/hutton32_8bit_counter_old.png
+[Hutton32b counter]: research/patterns/presets/hutton32b_8bit_counter.rle
+[Hutton32 counter]: research/patterns/presets/hutton32_8bit_counter_old.rle
 [`README.md`]: research/patterns/README.md
 [`lotr1.PPMd-244K`]: research/patterns/misc/extra/lotr1.PPMd-244K.rle
 [segmented ROM]: research/patterns/misc/Segmented%20ROM%20%28256k%29.mc
@@ -802,7 +802,6 @@ Each rule has one authoritative table (Table XXVI). The harness's CPU rule imple
 [lotr1.ANSI-1M.rle]: research/patterns/misc/extra/lotr1.ANSI-1M.rle
 [ROMs]: research/patterns/misc/extra/lotr1.ANSI-1M.rle
 [counters]: research/patterns/advanced%20counter%20v2.rle
-[Hutton32b PNG counter]: research/patterns/presets/hutton32b_8bit_counter.png
 [`serial display`]: research/patterns/misc/serial%20display%20%2832x32%29.mc
 [Segmented ROM (256k)]: research/patterns/misc/Segmented%20ROM%20%28256k%29.mc
 [serial display (32×32)]: research/patterns/misc/serial%20display%20%2832x32%29.mc
