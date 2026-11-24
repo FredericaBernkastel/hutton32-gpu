@@ -32,7 +32,7 @@ impl super::GPUDriver {
 
   pub fn load_simulation(&mut self, device: &Device, queue: &Queue) {
     //TODO: RLE/Macrocell Pattern reader
-    let path = "./doc/hutton32_squares.png";
+    let path = "./doc/hutton32b_8bit_counter.png";
     let mut pattern = image::open(path)
       .expect("Failed to load {path}")
       .to_rgba8();
