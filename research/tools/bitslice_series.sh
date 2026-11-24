@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Every GPU measurement of paper section 13, with the circuit in bitslice/step_planes.wgsl.
+# Every GPU measurement of the bit-plane, window and shared-tile kernels, with the circuit in
+# bitslice/step_planes.wgsl. reproduce.sh runs it section by section, one target per table.
 # usage (from research/): bash tools/bitslice_series.sh ./target/release/ca-research [sections] [quick]
 #   sections: letters to run, default ABCDEFGHST
 #   quick:    skip the CPU verification of the pattern runs (the random-soup runs are still verified)

@@ -1,6 +1,6 @@
 # Canonical rule tables
 
-Byte-for-byte copies of the two tables that define the rules (`paper.md` §10):
+Byte-for-byte copies of the two tables that define the rules (`paper.md`, Appendix B):
 
 | File | Rule | Upstream |
 |---|---|---|
