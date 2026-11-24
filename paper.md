@@ -557,7 +557,7 @@ Two refinements were proposed after the first version of this report: let tiles 
 | 128×128 | $1.36 \cdot 10^{10}$ | 1 149 321 | 43 759 | 4 MiB | 3 MiB | 4 224 |
 | 256×256 | $1.83 \cdot 10^{10}$ | **6 714 020** | 12 475 | 1 MiB | 1 MiB | 8 448 |
 
-Each level is worth 6–24×: 8× from the tile-step and the rest from the table sliding into the L2 cache. The price is the last column. The ROM's period is $528 = 2^4 \cdot 33$; a tile of side $2^L$ returns to the same alignment every $2^L$ generations and so sees the same content again only after $\operatorname{lcm}(528, 2^L)$ generations. Every level above 16×16 doubles the time to learn. Large tiles are something a region grows into.
+Each level is worth 6–24×: 8× from the tile-step and the rest from the table sliding into the L2 cache. The price is the last column. The ROM's period is $528 = 2^4 \cdot 33$; a tile of side $2^L$ returns to the same alignment every $2^L$ generations and so sees the same content again only after $\mathrm{lcm}(528, 2^L)$ generations. Every level above 16×16 doubles the time to learn. Large tiles are something a region grows into.
 
 **How much it helps when content is not periodic** (hash operations per generation, flat sweep at the given tile, recursion below it; `flat`):
 
@@ -822,177 +822,58 @@ Not done: the kernel is a benchmark, not yet the app's kernel; there is no circu
 
 ## Appendix A. Reproducing the numbers
 
-Everything the commands need is in the repository: the harness in `research/`, every pattern in `research/patterns` (sources and rules in its README), and the two canonical tables in `research/rules`. The commands are bash and run from `research/`, in git-bash on Windows or in WSL or Linux (where `python` may be `python3`). They need Rust, Python 3 and a GPU with Vulkan or DX12. Golly is needed only for the Golly columns: `tools/time_golly.py` and `tools/head2head.py` take `bgolly` from `$BGOLLY`, from Golly 5.1's Windows install path, or from `PATH`, and use `research/rules` as Golly's rule folder. GPU figures should be taken on an otherwise idle machine (§11).
+Everything the figures need is in the repository: the harness in `research/`, every pattern in `research/patterns` (sources and rules in its README) and the two canonical tables in `research/rules`. Each figure is one command, run in bash (git-bash on Windows, WSL or Linux) from `research/`. `research/reproduce.sh` builds the harness first; run with no argument it lists the targets, and its source holds the exact harness commands behind each one.
 
-```bash
-cd research
-cargo build --release
-R=./target/release/ca-research        # git-bash finds the .exe
-P=patterns
-BG="${BGOLLY:-/c/Program Files/golly-5.1-win-64bit/bgolly.exe}"   # only for the direct bgolly calls in §4.3
-mkdir -p out/golly out/v1
+It needs Rust, Python 3 and a GPU with Vulkan or DX12. The Golly targets also need `bgolly`, which is taken from `$BGOLLY`, from Golly 5.1's Windows install path or from `PATH`, with `research/rules` as its rule folder. GPU figures should be taken on an otherwise idle machine (§11).
 
-# §1.1, §10: the rules
-$R selftest                                                      # reference engine vs per-cell stepping
-$R lut --rule hutton32b                                          # CPU port vs archive/src/kernel/rules/hutton32b.rule.wgsl run on the GPU
-$R lut --rule hutton32  --against table:rules/Hutton32.table     # 0 mismatches: the WGSL file is Tim Hutton's table
-$R lut --rule hutton32b --against table:rules/Hutton32b.rule     # 0 mismatches; leaves out/lut_table_Hutton32b.bin for §13
-$R rulediff --a table:rules/Hutton32.table --b table:rules/Hutton32b.rule   # 74 854
-$R rulediff --a hutton32-v1  --b hutton32                        # 2 430 000: the files as archived in 256ef91
-$R rulediff --a hutton32b-v1 --b hutton32b                       # 3 082 794
-git show 256ef91:archive/src/kernel/rules/hutton32b.rule.wgsl > out/v1/hutton32b.rule.wgsl
-$R lut --rule hutton32b --wgsl out/v1/hutton32b.rule.wgsl --against hutton32b-v1   # 0: the v1 port is the v1 file
-python tools/fix_rules.py                                        # reports every correction as present
-# optional, needs the network: the committed tables are the upstream files
-curl -sL --retry 3 https://gollygang.github.io/ruletablerepository/downloads/Hutton32.table | cmp - rules/Hutton32.table && echo same
-curl -sL --retry 3 https://raw.githubusercontent.com/FredericaBernkastel/Hutton32-Computer/master/doc/Hutton32b.rule | cmp - rules/Hutton32b.rule && echo same
+| Figure | Command | Harness | Needs |
+|---|---|---|---|
+| §1.1: reference engine against per-cell stepping; CPU rule port against the WGSL on the GPU and against both tables | `bash reproduce.sh 1.1` | `selftest`, `lut` | |
+| §1.2, the archived kernel | `bash reproduce.sh 1.2a` | `gpu-baseline` | |
+| §1.2, the byte-LUT kernel; workgroup shapes, DX12 | `bash reproduce.sh 1.2b` | `gpu-brute` | |
+| §1.2, content; the class-compressed LUT | `bash reproduce.sh 1.2c` | `gpu-brute2` | |
+| §1.3, Golly HashLife | `bash reproduce.sh 1.3a` | `tools/time_golly.py` | Golly |
+| §1.3, `lotr1.ANSI-1M` on both GPU kernels and on one CPU core | `bash reproduce.sh 1.3b` | `gpu-baseline`, `gpu-brute --verify` | |
+| §2.1, $R_P$ and $R_I$ ($R_B$ is `1.2b`) | `bash reproduce.sh 2.1` | `gpu-probe`, `gpu-insert` | |
+| §2.3, miss rates of the flat tile automaton | `bash reproduce.sh 2.3` | `flat` | |
+| §2.5, batch statistics | `bash reproduce.sh 2.5` | `root` | |
+| §2.6, both tables | `bash reproduce.sh 2.6` | `gpu-latency` | |
+| §4.2 | `bash reproduce.sh 4.2` | `gpu-sweep` | |
+| §4.3 | `bash reproduce.sh 4.3` | `gpu-sparse`, `tools/time_golly.py`, `bgolly`, `root` | Golly |
+| §4.4 | `bash reproduce.sh 4.4` | `tools/head2head.py` | Golly |
+| §10, the canonical tables and the v1 counts | `bash reproduce.sh 10a` | `lut`, `rulediff`, `tools/fix_rules.py` | |
+| §10, which patterns notice the v1 rules | `bash reproduce.sh 10b` | `tools/head2head.py --v1` | Golly |
+| §10, the committed tables are the published files | `bash reproduce.sh 10c` | `curl`, `cmp` | network |
+| §12.2, larger sweep tiles on the GPU | `bash reproduce.sh 12.2a` | `gpu-sweep` | |
+| §12.2, hash operations per generation | `bash reproduce.sh 12.2b` | `flat` | |
+| §12.3 | `bash reproduce.sh 12.3` | `adapt` | |
+| §12.4 | `bash reproduce.sh 12.4` | `root` | |
+| §12.5, engine per content | `bash reproduce.sh 12.5a` | `tools/engine_choice.sh` | |
+| §12.5, the controller | `bash reproduce.sh 12.5b` | `adapt` | |
+| §12.6, the counter's work per generation | `bash reproduce.sh 12.6` | `adapt` | |
+| §13.1, forms A and C | `bash reproduce.sh 13.1` | `bitslice/scalar.py`, `bitslice/tables.py` | network (numpy) |
+| §13.2, the circuit against the table | `bash reproduce.sh 13.2` | `bitslice/verify.py` | network (numpy) |
+| §13.3, $16384^{2}$ cells, four contents | `bash reproduce.sh 13.3a` | `gpu-bitslice`, `gpu-brute2` | |
+| §13.3, other sizes | `bash reproduce.sh 13.3b` | `gpu-bitslice` | |
+| §13.3, where the limit is | `bash reproduce.sh 13.3c` | `gpu-bitslice --wgsl` | |
+| §13.4, one thread per window; serial cost | `bash reproduce.sh 13.4a` | `gpu-window`, `gpu-bitslice` | |
+| §13.4, shared tile | `bash reproduce.sh 13.4b` | `gpu-tile` | |
+| §13.5 | `bash reproduce.sh 13.5` | `bitslice/bench` | |
+| §13.6, §12.5 and §12.6 re-priced | `bash reproduce.sh 13.6` | `tools/engine_choice.sh`, `adapt --cell-rate 2.9e11` | |
 
-# §1.2: the archived kernel, then the byte-LUT kernel done properly
-NEW=$P/presets/hutton32b_8bit_counter.png; OLD=$P/presets/hutton32_8bit_counter_old.png
-$R gpu-baseline --pattern $NEW --gens 16384 --per-submit 272 --verify
-$R gpu-baseline --pattern $OLD --rule hutton32 --gens 8192 --per-submit 32 --verify
-$R gpu-baseline --pattern $P/misc/squares.rle --gens 8192 --per-submit 32 --verify
-$R gpu-baseline --pattern $OLD --rule hutton32 --reps 8 --gens 512 --per-submit 32            # 5080 x 3608
-$R gpu-brute    --pattern $NEW --gens 65536 --per-submit 1024 --verify
-$R gpu-brute    --pattern $P/misc/squares.rle --gens 65536 --per-submit 1024 --verify
-$R gpu-brute    --pattern $OLD --rule hutton32 --reps 8 --gens 2048 --per-submit 64 --verify  # 18.7 M cells
-$R gpu-brute    --pattern $OLD --rule hutton32 --reps 24 --gens 512 --per-submit 32           # 169 M cells
-for s in "8 8" "16 16" "32 8" "64 4"; do set -- $s; $R gpu-brute --pattern $OLD --rule hutton32 --reps 24 --gens 512 --per-submit 32 --wgx $1 --wgy $2; done
-$R gpu-brute    --pattern $OLD --rule hutton32 --reps 24 --gens 512 --per-submit 32 --backend dx12
-$R gpu-brute2   --side 8192 --gens 64 --pattern $P/misc/chaotic.rle --verify                 # content table: tiled chaotic
-$R gpu-brute2   --side 8192 --gens 64 --verify                                               # random states, decaying
-$R gpu-brute2   --side 8192 --gens 64 --same-src --verify                                    # random states, held constant
+Several targets can be given at once. `4.2` and `12.2a` learn the ROM's table on the CPU before each GPU run, about 90 s per period at 16×16 tiles. The §13 GPU targets are sections of `tools/bitslice_series.sh`, which runs all of them in one go.
 
-# §1.3: Golly HashLife (bgolly), load time subtracted; the last two lines are the GPU and single-core rates on the ROM
-python tools/time_golly.py "$P/advanced counter v2.rle" 1048576 1 8 64 512 4096 32768 262144 --cells 37627
-python tools/time_golly.py $P/misc/squares.rle 65536 8 64 1024 --algo JvN --cells 274950
-python tools/time_golly.py $P/misc/chaotic.rle 16384 8 64 1024 --cells 19932
-python tools/time_golly.py $P/misc/extra/lotr1.ANSI-1M.rle 65536 64 4096 --cells 9467605 --timeout 180
-python tools/time_golly.py $P/replicators/Hutton-replicator.rle 1048576 1024 16384 262144 --algo JvN --timeout 300
-for spec in "misc/Segmented ROM (256k).mc|RuleLoader|538740" "misc/serial display (32x32).mc|RuleLoader|1710912" \
-            "32x32 movie/32x32 movie.mc|RuleLoader|1404064" "misc/parallel display (16x16).mc|JvN|612717" \
-            "16x16 movie/16x16 movie.mc|JvN|5716840" "misc/efficient_demultiplexer.mc|JvN|578280"; do
-  IFS='|' read -r f algo cells <<< "$spec"
-  python tools/time_golly.py "$P/$f" 65536 64 1024 --algo $algo --cells $cells --timeout 120
-done
-$R gpu-baseline --pattern $P/misc/extra/lotr1.ANSI-1M.rle --gens 64 --per-submit 32
-$R gpu-brute    --pattern $P/misc/extra/lotr1.ANSI-1M.rle --gens 528 --per-submit 264 --verify   # also prints the single-thread CPU rate
+Tables without a target restate or derive from these: the summary, §1.2's causes, the $V_L$ table of §2.1, §2.2, §5, §6, §12.6's dispatch bounds and §13.1's first table. §10's table of centre states and §12.1 come from the code, and §9 is a plan.
 
-# §2.1, §2.6, §4.1: primitives
-$R gpu-probe --log2-slots 10,14,16,18,19,20,21,22,24,25,26,27,28   # the 8 GiB table needs that much free VRAM
-$R gpu-insert
-$R gpu-latency
+The circuit is regenerated in `bitslice/` with `rule_circuit.py`, `optimize.py 25 1` (25 minutes), `optimize_more.py 6.5 7` and `emit.py`, which also need `pip install yowasp-yosys python-sat`. The optimiser runs on a wall-clock budget, so a rerun does not reproduce the netlist gate for gate; `circuit.netlist` is the artifact.
 
-# §2.3: miss rates of the flat tile automaton (SUMMARY lines: second half of each run)
-for a in 2 3 4; do for lt in 3 4 5 6 7; do
-  if [ $lt -ge $a ]; then $R flat --pattern "$P/advanced counter v2.rle" --lt $lt --a $a --gens 262144 --quiet --summary | grep SUMMARY; fi
-done; done
-for f in "misc/Segmented ROM (256k).mc" "misc/serial display (32x32).mc" "misc/parallel display (16x16).mc" "16x16 movie/16x16 movie.mc" \
-         "misc/efficient_demultiplexer.mc" "misc/chaotic.rle" "misc/squares.rle" "component-basis.rle" "misc/extra/lotr1.PPMd-244K.rle"; do
-  for lt in 4 5; do $R flat --pattern "$P/$f" --lt $lt --a 2 --gens 16384 --quiet --summary | grep SUMMARY; done
-done
-$R flat --pattern "$P/32x32 movie/32x32 movie.mc" --lt 4 --a 2 --gens 131072 --summary
-$R flat --pattern $P/misc/extra/lotr1.ANSI-1M.rle --lt 4 --a 2 --gens 4096 --summary
-for f in "misc/weird designs/cpu.mc" "misc/BIN2BCD.rle"; do $R flat --pattern "$P/$f" --lt 4 --a 2 --gens 65536; done
-
-# §2.5: batch statistics of the level-synchronous schedule
-$R root --pattern $P/replicators/Hutton-replicator.rle --k 14 --gens 262144
-
-# §4.2, §12.2: memo hit path on phase-shifted lotr1.ANSI-1M ROMs; each run first learns the table on the CPU (about 90 s per period)
-ROM=$P/misc/extra/lotr1.ANSI-1M.rle
-$R gpu-sweep --pattern $ROM --lt 4 --reps 1  --cycles 6600 --per-submit 512
-$R gpu-sweep --pattern $ROM --lt 5 --reps 1  --cycles 6600 --per-submit 512
-$R gpu-sweep --pattern $ROM --lt 4 --reps 8  --cycles 66
-$R gpu-sweep --pattern $ROM --lt 4 --reps 32 --cycles 33 --per-submit 4
-$R gpu-sweep --pattern $ROM --lt 5 --reps 32 --cycles 33 --per-submit 4
-for lt in 6 7 8; do $R gpu-sweep --pattern $ROM --lt $lt --a 4 --reps 32 --cycles 264 --per-submit 66 --max-learn-gens 40000; done
-
-# §4.3: sparse 100k x 100k universe of 2304 counters, then the same universe in Golly and in the CPU engine
-$R gpu-sparse --pattern "$P/advanced counter v2.rle" --lt 4 --reps 48 --pitch 8 --cycles 1024 --export-mc out/golly/sparse100k.mc
-python tools/time_golly.py out/golly/sparse100k.mc 16384 16 1024 16384 --timeout 600
-python tools/time_golly.py out/golly/sparse100k.mc 1048576 1024 65536 --timeout 900
-"$BG" -q -q -a RuleLoader -s rules/ -M 8000 -m 16384 -i 1024 -o out/golly/sparse100k_out.mc out/golly/sparse100k.mc
-$R fingerprint --pattern out/golly/sparse100k_out.mc               # population 55478381, hash 144be5c0cde9cb81
-$R root --pattern out/golly/sparse100k.mc --k 10 --gens 16384 --a 2   # the CPU engine ends in the same state
-
-# §4.4: head-to-head at step 1024 (k = 10) or 16 384 (k = 14), one thread; the last column compares the final states
-python tools/head2head.py 16777216 10 --a 2 --timeout 400 "$P/misc/Segmented ROM (256k).mc" "$P/misc/serial display (32x32).mc" \
-  "$P/misc/parallel display (16x16).mc" "$P/16x16 movie/16x16 movie.mc" $P/misc/efficient_demultiplexer.mc "$P/misc/weird designs/cpu.mc" \
-  $P/misc/BIN2BCD.rle "$P/advanced counter v2.rle" $P/misc/chaotic.rle "$P/32x32 movie/32x32 movie.mc"
-python tools/head2head.py 1048576 10 --a 2 --timeout 600 $P/misc/squares.rle
-python tools/head2head.py 262144 14 --a 2 --timeout 900 $P/replicators/Hutton-replicator.rle
-
-# §10: the same with the engine on the v1 rules: NO for all but cpu and the counter
-python tools/head2head.py 16777216 10 --a 2 --timeout 400 --v1 "$P/misc/Segmented ROM (256k).mc" "$P/misc/serial display (32x32).mc" \
-  "$P/misc/parallel display (16x16).mc" "$P/16x16 movie/16x16 movie.mc" $P/misc/efficient_demultiplexer.mc "$P/misc/weird designs/cpu.mc" \
-  $P/misc/BIN2BCD.rle "$P/advanced counter v2.rle"
-
-# §12.2: model hash operations per generation by sweep tile (MODEL lines)
-for spec in "advanced counter v2.rle|65536" "misc/chaotic.rle|16384" "misc/extra/lotr1.PPMd-244K.rle|528" \
-            "misc/extra/lotr1.PPMd-244K.rle|8448" "32x32 movie/32x32 movie.mc|16384" "misc/serial display (32x32).mc|16384"; do
-  IFS='|' read -r f g <<< "$spec"
-  for lt in 3 4 5 6 7 8; do $R flat --pattern "$P/$f" --lt $lt --a 2 --gens $g --quiet | grep MODEL; done
-done
-
-# §12.3: fixed floors and plain cells (--a 2: 4x4 base tiles, --a 3: 8x8)
-C=$P/misc/chaotic.rle
-CH8="$C@64,64;$C@576,64~1;$C@1088,64~2;$C@1600,64~3;$C@64,576~4;$C@576,576~5;$C@1088,576~6;$C@1600,576~7"   # 8 perturbed copies
-for a in 2 3; do
-  $R adapt --pattern "$P/advanced counter v2.rle" --gens 16384 --a $a --policies fixed
-  $R adapt --compose "$CH8" --gens 8192 --a $a --policies fixed
-  $R adapt --pattern $P/misc/extra/lotr1.PPMd-244K.rle --gens 512 --a $a --policies fixed
-done
-
-# §12.4: conditional miss rate per window size (per level: requests in column 6, misses in column 7)
-for spec in "misc/extra/lotr1.PPMd-244K.rle|512" "advanced counter v2.rle|16384" "misc/chaotic.rle|8192" \
-            "32x32 movie/32x32 movie.mc|4096" "misc/squares.rle|4096"; do
-  IFS='|' read -r f g <<< "$spec"
-  $R root --pattern "$P/$f" --k 6 --gens $g --a 3
-done
-
-# §12.5: engine per content, then the controller
-bash tools/engine_choice.sh $R 4096
-$R adapt --compose "$(cat tools/composite_spec.txt)" --gens 4096 --a 3 --k 4 --init-floor 3 --policies "16x16,adaptive"
-$R adapt --pattern $P/misc/extra/lotr1.PPMd-244K.rle --gens 2112 --a 3 --k 4 --init-floor 3 --policies "16x16,adaptive"
-$R adapt --pattern "$P/advanced counter v2.rle" --gens 16384 --a 3 --k 4 --init-floor 3 --policies "16x16,adaptive"
-$R adapt --compose "$CH8" --gens 8192 --a 3 --k 4 --init-floor 3 --policies "16x16,adaptive"
-
-# §12.6: the counter's work per generation, which sets the thresholds
-$R adapt --pattern "$P/advanced counter v2.rle" --gens 16384 --a 3
-
-# §13: the circuit, the CPU benchmark and every GPU figure (on an idle machine)
-python -m venv out/bitslice-venv
-VPY=$PWD/out/bitslice-venv/bin/python; [ -e out/bitslice-venv/Scripts/python.exe ] && VPY=$PWD/out/bitslice-venv/Scripts/python
-"$VPY" -m pip install numpy yowasp-yosys python-sat pillow
-(cd bitslice && "$VPY" verify.py && "$VPY" scalar.py && "$VPY" tables.py)   # exhaustive checks; forms A and C
-cargo run --release --manifest-path bitslice/bench/Cargo.toml                 # CPU: forms A, B, C against the byte LUT
-RUSTFLAGS="-C target-cpu=native" cargo run --release --manifest-path bitslice/bench/Cargo.toml   # adds the AVX2 column
-bash tools/bitslice_series.sh $R                                              # every GPU figure of §13: sections A-H, S and T
-bash tools/engine_choice.sh $R 4096 --cell-rate 2.9e11                        # §12.5 at the bit-plane kernel's rate
-$R adapt --pattern "$P/advanced counter v2.rle" --gens 16384 --a 3 --cell-rate 2.9e11
-```
-
-Single lines of the series, for a quick check:
-
-```bash
-$R gpu-bitslice --side 16384 --gens 64 --same-src --verify                    # random states, held constant
-$R gpu-bitslice --side 3104 --gens 528 --pattern $P/misc/extra/lotr1.ANSI-1M.rle --verify
-$R gpu-window --windows 64 --iters 4096
-$R gpu-tile --k 16 --tw 7 --th 16 --side 200 --gens 65536 --pattern "$P/advanced counter v2.rle" --verify   # 16 generations per dispatch
-$R gpu-tile --k 16 --tw 6 --th 48 --side 672 --gens 65536 --pattern $P/misc/squares.rle
-$R gpu-tile --k 3 --side 16384 --gens 48 --same-src                           # large grid: slower than gpu-bitslice
-```
-
-The circuit is regenerated in `bitslice/` with `rule_circuit.py` (the hand-written network and its exhaustive check), `optimize.py 25 1` (25 minutes of optimisation), `optimize_more.py 6.5 7` and `emit.py`, each run with `"$VPY"`. The optimiser runs on a wall-clock budget, so a rerun does not reproduce the netlist gate for gate; `circuit.netlist` is the artifact.
-
-The mixed universe of §12.5 is a `--compose` string of `file@x,y[+pre-run gens][~perturbation seed]` items, kept in `tools/composite_spec.txt` with paths relative to `research/`: the ROM at 512,512; six perturbed `chaotic` and six pre-run counters on a 512-cell pitch; `32x32 movie`, `squares` and `serial display` beside them. The three controller designs that §12.5 lists as not working were replaced in `cmd_adapt.rs` and cannot be rerun with the current harness.
-
-`gpu-sweep` on the ROM spends about 90 s learning one period on the CPU before the GPU run. A pattern runs under the canonical rule named in its header (`cmd_stats.rs: variant_for`). The one comparison in this report that needs Golly's own copy of `Hutton32b.rule` is the check that it is the same rule as the committed one: `$R rulediff --a "table:<Golly folder>/Rules/Hutton32b.rule" --b table:rules/Hutton32b.rule` reports 0.
+The mixed universe of §12.5 is the `--compose` string in `tools/composite_spec.txt`: items `file@x,y[+pre-run gens][~perturbation seed]`. The three controller designs that §12.5 lists as not working were replaced in `cmd_adapt.rs` and cannot be rerun. The one comparison that needs Golly's own copy of `Hutton32b.rule` checks that it is the same rule as the committed one: `./target/release/ca-research rulediff --a "table:<Golly folder>/Rules/Hutton32b.rule" --b table:rules/Hutton32b.rule` reports 0.
 
 ## Appendix B. Harness map
 
 | File | Contents |
 |---|---|
+| `reproduce.sh` | Appendix A: one target per figure, with the exact harness commands behind it |
 | `rule.rs`, `rulespec.rs` | CPU transliteration of both WGSL rule files, as they are now (canonical) and as first archived (`-v1`); loader for Golly tables (`.rule` with `@TABLE`, or a bare `.table`); rule selection |
 | `cmd_lut.rs` | `lut`: a WGSL rule file executed on the GPU for all $2^{25}$ neighbourhoods, compared with the CPU port or with any other rule |
 | `tools/fix_rules.py` | §10: the corrections to the WGSL rule files in `archive/`, applied in place, idempotent |
