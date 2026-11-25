@@ -86,8 +86,10 @@ pub fn load_png(path: &Path) -> Grid {
   g
 }
 
-fn rle_state(out: &mut String, s: u8) {
-  if s == 0 {
+fn rle_state(out: &mut String, s: u8, two_state: bool) {
+  if two_state {
+    out.push(if s == 0 { 'b' } else { 'o' });
+  } else if s == 0 {
     out.push('.');
   } else {
     let s = s as u32 - 1;
@@ -98,8 +100,9 @@ fn rle_state(out: &mut String, s: u8) {
   }
 }
 
-/// Write Golly extended RLE.
+/// Write Golly extended RLE (`b`/`o` for two-state rules).
 pub fn write_rle(path: &Path, g: &Grid, rule: &str) {
+  let two_state = crate::ca::parse_life_like(rule).is_some();
   let mut body = String::new();
   let mut line_len = 0usize;
   let mut emit = |body: &mut String, count: usize, tok: &str| {
@@ -132,7 +135,7 @@ pub fn write_rle(path: &Path, g: &Grid, rule: &str) {
           run += 1;
         }
         let mut tok = String::new();
-        rle_state(&mut tok, s);
+        rle_state(&mut tok, s, two_state);
         emit(&mut body, run, &tok);
         x += run;
       }

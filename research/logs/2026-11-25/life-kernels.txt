@@ -1,0 +1,43 @@
+=== life-kernels      Life: bit-sliced Moore kernel by grid size, shared tile on small grids (gpu-life)
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: random soup, density 0.5 | 512x512 = 262144 cells | plain kernel, 8x8 workgroups | 0 MiB per buffer
+  life kernel: 1024 gens in 0.0051s = 202387.5 gens/s = 5.305e10 cell-updates/s
+  final state after 1024 gens: population 11279 bbox 512x512 hash a75cb93ec982babd
+  warning: live cells reached the edge of the grid; the result is the bounded grid's, not the plane's
+  verify vs the table on the CPU: 0 mismatching cells
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: random soup, density 0.5 | 512x512 = 262144 cells | shared tile, k = 16, tiles of 192 x 32 cells | 0 MiB per buffer
+  life kernel: 1024 gens in 0.0010s = 1022058.1 gens/s = 2.679e11 cell-updates/s
+  final state after 1024 gens: population 11279 bbox 512x512 hash a75cb93ec982babd
+  warning: live cells reached the edge of the grid; the result is the bounded grid's, not the plane's
+  verify vs the table on the CPU: 0 mismatching cells
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: random soup, density 0.5 | 256x256 = 65536 cells | plain kernel, 8x8 workgroups | 0 MiB per buffer
+  life kernel: 65536 gens in 0.1419s = 461982.8 gens/s = 3.028e10 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 4.5771e5, max 4.6356e5
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: random soup, density 0.5 | 1024x1024 = 1048576 cells | plain kernel, 8x8 workgroups | 0 MiB per buffer
+  life kernel: 8192 gens in 0.0232s = 353321.2 gens/s = 3.705e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 3.4620e5, max 3.5472e5
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: random soup, density 0.5 | 4096x4096 = 16777216 cells | plain kernel, 8x8 workgroups | 2 MiB per buffer
+  life kernel: 2048 gens in 0.0243s = 84412.2 gens/s = 1.416e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.3081e4, max 8.5237e4
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: random soup, density 0.5 | 16384x16384 = 268435456 cells | plain kernel, 8x8 workgroups | 32 MiB per buffer
+  life kernel: 256 gens in 0.0487s = 5253.4 gens/s = 1.410e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 5.2355e3, max 5.2564e3
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: random soup, density 0.5 | 32768x32768 = 1073741824 cells | plain kernel, 8x8 workgroups | 128 MiB per buffer
+  life kernel: 64 gens in 0.0697s = 918.0 gens/s = 9.857e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.9673e2, max 9.2089e2
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: random soup, density 0.5 | 256x256 = 65536 cells | shared tile, k = 16, tiles of 192 x 32 cells | 0 MiB per buffer
+  life kernel: 65536 gens in 0.0314s = 2089209.7 gens/s = 1.369e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 2.0596e6, max 2.0909e6
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: random soup, density 0.5 | 1024x1024 = 1048576 cells | shared tile, k = 16, tiles of 192 x 32 cells | 0 MiB per buffer
+  life kernel: 8192 gens in 0.0115s = 714105.1 gens/s = 7.488e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 7.0443e5, max 7.1901e5
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: Unit-Life-Cell-512x512.rle with a margin of 64 cells | 640x639 = 408960 cells | plain kernel, 8x8 workgroups | 0 MiB per buffer
+  life kernel: 11520 gens in 0.0300s = 384083.2 gens/s = 1.571e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 3.8287e5, max 3.8808e5
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: Unit-Life-Cell-512x512.rle with a margin of 64 cells | 640x639 = 408960 cells | shared tile, k = 16, tiles of 192 x 32 cells | 0 MiB per buffer
+  life kernel: 11520 gens in 0.0101s = 1143594.6 gens/s = 4.677e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 1.1407e6, max 1.1541e6
+  final state after 11520 gens: population 4695 bbox 640x639 hash c2e766f892cfbfd7
+  warning: live cells reached the edge of the grid; the result is the bounded grid's, not the plane's
+  verify vs the table on the CPU: 0 mismatching cells

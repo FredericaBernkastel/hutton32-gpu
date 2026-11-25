@@ -9,6 +9,7 @@
 //! the CPU port in `rule.rs` (`hutton32`, `hutton32b`). The same files as first archived
 //! (commit 256ef91) did not; that version is kept as `hutton32-v1`, `hutton32b-v1`.
 
+use crate::ca::{self, Nbhd, Rule};
 use crate::rule::{self, Variant, LUT_SIZE};
 use std::path::{Path, PathBuf};
 
@@ -20,12 +21,17 @@ pub enum RuleSpec {
   WgslV1(Variant),
   /// a Golly rule table: a `.rule` file with an `@TABLE` section, or a bare `.table`
   Table(PathBuf),
+  /// a Life-like rule in Golly's B/S notation (two states; Moore, hexagonal or von Neumann)
+  LifeLike(u16, u16, Nbhd),
 }
 
 impl RuleSpec {
   pub fn parse(s: &str) -> Option<Self> {
     if let Some(p) = s.strip_prefix("table:") {
       return Some(RuleSpec::Table(p.into()));
+    }
+    if let Some((b, sv, nb)) = ca::parse_life_like(s) {
+      return Some(RuleSpec::LifeLike(b, sv, nb));
     }
     match s {
       // older command lines: Golly's built-in Hutton32 is the canonical Hutton32
@@ -41,6 +47,7 @@ impl RuleSpec {
       RuleSpec::Wgsl(Variant::Hutton32b) => "Hutton32b".into(),
       RuleSpec::WgslV1(v) => format!("{} as archived in v1", v.name()),
       RuleSpec::Table(p) => format!("{} (Golly table)", p.file_stem().unwrap().to_string_lossy()),
+      RuleSpec::LifeLike(b, s, nb) => ca::life_like_name(*b, *s, *nb),
     }
   }
   pub fn cache_name(&self) -> String {
@@ -48,6 +55,7 @@ impl RuleSpec {
       RuleSpec::Wgsl(v) => format!("{}_canonical", v.name()),
       RuleSpec::WgslV1(v) => format!("{}_v1", v.name()),
       RuleSpec::Table(p) => format!("table_{}", p.file_stem().unwrap().to_string_lossy()),
+      RuleSpec::LifeLike(b, s, nb) => ca::life_like_name(*b, *s, *nb).replace('/', "_"),
     }
   }
   /// What a cached LUT of this rule depends on besides the harness itself: for a table, the
@@ -68,6 +76,14 @@ impl RuleSpec {
       RuleSpec::Wgsl(v) => rule::build_lut(*v),
       RuleSpec::WgslV1(v) => rule::build_lut_v1(*v),
       RuleSpec::Table(p) => lut_from_table(p),
+      RuleSpec::LifeLike(b, s, nb) => Rule::life_like(*b, *s, *nb).table,
+    }
+  }
+  /// The rule with its neighbourhood: the Hutton32 family is von Neumann with 32 states.
+  pub fn rule_from(&self, table: Vec<u8>) -> Rule {
+    match self {
+      RuleSpec::LifeLike(b, s, nb) => Rule::life_like(*b, *s, *nb),
+      _ => Rule::from_table(&self.name(), Nbhd::VonNeumann, 32, 5, table),
     }
   }
 }

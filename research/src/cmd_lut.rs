@@ -36,7 +36,7 @@ pub fn run(args: &[String]) {
   let against = opt(args, "--against").map(|s| crate::rulespec::RuleSpec::parse(&s).expect("bad --against"));
 
   let (lut, ref_name) = match &against {
-    Some(spec) => (crate::load_lut(spec), spec.name()),
+    Some(spec) => (crate::load_lut(spec).table, spec.name()),
     None => {
       let t = std::time::Instant::now();
       let lut = rule::build_lut(variant);

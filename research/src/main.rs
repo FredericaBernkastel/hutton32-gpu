@@ -1,10 +1,12 @@
 //! Measurement harness for `paper.md`. Run `cargo run --release -- help`.
 #![allow(dead_code)]
 
+mod ca;
 mod cmd_adapt;
 mod cmd_bitslice;
 mod cmd_brute2;
 mod cmd_gpu;
+mod cmd_life;
 mod cmd_insert;
 mod cmd_lut;
 mod cmd_sparse;
@@ -36,23 +38,23 @@ pub fn out_dir() -> PathBuf {
 /// The LUT for a rule. The built-in rules are computed on every call (a third of a second), so
 /// that no cache can outlive a change to `rule.rs`. A table's LUT takes much longer and is cached
 /// in `out/`, next to a stamp of the table file's contents.
-pub fn load_lut(spec: &rulespec::RuleSpec) -> Vec<u8> {
+pub fn load_lut(spec: &rulespec::RuleSpec) -> ca::Rule {
   let Some(stamp) = spec.source_stamp() else {
-    return spec.build();
+    return spec.rule_from(spec.build());
   };
   let path = out_dir().join(format!("lut_{}.bin", spec.cache_name()));
   let stamp_path = path.with_extension("src");
   if std::fs::read_to_string(&stamp_path).is_ok_and(|s| s == stamp) {
     if let Ok(data) = std::fs::read(&path) {
       if data.len() == rule::LUT_SIZE {
-        return data;
+        return spec.rule_from(data);
       }
     }
   }
   let lut = spec.build();
   std::fs::write(&path, &lut).unwrap();
   std::fs::write(&stamp_path, &stamp).unwrap();
-  lut
+  spec.rule_from(lut)
 }
 
 /// `--key value` lookup in argv.
@@ -115,6 +117,8 @@ fn main() {
     "gpu-window" => cmd_bitslice::window(rest),
     "gpu-tile" => cmd_bitslice::tile(rest),
     "gpu-sparse" => cmd_sparse::run(rest),
+    "gpu-life" => cmd_life::run(rest),
+    "life-soup" => cmd_life::soup_cmd(rest),
     _ => {
       eprintln!(
         "{}",
@@ -142,9 +146,13 @@ fn main() {
           "  gpu-latency [--n N]                          dispatch / pass / submit / readback costs",
           "  gpu-sweep --pattern P [--lt L --reps N --cycles C]   dense universe: flat tile CA (memo hit path)",
           "  gpu-sparse --pattern P [--pitch F --reps N --export-mc F]  sparse universe: flat vs active blocks",
+          "  gpu-life [--side N | --pattern P [--tiled | --margin M]] [--k K --tw W --th H] [--verify --fingerprint]",
+          "                                               Life-like rules: bit-sliced Moore kernel, plain or shared tile",
+          "  life-soup --side S [--density D --seed N] --out F   random square soup as RLE",
           "rules (--rule, --a, --b, --against): hutton32 | hutton32b (canonical; the WGSL files in archive/src/kernel/rules),",
           "  hutton32-v1 | hutton32b-v1 (those files as archived in commit 256ef91), table:<Golly .rule or .table file>",
-          "  (the canonical tables: table:rules/Hutton32.table, table:rules/Hutton32b.rule)",
+          "  (the canonical tables: table:rules/Hutton32.table, table:rules/Hutton32b.rule),",
+          "  or a Life-like rule in B/S notation (B3/S23, B36/S23, B2/S34H, ...: Moore, hexagonal, von Neumann)",
           "patterns (--pattern): palette PNG, RLE or macrocell; the report's are in patterns/ (default: the counter preset)",
         ]
         .join("\n")

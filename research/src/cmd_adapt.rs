@@ -556,7 +556,7 @@ fn dense(loaded: Loaded) -> Grid {
   match loaded {
     Loaded::Dense(g) => g,
     Loaded::Mc(m) => {
-      let dummy = vec![0u8; 1];
+      let dummy = crate::ca::Rule::dummy();
       let mut e = Engine::new(&dummy, 1, 1);
       let (root, level) = e.from_mc(&m);
       let full = e.expand(root, level);
@@ -568,7 +568,7 @@ fn dense(loaded: Loaded) -> Grid {
 
 /// Build a universe from `--compose "file@x,y[+gens][~seed];..."` or a single `--pattern`.
 /// `+gens` pre-runs that copy, `~seed` first overwrites eight of its cells so that copies diverge.
-pub fn build_universe(args: &[String], lut_for: &dyn Fn(&str) -> Vec<u8>) -> (Grid, Vec<u8>, String) {
+pub fn build_universe(args: &[String], lut_for: &dyn Fn(&str) -> crate::ca::Rule) -> (Grid, crate::ca::Rule, String) {
   if let Some(spec) = opt(args, "--compose") {
     let lut = lut_for("Hutton32b");
     let mut items = Vec::new();
@@ -638,7 +638,7 @@ struct RunResult {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn run_policy(label: &str, kind: Kind, init: Mode, g: &Grid, lut: &[u8], a: usize, k: usize, rl: usize, steps: u64, model: Model, maxf: usize, nominal_out: &mut f64) -> RunResult {
+fn run_policy(label: &str, kind: Kind, init: Mode, g: &Grid, lut: &crate::ca::Rule, a: usize, k: usize, rl: usize, steps: u64, model: Model, maxf: usize, nominal_out: &mut f64) -> RunResult {
   let t0 = Instant::now();
   let mut e = Engine::new(lut, a, k);
   let (mut root, mut level) = e.from_grid(g);

@@ -43,3 +43,18 @@
 2026-11-25 07:06:42 done  window (exit 0)
 2026-11-25 07:08:05 start head2head
 2026-11-25 07:09:19 done  head2head (exit 0)
+2026-11-25 08:00:37 Life batch
+2026-11-25 08:00:37 start life-kernels
+2026-11-25 08:01:25 done  life-kernels (exit 0)
+2026-11-25 08:01:25 start life-golly
+2026-11-25 08:04:01 done  life-golly (exit 0)
+2026-11-25 08:04:01 start life-h2h
+2026-11-25 08:06:07 done  life-h2h (exit 0)
+2026-11-25 08:06:07 start life-sweep
+2026-11-25 08:06:15 done  life-sweep (exit 0)
+2026-11-25 08:06:15 start life-sparse
+2026-11-25 08:06:33 done  life-sparse (exit 0)
+2026-11-25 08:06:33 start life-floors
+2026-11-25 08:07:01 done  life-floors (exit 0)
+2026-11-25 08:07:09 start life-sweep
+2026-11-25 08:07:20 done  life-sweep (exit 0)

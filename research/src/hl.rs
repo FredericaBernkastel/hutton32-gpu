@@ -50,7 +50,7 @@ impl Level {
 pub struct Engine<'a> {
   pub a: usize,
   pub step_log2: usize,
-  lut: &'a [u8],
+  lut: &'a crate::ca::Rule,
   pub tile_side: usize,
   tile_area: usize,
   pub tile_data: Vec<u8>,
@@ -93,7 +93,7 @@ pub trait FloorPolicy {
 }
 
 impl<'a> Engine<'a> {
-  pub fn new(lut: &'a [u8], a: usize, step_log2: usize) -> Self {
+  pub fn new(lut: &'a crate::ca::Rule, a: usize, step_log2: usize) -> Self {
     assert!(a >= 1 && step_log2 >= a, "need step_log2 >= a >= 1");
     let tile_side = 1usize << a;
     let mut e = Engine {

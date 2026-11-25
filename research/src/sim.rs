@@ -1,5 +1,7 @@
-//! Plain per-cell LUT stepping on the CPU (reference semantics; zero boundary).
+//! Plain per-cell table stepping on the CPU (reference semantics; zero boundary), for any rule of
+//! `ca::Rule`: von Neumann, hexagonal or Moore neighbourhood.
 
+use crate::ca::{Nbhd, Rule};
 use crate::pattern::Grid;
 
 pub struct Sim<'a> {
@@ -8,12 +10,64 @@ pub struct Sim<'a> {
   stride: usize,
   cur: Vec<u8>,
   nxt: Vec<u8>,
-  lut: &'a [u8],
+  lut: &'a Rule,
   pub generation: u64,
 }
 
+/// Step cells `lo..hi` of one row: `up`, `mid`, `dn` are the rows above, at and below it (same
+/// x coordinates), `out` receives the new row. Returns the number of cells that changed.
+#[inline]
+fn step_span(rule: &Rule, up: &[u8], mid: &[u8], dn: &[u8], out: &mut [u8], lo: usize, hi: usize) -> usize {
+  let t = &rule.table[..];
+  let b = rule.bits;
+  let mut changed = 0usize;
+  macro_rules! span {
+    ($idx:expr) => {{
+      let f = $idx;
+      for x in lo..hi {
+        let r = t[f(x)];
+        changed += (r != mid[x]) as usize;
+        out[x] = r;
+      }
+    }};
+  }
+  let u = |v: u8| v as usize;
+  match rule.nbhd {
+    // the Hutton32 layout, kept as a fast path
+    Nbhd::VonNeumann if b == 5 => span!(|x: usize| u(mid[x - 1]) | u(dn[x]) << 5 | u(mid[x + 1]) << 10 | u(up[x]) << 15 | u(mid[x]) << 20),
+    Nbhd::VonNeumann => span!(|x: usize| u(mid[x - 1]) | u(dn[x]) << b | u(mid[x + 1]) << (2 * b) | u(up[x]) << (3 * b) | u(mid[x]) << (4 * b)),
+    Nbhd::Hex => span!(|x: usize| u(mid[x - 1])
+      | u(dn[x]) << b
+      | u(mid[x + 1]) << (2 * b)
+      | u(up[x]) << (3 * b)
+      | u(mid[x]) << (4 * b)
+      | u(up[x - 1]) << (5 * b)
+      | u(dn[x + 1]) << (6 * b)),
+    // two states: the nine fields are single bits
+    Nbhd::Moore if b == 1 => span!(|x: usize| u(mid[x - 1])
+      | u(dn[x]) << 1
+      | u(mid[x + 1]) << 2
+      | u(up[x]) << 3
+      | u(mid[x]) << 4
+      | u(up[x - 1]) << 5
+      | u(up[x + 1]) << 6
+      | u(dn[x - 1]) << 7
+      | u(dn[x + 1]) << 8),
+    Nbhd::Moore => span!(|x: usize| u(mid[x - 1])
+      | u(dn[x]) << b
+      | u(mid[x + 1]) << (2 * b)
+      | u(up[x]) << (3 * b)
+      | u(mid[x]) << (4 * b)
+      | u(up[x - 1]) << (5 * b)
+      | u(up[x + 1]) << (6 * b)
+      | u(dn[x - 1]) << (7 * b)
+      | u(dn[x + 1]) << (8 * b)),
+  }
+  changed
+}
+
 impl<'a> Sim<'a> {
-  pub fn new(g: &Grid, lut: &'a [u8]) -> Self {
+  pub fn new(g: &Grid, lut: &'a Rule) -> Self {
     let stride = g.w + 2;
     let mut cur = vec![0u8; stride * (g.h + 2)];
     for y in 0..g.h {
@@ -32,13 +86,7 @@ impl<'a> Sim<'a> {
       let mid = &self.cur[y * s..(y + 1) * s];
       let dn = &self.cur[(y + 1) * s..(y + 2) * s];
       let out = &mut self.nxt[y * s..(y + 1) * s];
-      for x in 1..=w {
-        let c = mid[x] as usize;
-        let idx = (mid[x - 1] as usize) | (dn[x] as usize) << 5 | (mid[x + 1] as usize) << 10 | (up[x] as usize) << 15 | c << 20;
-        let r = self.lut[idx];
-        changed += (r as usize != c) as usize;
-        out[x] = r;
-      }
+      changed += step_span(self.lut, up, mid, dn, out, 1, w + 1);
     }
     std::mem::swap(&mut self.cur, &mut self.nxt);
     self.generation += 1;
@@ -76,23 +124,17 @@ impl<'a> Sim<'a> {
 
 /// Advance a square window in place for `gens` generations with garbage creeping in from the
 /// boundary (outside treated as zero). Only the cells at distance >= gens from the border are
-/// valid afterwards. Used for memo misses. `buf`/`tmp` are `side*side`.
-pub fn advance_window(lut: &[u8], buf: &mut Vec<u8>, tmp: &mut Vec<u8>, side: usize, gens: usize) {
+/// valid afterwards (the light cone of every radius-1 neighbourhood). Used for memo misses.
+/// `buf`/`tmp` are `side*side`.
+pub fn advance_window(rule: &Rule, buf: &mut Vec<u8>, tmp: &mut Vec<u8>, side: usize, gens: usize) {
   for g in 0..gens {
     // cells closer than g+1 to the border are already garbage; skip them
     let lo = g + 1;
     let hi = side - g - 1;
     for y in lo..hi {
       let r = y * side;
-      for x in lo..hi {
-        let c = buf[r + x] as usize;
-        let idx = (buf[r + x - 1] as usize)
-          | (buf[r + side + x] as usize) << 5
-          | (buf[r + x + 1] as usize) << 10
-          | (buf[r - side + x] as usize) << 15
-          | c << 20;
-        tmp[r + x] = lut[idx];
-      }
+      let (up, mid, dn) = (&buf[r - side..r], &buf[r..r + side], &buf[r + side..r + 2 * side]);
+      step_span(rule, up, mid, dn, &mut tmp[r..r + side], lo, hi);
     }
     std::mem::swap(buf, tmp);
   }

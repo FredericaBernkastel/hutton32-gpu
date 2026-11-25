@@ -1,0 +1,30 @@
+=== life-golly        Life: Golly HashLife and QuickLife on a soup and the Unit Life Cell; the soup on the GPU (needs Golly)
+wrote out/life/soup2048.rle: 2048x2048 soup, density 0.5, seed 1, population 2097154
+pattern out/life/soup2048.rle
+load-only 0.236s (algo HashLife, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
+step       64:   18.784s net,          218.1 gens/s, 9.146e+08 cell-updates/s (median of 3; 217.7-220.4 gens/s), peak 1849 MiB, second half 761.6 gens/s
+step     1024:   20.414s net,          200.7 gens/s, 8.416e+08 cell-updates/s (median of 3; 197.7-204.6 gens/s), peak 1849 MiB, second half 682.8 gens/s
+pattern out/life/soup2048.rle
+load-only 0.125s (algo QuickLife, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
+step        1:    1.219s net,         3359.1 gens/s, 1.409e+10 cell-updates/s (median of 3; 3334.9-3378.6 gens/s), peak 5 MiB, second half 7157.1 gens/s
+step       64:    1.183s net,         3463.6 gens/s, 1.453e+10 cell-updates/s (median of 3; 3166.0-3464.1 gens/s), peak 5 MiB, second half 7565.3 gens/s
+pattern patterns/life/Unit-Life-Cell-512x512.rle
+load-only 0.008s (algo HashLife, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
+step     1024:    0.072s net,     14650297.5 gens/s, 3.826e+12 cell-updates/s (median of 3; 11030570.9-15366993.2 gens/s), peak 13 MiB, second half 63913399.0 gens/s
+step    65536:    0.050s net,     21077751.9 gens/s, 5.504e+12 cell-updates/s (median of 3; 16625880.6-22566084.7 gens/s), peak 11 MiB, second half 2618821034.6 gens/s
+step  1048576:    0.060s net,     17460494.0 gens/s, 4.559e+12 cell-updates/s (median of 3; 14763685.5-18088783.0 gens/s), peak 11 MiB
+pattern patterns/life/Unit-Life-Cell-512x512.rle
+load-only 0.009s (algo QuickLife, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
+step        1:    0.467s net,        49301.7 gens/s, 1.287e+10 cell-updates/s (median of 3; 45901.3-50231.4 gens/s), peak 4 MiB
+step       64:    0.457s net,        50434.4 gens/s, 1.317e+10 cell-updates/s (median of 3; 50386.5-50813.9 gens/s), peak 4 MiB, second half 50036.7 gens/s
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: soup2048.rle with a margin of 2304 cells | 6656x6656 = 44302336 cells | plain kernel, 8x8 workgroups | 5 MiB per buffer
+  life kernel: 4096 gens in 0.0826s = 49583.2 gens/s = 2.197e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 4.9527e4, max 4.9829e4
+  final state after 4096 gens: population 141395 bbox 5023x4095 hash bc3e188f05da1ec0
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: soup2048.rle with a margin of 2304 cells | 6656x6656 = 44302336 cells | shared tile, k = 8, tiles of 448 x 48 cells | 5 MiB per buffer
+  life kernel: 4096 gens in 0.1371s = 29879.6 gens/s = 1.324e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 2.9704e4, max 2.9883e4
+  final state after 4096 gens: population 141395 bbox 5023x4095 hash bc3e188f05da1ec0
+This is bgolly 5.1 Copyright 2005-2026 The Golly Gang.
+- C:\Program Files\golly-5.1-win-64bit\bgolly.exe -q -q -a HashLife -M 8000 -m 4096 -i 1024 -o out/life/soup2048_4096.mc out/life/soup2048.rle
+(->out/life/soup2048_4096.mc)population 141395 bbox 5023x4095 hash bc3e188f05da1ec0

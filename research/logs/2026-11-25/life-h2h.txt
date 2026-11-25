@@ -1,0 +1,15 @@
+=== life-h2h          Life: the CPU engine vs Golly HashLife, final states compared (needs Golly)
+engine base tile: 8x8 cells; median of runs adding up to 1 s (at most 5)
+pattern                               golly s runs   engine s runs  golly gens/s  engine gens/s  same-state
+metapixel-galaxy.mc                    0.8126    2     0.9256    2      20646908       18124794  yes
+Unit-Life-Cell-512x512.rle             0.2906    4     0.5336    2      57730985       31441559  yes
+ruler.mc                               0.9772    2     1.7799    1      17169210        9425932  yes
+wedge-grow.mc                          2.9989    1     4.6269    1       5594536        3626017  yes
+gotts-dots.mc                          2.4995    1     5.4671    1       6712253        3068760  yes
+metacatacryst.mc                       3.2048    1     6.0417    1       5235085        2776903  yes
+engine base tile: 8x8 cells; median of runs adding up to 1 s (at most 5)
+pattern                               golly s runs   engine s runs  golly gens/s  engine gens/s  same-state
+catacryst.mc                           0.5727    2     1.4563    1       1830814         720027  yes
+mosquito5.mc                           1.3699    1     3.3040    1        765444         317366  yes
+jagged.mc                              0.8257    2     1.3914    1       1269939         753612  yes
+totalperiodic.mc                       2.3057    1     3.7388    1        454768         280458  yes

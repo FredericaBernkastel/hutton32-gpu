@@ -64,15 +64,28 @@ pub fn write_mc(e: &mut Engine, root: u32, level: usize, rule: &str, path: &std:
   let mut lines: Vec<String> = Vec::new();
   let mut raw_memo: FxHashMap<Vec<u8>, usize> = Default::default();
   let mut node_memo: FxHashMap<(usize, u32), usize> = Default::default();
+  // two-state rules are written in Golly's two-state flavour (8x8 leaves), which its Life-like
+  // algorithms read
+  let two_state = crate::ca::parse_life_like(rule).is_some();
+  assert!(!two_state || e.a >= 3, "two-state macrocell output needs base tiles of at least 8x8");
   // raw square of side 2^d (d >= 1) -> line index (0 = empty)
-  fn emit_raw(cells: &[u8], side: usize, lines: &mut Vec<String>, memo: &mut FxHashMap<Vec<u8>, usize>) -> usize {
+  fn emit_raw(cells: &[u8], side: usize, two_state: bool, lines: &mut Vec<String>, memo: &mut FxHashMap<Vec<u8>, usize>) -> usize {
     if cells.iter().all(|&c| c == 0) {
       return 0;
     }
     if let Some(&i) = memo.get(cells) {
       return i;
     }
-    let line = if side == 2 {
+    let line = if two_state && side == 8 {
+      let mut t = String::new();
+      for y in 0..8 {
+        let row = &cells[y * 8..y * 8 + 8];
+        let end = row.iter().rposition(|&c| c != 0).map_or(0, |i| i + 1);
+        t.extend(row[..end].iter().map(|&c| if c != 0 { '*' } else { '.' }));
+        t.push('$');
+      }
+      t
+    } else if side == 2 {
       format!("1 {} {} {} {}", cells[0], cells[1], cells[2], cells[3])
     } else {
       let h = side / 2;
@@ -83,7 +96,7 @@ pub fn write_mc(e: &mut Engine, root: u32, level: usize, rule: &str, path: &std:
         for y in 0..h {
           sub[y * h..(y + 1) * h].copy_from_slice(&cells[(oy + y) * side + ox..(oy + y) * side + ox + h]);
         }
-        idx[q] = emit_raw(&sub, h, lines, memo);
+        idx[q] = emit_raw(&sub, h, two_state, lines, memo);
       }
       format!("{} {} {} {} {}", side.trailing_zeros(), idx[0], idx[1], idx[2], idx[3])
     };
@@ -95,6 +108,7 @@ pub fn write_mc(e: &mut Engine, root: u32, level: usize, rule: &str, path: &std:
     e: &Engine,
     id: u32,
     l: usize,
+    two_state: bool,
     empties: &[u32],
     lines: &mut Vec<String>,
     raw: &mut FxHashMap<Vec<u8>, usize>,
@@ -107,17 +121,17 @@ pub fn write_mc(e: &mut Engine, root: u32, level: usize, rule: &str, path: &std:
       return i;
     }
     let i = if l == e.a {
-      emit_raw(e.tile_cells(id), e.tile_side, lines, raw)
+      emit_raw(e.tile_cells(id), e.tile_side, two_state, lines, raw)
     } else {
       let ch = e.levels[l].nodes[id as usize];
-      let c: Vec<usize> = ch.iter().map(|&c| emit(e, c, l - 1, empties, lines, raw, memo)).collect();
+      let c: Vec<usize> = ch.iter().map(|&c| emit(e, c, l - 1, two_state, empties, lines, raw, memo)).collect();
       lines.push(format!("{} {} {} {} {}", l, c[0], c[1], c[2], c[3]));
       lines.len()
     };
     memo.insert((l, id), i);
     i
   }
-  emit(e, root, level, &empties, &mut lines, &mut raw_memo, &mut node_memo);
+  emit(e, root, level, two_state, &empties, &mut lines, &mut raw_memo, &mut node_memo);
   let mut f = std::io::BufWriter::new(std::fs::File::create(path).unwrap());
   writeln!(f, "[M2] (ca-research)\n#R {rule}").unwrap();
   for l in &lines {

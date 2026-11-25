@@ -31,19 +31,19 @@ pub fn load_pattern(path: &Path) -> (Loaded, String) {
 /// bgolly). Patterns without a rule header, such as the PNG presets, get Hutton32b.
 pub fn variant_for(args: &[String], file_rule: &str) -> RuleSpec {
   if let Some(r) = opt(args, "--rule") {
-    return RuleSpec::parse(&r).expect("bad --rule (hutton32 | hutton32b | hutton32-v1 | hutton32b-v1 | table:<path>)");
+    return RuleSpec::parse(&r).expect("bad --rule (hutton32 | hutton32b | hutton32-v1 | hutton32b-v1 | table:<path> | B3/S23 ...)");
   }
   match file_rule.to_ascii_lowercase().as_str() {
     "hutton32" => RuleSpec::Wgsl(rule::Variant::Hutton32),
     "hutton32b" | "" => RuleSpec::Wgsl(rule::Variant::Hutton32b),
-    other => panic!("pattern uses rule {other}, which this harness does not implement"),
+    other => RuleSpec::parse(other).unwrap_or_else(|| panic!("pattern uses rule {other}, which this harness does not implement")),
   }
 }
 
 fn engine_fingerprint(e: &Engine, root: u32, level: usize) -> hl::Fingerprint {
   hl::fingerprint(|f| e.for_each_cell(root, level, 0, 0, &mut |x, y, s| f(x, y, s)))
 }
-fn grid_fingerprint(g: &Grid) -> hl::Fingerprint {
+pub fn grid_fingerprint(g: &Grid) -> hl::Fingerprint {
   hl::fingerprint(|f| {
     for y in 0..g.h {
       for x in 0..g.w {
@@ -396,7 +396,7 @@ pub fn fingerprint(args: &[String]) {
   let fp = match &loaded {
     Loaded::Dense(g) => grid_fingerprint(g),
     Loaded::Mc(m) => {
-      let lut = vec![0u8; 1]; // unused
+      let lut = crate::ca::Rule::dummy(); // never steps
       let mut e = Engine::new(&lut, 1, 1);
       let (root, level) = e.from_mc(m);
       engine_fingerprint(&e, root, level)
@@ -428,7 +428,7 @@ pub fn ruletree(args: &[String]) {
   fn recur(
     at: usize,
     params: &mut [u32; 5],
-    lut: &[u8],
+    lut: &crate::ca::Rule,
     world: &mut rustc_hash::FxHashMap<Vec<u32>, u32>,
     lines: &mut Vec<String>,
   ) -> u32 {
@@ -464,7 +464,7 @@ pub fn rulediff(args: &[String]) {
   let a = RuleSpec::parse(&opt(args, "--a").expect("--a")).expect("bad --a");
   let b = RuleSpec::parse(&opt(args, "--b").expect("--b")).expect("bad --b");
   let (la, lb) = (crate::load_lut(&a), crate::load_lut(&b));
-  let total = la.iter().zip(&lb).filter(|(x, y)| x != y).count();
+  let total = la.iter().zip(lb.iter()).filter(|(x, y)| x != y).count();
   println!("A = {}\nB = {}\n{} of {} neighbourhoods differ", a.name(), b.name(), total, rule::LUT_SIZE);
   // group by (centre, A result, B result)
   let mut groups: std::collections::BTreeMap<(u32, u8, u8), (u64, u32)> = Default::default();

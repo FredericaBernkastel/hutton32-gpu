@@ -46,6 +46,12 @@ cpu-bench         CPU engines, default and target-cpu=native builds (bitslice/be
 cpu-parallel      bit-sliced CPU forms on 4 threads: random states and the ROM (bitslice/bench)
 reprice           engine-choice and counter-work re-priced at the rate of the bit-plane kernel
 figures           Figs. 2-4 as SVG in figures/, from the medians in logs/2026-11-25 (tools/figures.py)
+life-kernels      Life: bit-sliced Moore kernel by grid size, shared tile on small grids (gpu-life)
+life-golly        Life: Golly HashLife and QuickLife on a soup and the Unit Life Cell; the soup on the GPU (needs Golly)
+life-h2h          Life: the CPU engine vs Golly HashLife, final states compared (needs Golly)
+life-sweep        Life: memo hit path on phase-shifted Unit Life Cells (gpu-sweep)
+life-sparse       Life: sparse universe of Unit Life Cells: GPU, Golly, CPU engine (needs Golly)
+life-floors       Life: fixed floors priced at the rate of the Life kernel and of the byte-LUT kernel (adapt)
 '
 
 R=./target/release/ca-research
@@ -55,6 +61,7 @@ CHA=$P/misc/chaotic.rle
 SQ=$P/misc/squares.rle
 ROM=$P/misc/extra/lotr1.ANSI-1M.rle
 PPMD=$P/misc/extra/lotr1.PPMd-244K.rle
+ULC=$P/life/Unit-Life-Cell-512x512.rle
 NEW=$P/presets/hutton32b_8bit_counter.rle
 OLD=$P/presets/hutton32_8bit_counter_old.rle
 # eight perturbed copies of chaotic on a 512-cell pitch
@@ -239,6 +246,51 @@ run() {
     bash tools/engine_choice.sh $R 4096 --cell-rate 2.9e11
     $R adapt --pattern "$CTR" --gens 16384 --a 3 --cell-rate 2.9e11 ;;
   figures) py tools/figures.py ;;
+  life-kernels) # random soups fill the grid; widths are multiples of 32
+    $R gpu-life --side 512 --gens 1024 --verify
+    $R gpu-life --side 512 --gens 1024 --k 16 --tw 6 --th 32 --verify
+    for sg in "256 65536" "1024 8192" "4096 2048" "16384 256" "32768 64"; do
+      set -- $sg; $R gpu-life --side $1 --gens $2 --repeats 5
+    done
+    for sg in "256 65536" "1024 8192"; do
+      set -- $sg; $R gpu-life --side $1 --gens $2 --k 16 --tw 6 --th 32 --repeats 5
+    done
+    $R gpu-life --pattern "$ULC" --margin 64 --gens 11520 --repeats 5
+    $R gpu-life --pattern "$ULC" --margin 64 --gens 11520 --k 16 --tw 6 --th 32 --repeats 5 --verify ;;
+  life-golly)
+    mkdir -p out/life
+    $R life-soup --side 2048 --seed 1 --out out/life/soup2048.rle
+    py tools/time_golly.py out/life/soup2048.rle 4096 64 1024 --algo HashLife --cells 4194304 --repeats 3 --timeout 120
+    py tools/time_golly.py out/life/soup2048.rle 4096 1 64 --algo QuickLife --cells 4194304 --repeats 3 --timeout 120
+    py tools/time_golly.py "$ULC" 1048576 1024 65536 1048576 --algo HashLife --cells 261121 --repeats 3
+    py tools/time_golly.py "$ULC" 23040 1 64 --algo QuickLife --cells 261121 --repeats 3
+    # the soup on the GPU: a margin of 2304 cells keeps every glider and spaceship of 4096 generations
+    $R gpu-life --pattern out/life/soup2048.rle --margin 2304 --gens 4096 --repeats 5 --fingerprint
+    $R gpu-life --pattern out/life/soup2048.rle --margin 2304 --gens 4096 --k 8 --tw 14 --th 48 --repeats 5 --fingerprint
+    bgolly -q -q -a HashLife -M 8000 -m 4096 -i 1024 -o out/life/soup2048_4096.mc out/life/soup2048.rle
+    $R fingerprint --pattern out/life/soup2048_4096.mc ;;  # Golly's final state
+  life-h2h) # 8x8 base tiles, as for Hutton32b; the last column compares the final states
+    py tools/head2head.py 16777216 10 --a 3 --timeout 300 $P/life/metapixel-galaxy.mc "$ULC" $P/life/ruler.mc       $P/life/wedge-grow.mc $P/life/gotts-dots.mc $P/life/metacatacryst.mc
+    py tools/head2head.py 1048576 10 --a 3 --timeout 300 $P/life/catacryst.mc $P/life/mosquito5.mc $P/life/jagged.mc       $P/life/totalperiodic.mc ;;
+  life-sweep) # GHL's floor for Life is 32x32 windows on 16x16 base tiles (--a 4)
+    $R gpu-sweep --pattern "$ULC" --a 4 --lt 5 --reps 1 --cycles 3600 --per-submit 360 --repeats 5
+    for lt in 5 6 7 8; do
+      $R gpu-sweep --pattern "$ULC" --a 4 --lt $lt --reps 32 --cycles $((230400 >> lt)) --per-submit 64 --repeats 5
+    done
+    $R gpu-life --pattern "$ULC" --tiled --side 20480 --gens 256 --repeats 5 ;;  # brute force on 32x32 copies
+  life-sparse)
+    mkdir -p out/life
+    $R gpu-sparse --pattern "$ULC" --a 4 --lt 5 --reps 48 --pitch 8 --cycles 512 --export-mc out/life/sparse_ulc.mc --repeats 5
+    py tools/time_golly.py out/life/sparse_ulc.mc 16384 1024 16384 --algo HashLife --timeout 600 --repeats 3
+    py tools/time_golly.py out/life/sparse_ulc.mc 1048576 1024 65536 --algo HashLife --timeout 900 --repeats 3
+    bgolly -q -q -a HashLife -M 8000 -m 16384 -i 1024 -o out/life/sparse_ulc_out.mc out/life/sparse_ulc.mc
+    $R fingerprint --pattern out/life/sparse_ulc_out.mc     # Golly's final state
+    $R root --pattern out/life/sparse_ulc.mc --k 10 --gens 16384 --a 3 ;; # the CPU engine's
+  life-floors) # --policies brute: fixed floors only (plain cells are costed in Table floors)
+    $R life-soup --side 512 --seed 1 --out out/life/soup512.rle
+    $R adapt --pattern out/life/soup512.rle --gens 1024 --a 3 --policies brute --max-floor 5 --cell-rate 1.39e12
+    $R adapt --pattern out/life/soup512.rle --gens 1024 --a 3 --policies brute --max-floor 5
+    $R adapt --pattern "$ULC" --gens 11520 --a 3 --policies brute --max-floor 5 --cell-rate 1.39e12 ;;
   *)
     echo "unknown target: $1" >&2; return 2 ;;
   esac

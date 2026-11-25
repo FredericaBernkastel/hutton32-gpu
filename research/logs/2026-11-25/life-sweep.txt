@@ -1,0 +1,34 @@
+=== life-sweep        Life: memo hit path on phase-shifted Unit Life Cells (gpu-sweep)
+pattern Unit-Life-Cell-512x512.rle rule B3/S23: tile 32x32, grid 20x20 tiles, period 5760 gens (180 cycles), learned in 0.7s
+memo: 13144 entries -> table 32768 slots (1 MiB), avg insert probes 1.33; dictionary 24633 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 1x1 copies = 20x20 tiles = 640x640 cells (4.096e5); id buffers 0 MiB each
+  115200 gens (7200 sweeps) in 0.042s = 2775355.2 gens/s = 1.137e12 cell-updates/s | 7.294e7 table probes/s | 5 runs after a warm-up, median of gens/s: min 2.6982e6, max 2.8032e6
+  verify: 0 table misses, 0 mismatching tiles of 400
+pattern Unit-Life-Cell-512x512.rle rule B3/S23: tile 32x32, grid 20x20 tiles, period 5760 gens (180 cycles), learned in 0.7s
+memo: 13144 entries -> table 32768 slots (1 MiB), avg insert probes 1.33; dictionary 24633 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 32x32 copies = 640x640 tiles = 20480x20480 cells (4.194e8); id buffers 1 MiB each
+  230400 gens (14400 sweeps) in 0.274s = 841637.1 gens/s = 3.530e14 cell-updates/s | 2.158e10 table probes/s | 5 runs after a warm-up, median of gens/s: min 8.3343e5, max 8.4563e5
+  verify: 0 table misses, 0 mismatching tiles of 409600
+pattern Unit-Life-Cell-512x512.rle rule B3/S23: tile 64x64, grid 12x12 tiles, period 5760 gens (90 cycles), learned in 0.7s
+memo: 5880 entries -> table 16384 slots (0 MiB), avg insert probes 1.26; dictionary 13151 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 32x32 copies = 384x384 tiles = 24576x24576 cells (6.040e8); id buffers 0 MiB each
+  230400 gens (7200 sweeps) in 0.077s = 2981848.8 gens/s = 1.801e15 cell-updates/s | 1.378e10 table probes/s | 5 runs after a warm-up, median of gens/s: min 2.9580e6, max 3.0156e6
+  verify: 0 table misses, 0 mismatching tiles of 147456
+pattern Unit-Life-Cell-512x512.rle rule B3/S23: tile 128x128, grid 8x8 tiles, period 5760 gens (45 cycles), learned in 0.7s
+memo: 2459 entries -> table 8192 slots (0 MiB), avg insert probes 1.24; dictionary 5898 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 32x32 copies = 256x256 tiles = 32768x32768 cells (1.074e9); id buffers 0 MiB each
+  230400 gens (3600 sweeps) in 0.031s = 7493511.5 gens/s = 8.046e15 cell-updates/s | 7.703e9 table probes/s | 5 runs after a warm-up, median of gens/s: min 7.3154e6, max 7.5450e6
+  verify: 0 table misses, 0 mismatching tiles of 65536
+pattern Unit-Life-Cell-512x512.rle rule B3/S23: tile 256x256, grid 6x6 tiles, period 11520 gens (45 cycles), learned in 0.7s
+memo: 1354 entries -> table 4096 slots (0 MiB), avg insert probes 1.27; dictionary 2475 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 32x32 copies = 192x192 tiles = 49152x49152 cells (2.416e9); id buffers 0 MiB each
+  230400 gens (1800 sweeps) in 0.012s = 19260188.1 gens/s = 4.653e16 cell-updates/s | 5.576e9 table probes/s | 5 runs after a warm-up, median of gens/s: min 1.7992e7, max 1.9714e7
+  verify: 0 table misses, 0 mismatching tiles of 36864
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule B3/S23 | content: Unit-Life-Cell-512x512.rle tiled 39x39 | 20256x20241 = 410001696 cells | plain kernel, 8x8 workgroups | 49 MiB per buffer
+  life kernel: 256 gens in 0.0751s = 3406.8 gens/s = 1.397e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 3.3904e3, max 3.4105e3

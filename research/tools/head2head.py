@@ -8,7 +8,8 @@ runs add up to --min-time seconds (default 1) or --max-runs runs (default 5) wer
 run is reported. Golly is timed with -q -q (no output), its load-only time subtracted;
 the engine reports its own high-resolution CPU timer. A separate untimed Golly run writes the final
 state, which is compared with the engine's by fingerprint.
---a A sets the engine's base tile (2: 4x4 cells, 3: 8x8 cells).
+--a A sets the engine's base tile (2: 4x4 cells, 3: 8x8 cells). Life-like (B/S) patterns run under
+Golly's Life HashLife, Hutton32 under its JvN algorithm, everything else under RuleLoader.
 --v1 runs the engine with the rule files as first archived (hutton32-v1 / hutton32b-v1).
 bgolly is taken from $BGOLLY (default: Golly 5.1's install path, else bgolly on PATH); the rule
 folder is research/rules.
@@ -32,9 +33,19 @@ def rule_of(path):
             m = re.match(r"#R\s*(\S+)", line) or re.match(r"x\s*=.*rule\s*=\s*(\S+)", line)
             if m:
                 return m.group(1)
+            if line.startswith((".", "*", "$")):
+                return "B3/S23"  # a two-state macrocell without a rule line: Golly reads it as Life
             if i > 1000 or (line.strip() and not line.startswith(("#", "[M2]"))):
                 break  # past the header
     return "Hutton32b"
+
+
+def golly_algo(rule):
+    """Golly's algorithm for a rule: its Life HashLife for Life-like (B/S) rules, its built-in JvN
+    family for Hutton32, RuleLoader (the published table) otherwise."""
+    if re.fullmatch(r"(?i)life|b\d*/?s\d*[hv]?|s\d*/?b\d*[hv]?", rule.strip()):
+        return "HashLife"
+    return "JvN" if rule.lower() == "hutton32" else "RuleLoader"
 
 
 def timed(cmd, timeout):
@@ -81,7 +92,7 @@ def main():
     print(f"{'pattern':<34} {'golly s':>10} {'runs':>4} {'engine s':>10} {'runs':>4} {'golly gens/s':>13} {'engine gens/s':>14}  same-state")
     for pat in argv[2:]:
         rule = rule_of(pat)
-        algo = "JvN" if rule.lower() == "hutton32" else "RuleLoader"
+        algo = golly_algo(rule)
         base = [BGOLLY, "-q", "-q", "-a", algo, "-s", RULES, "-M", "8000"]
         load, _ = timed(base + ["-m", "0", pat], timeout)
 

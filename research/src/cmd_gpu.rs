@@ -15,7 +15,7 @@ fn uniform(gpu: &Gpu, words: &[u32]) -> wgpu::Buffer {
   buf
 }
 
-fn dense_pattern(args: &[String]) -> (Grid, Vec<u8>, String) {
+fn dense_pattern(args: &[String]) -> (Grid, crate::ca::Rule, String) {
   let default = crate::patterns_dir().join("presets/hutton32b_8bit_counter.rle");
   let path: std::path::PathBuf = opt(args, "--pattern").map(Into::into).unwrap_or(default);
   let (loaded, file_rule) = cmd_stats::load_pattern(&path);
@@ -24,7 +24,7 @@ fn dense_pattern(args: &[String]) -> (Grid, Vec<u8>, String) {
   let g = match loaded {
     Loaded::Dense(g) => g,
     Loaded::Mc(m) => {
-      let dummy = vec![0u8; 1];
+      let dummy = crate::ca::Rule::dummy();
       let mut e = Engine::new(&dummy, 1, 1);
       let (root, level) = e.from_mc(&m);
       let full = e.expand(root, level);

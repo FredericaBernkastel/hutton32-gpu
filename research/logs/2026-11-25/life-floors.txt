@@ -1,0 +1,47 @@
+=== life-floors       Life: fixed floors priced at the rate of the Life kernel and of the byte-LUT kernel (adapt)
+wrote out/life/soup512.rle: 512x512 soup, density 0.5, seed 1, population 130619
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 8x8, macro-step 64 gens, region 256x256 | 1024 gens
+  [    2.6s cpu] fixed: brute at 16x16
+  [    3.7s cpu] fixed: brute at 32x32
+  [    5.0s cpu] fixed: brute at 64x64
+all 3 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 0.70 ms model time (9.731e8 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16          1588607     789780     6.464e8     2.89      0.47      3.35    0.21x     36.5  16:100%
+fixed: brute at 32x32           421658     242324     1.062e9     1.38      0.76      2.15    0.33x     13.8  32:100%
+fixed: brute at 64x64           175967      88140     1.521e9     0.84      1.09      1.93    0.36x      6.0  64:100%
+best fixed per region                                                                 1.74    0.40x           regions: brute at 16x16: 29, brute at 32x32: 8, brute at 64x64: 4
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 2.81 ms | brute at 32x32 1.96 ms | brute at 64x64 1.80 ms
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 8x8, macro-step 64 gens, region 256x256 | 1024 gens
+  [    2.6s cpu] fixed: brute at 16x16
+  [    3.8s cpu] fixed: brute at 32x32
+  [    4.9s cpu] fixed: brute at 64x64
+all 3 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 5.23 ms model time (9.731e8 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16          1588607     789780     6.464e8     2.89      3.48      6.36    0.82x     36.5  16:100%
+fixed: brute at 32x32           421658     242324     1.062e9     1.38      5.71      7.09    0.74x     13.8  32:100%
+fixed: brute at 64x64           175967      88140     1.521e9     0.84      8.18      9.01    0.58x      6.0  64:100%
+best fixed per region                                                                 6.36    0.82x           regions: brute at 16x16: 41
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 5.82 ms | brute at 32x32 6.91 ms | brute at 64x64 8.89 ms
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 8x8, macro-step 64 gens, region 256x256 | 11520 gens
+  [    0.2s cpu] fixed: brute at 16x16
+  [    0.7s cpu] fixed: brute at 32x32
+  [    2.7s cpu] fixed: brute at 64x64
+all 3 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 5.11 ms model time (7.101e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16           581734      99805     4.217e7     0.44      0.03      0.47   10.77x      3.5  16:100%
+fixed: brute at 32x32           360046      68321     2.018e8     0.40      0.15      0.54    9.40x      2.3  32:100%
+fixed: brute at 64x64           269674      44341     8.617e8     0.54      0.62      1.16    4.39x      1.6  64:100%
+best fixed per region                                                                 0.47   10.77x           regions: brute at 16x16: 177
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 0.35 ms | brute at 32x32 0.45 ms | brute at 64x64 1.03 ms
