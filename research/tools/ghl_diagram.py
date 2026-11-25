@@ -77,7 +77,7 @@ def pct(v, digits=1):
 
 
 def compact(n, room):
-    """`n` in full if it fits `room` pixels at 9.5 px, else as 9.1k or 36k."""
+    """`n` in full if it fits `room` pixels at 9.5 px, else as 9.1k or 36k (k: thousand)."""
     for s in (thousands(n), f"{n / 1000:.1f}k", f"{n / 1000:.0f}k"):
         if text_width(s, 9.5) + 3 <= room:
             return s
@@ -98,21 +98,51 @@ _BOLD = ("278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,55
          "584,333,333,333,619,1000,556,549,549,549,576,400,1000")
 _ADV = {False: dict(zip(_CHARS, (int(v) for v in _REG.split(",")))), True: dict(zip(_CHARS, (int(v) for v in _BOLD.split(","))))}
 assert len(_ADV[False]) == len(_CHARS) == len(_ADV[True])
-_MARK = re.compile(r"([_^])\{([^}]*)\}")
+MONO = "'DejaVu Sans Mono', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace"
+MONO_SCALE, MONO_ADV = 0.93, 602       # file names a little smaller; the advance of the widest of these fonts
+for _t in _ADV.values():
+    _t[" "] = _t[" "]
+# markup of every text: ^{superscript} _{subscript} `file name` [[rule name]] **term**
+_TOK = re.compile(r"([_^])\{([^}]*)\}|`([^`]*)`|\[\[([^\]]*)\]\]|\*\*([^*]*)\*\*")
+_SPAN = re.compile(r"`[^`]*`|\[\[[^\]]*\]\]|\*\*[^*]*\*\*")
+
+
+def rule_colour(name):
+    """Two-state rules green, the 32-state rules blue, in the text as in the charts."""
+    return GREEN if name.startswith(("Life", "B3")) else BLUE
+
+
+def rule_name(rule):
+    return "Life" if rule == "B3/S23" else rule
+
+
+def fname(path):
+    """A pattern as the paper names it: its file name, with the extension."""
+    return path.replace("\\", "/").rsplit("/", 1)[-1]
+
+
+def _plain(s, bold):
+    adv = _ADV[bool(bold)]
+    return sum(adv.get(c, 556) for c in s)
 
 
 def text_width(s, size, bold=False):
-    adv = _ADV[bool(bold)]
     total, pos = 0.0, 0
-    for m in _MARK.finditer(s):
-        total += sum(adv.get(c, 556) for c in s[pos:m.start()])
-        total += 0.72 * sum(adv.get(c, 556) for c in m.group(2))
+    for m in _TOK.finditer(s):
+        total += _plain(s[pos:m.start()], bold)
+        if m.group(1):
+            total += 0.72 * _plain(m.group(2), bold)
+        elif m.group(3) is not None:
+            total += len(m.group(3)) * MONO_ADV * MONO_SCALE
+        else:
+            total += _plain(m.group(4) if m.group(4) is not None else m.group(5), True)
         pos = m.end()
-    total += sum(adv.get(c, 556) for c in s[pos:])
-    return total * size / 1000
+    return (total + _plain(s[pos:], bold)) * size / 1000
 
 
 def wrap(s, size, width, bold=False):
+    """Lines no wider than `width`; a file name, a rule name or a term is never broken."""
+    s = _SPAN.sub(lambda m: m.group(0).replace(" ", " "), s)
     lines, cur = [], ""
     for word in s.split(" "):
         trial = f"{cur} {word}" if cur else word
@@ -124,22 +154,34 @@ def wrap(s, size, width, bold=False):
     return lines + [cur] if cur else lines
 
 
-def rich(s, size):
-    """Escape `s`; `^{x}` becomes a superscript and `_{x}` a subscript."""
+def rich(s, size, neutral=True):
+    """Escape `s` and apply the markup. File names are set in a monospaced font, rule names in bold
+    italics and, in black or grey text (`neutral`), in their rule's colour, terms in bold."""
     out, pos, cur = [], 0, 0.0
-    small = round(size * 0.72, 1)
-    for m in _MARK.finditer(s):
-        seg = escape(s[pos:m.start()])
-        if seg:
-            out.append(f'<tspan dy="{-cur:.1f}">{seg}</tspan>' if cur else seg)
+
+    def emit(text, attrs=""):
+        nonlocal cur
+        if not text:
+            return
+        if cur:
+            attrs += f' dy="{-cur:.1f}"'
             cur = 0.0
-        target = -0.36 * size if m.group(1) == "^" else 0.22 * size
-        out.append(f'<tspan dy="{target - cur:.1f}" font-size="{small}">{escape(m.group(2))}</tspan>')
-        cur = target
+        out.append(f"<tspan{attrs}>{escape(text)}</tspan>" if attrs else escape(text))
+
+    for m in _TOK.finditer(s):
+        emit(s[pos:m.start()])
+        if m.group(1):
+            target = -0.36 * size if m.group(1) == "^" else 0.22 * size
+            out.append(f'<tspan dy="{target - cur:.1f}" font-size="{round(size * 0.72, 1)}">{escape(m.group(2))}</tspan>')
+            cur = target
+        elif m.group(3) is not None:
+            emit(m.group(3), f' font-family="{MONO}" font-size="{round(size * MONO_SCALE, 1)}"')
+        elif m.group(4) is not None:
+            emit(m.group(4), ' font-weight="bold" font-style="italic"' + (f' fill="{rule_colour(m.group(4))}"' if neutral else ""))
+        else:
+            emit(m.group(5), ' font-weight="bold"' + (f' fill="{INK}"' if neutral else ""))
         pos = m.end()
-    seg = escape(s[pos:])
-    if seg:
-        out.append(f'<tspan dy="{-cur:.1f}">{seg}</tspan>' if cur else seg)
+    emit(s[pos:])
     return "".join(out)
 
 
@@ -151,7 +193,7 @@ class Svg:
         a = f' font-weight="{weight}"' if weight else ""
         a += f' text-anchor="{anchor}"' if anchor != "start" else ""
         a += f' stroke="{halo}" stroke-width="3.2" stroke-linejoin="round" paint-order="stroke"' if halo else ""
-        self.o.append(f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size}" fill="{fill}"{a}>{rich(s, size)}</text>')
+        self.o.append(f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size}" fill="{fill}"{a}>{rich(s, size, fill in (INK, GREY))}</text>')
 
     def para(self, x, y, s, width, size=11, fill=GREY, lead=None, weight=None):
         """`s` wrapped to `width`, first baseline at y; returns the baseline after the last line."""
@@ -182,9 +224,10 @@ class Svg:
         a += f' stroke-linejoin="{join}"' if join else ""
         self.o.append(f'<path d="{d}" fill="{fill}"{a}/>')
 
-    def circle(self, x, y, r, fill=INK, stroke=None, sw=1, opacity=None):
+    def circle(self, x, y, r, fill=INK, stroke=None, sw=1, opacity=None, dash=None):
         a = f' stroke="{stroke}" stroke-width="{sw}"' if stroke else ""
         a += f' opacity="{opacity}"' if opacity is not None else ""
+        a += f' stroke-dasharray="{dash}"' if dash else ""
         self.o.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{r}" fill="{fill}"{a}/>')
 
     def image(self, x, y, w, h, png):
@@ -285,30 +328,38 @@ LIFE_PALETTE = [(0, 0, 0), (255, 255, 255)]
 
 # ---- shared drawing ---------------------------------------------------------------------------------------
 
-def section(svg, y, n, title, sub=None, badge=None):
-    """A numbered heading across the page; returns the y below it."""
+def section(svg, y, n, title, sub=None, built=None):
+    """A numbered heading across the page, with how far the panel's content is built; returns the y below it."""
     svg.line(M, y, W - M, y, stroke=LIGHT, sw=1)
     cy = y + 25
     svg.badge(M + 11, cy - 5.5, n)
     svg.text(M + 30, cy, title, size=17, weight="bold")
     if sub:
         svg.text(M + 30 + text_width(title, 17, True) + 12, cy, sub, size=12.5, fill=GREY)
-    if badge:
-        chips(svg, W - M, cy - 14, badge, right=True)
+    if built:
+        status(svg, W - M, cy, built)
     return y + 42
 
 
-def chips(svg, x, y, items, right=False, size=10.5):
-    """Small labelled chips in a row: [(label, kind)], kind in gpu / cpu / model."""
-    style = {"gpu": (INK, "#ffffff", INK, None), "cpu": ("#ffffff", INK, INK, None), "model": ("#ffffff", GREY, GREY, "3 2")}
-    widths = [text_width(lab, size) + 16 for lab, _ in items]
-    if right:
-        x -= sum(widths) + 6 * (len(items) - 1)
-    for (lab, kind), w in zip(items, widths):
-        fill, ink, stroke, dash = style[kind]
-        svg.rect(x, y, w, 17, fill=fill, stroke=stroke, sw=1, rx=8.5, dash=dash)
-        svg.text(x + w / 2, y + 12.2, lab, size=size, anchor="middle", fill=ink)
-        x += w + 6
+def status_mark(svg, kind, x, y):
+    """How far a part is built: on the GPU, a filled circle; in the CPU reference engine, a diamond;
+    in the model only, a dashed circle. The comparison with Golly uses the same shapes."""
+    if kind == "gpu":
+        svg.circle(x, y, 4, fill=INK)
+    elif kind == "cpu":
+        svg.path(f"M{x - 4.6:.1f},{y:.1f}L{x:.1f},{y - 4.6:.1f}L{x + 4.6:.1f},{y:.1f}L{x:.1f},{y + 4.6:.1f}Z", stroke=INK, sw=1.3, fill="#ffffff")
+    else:
+        svg.circle(x, y, 3.7, fill="#ffffff", stroke=GREY, sw=1.2, dash="2 1.6")
+
+
+def status(svg, x, y, items, size=11):
+    """Status marks with their texts in a row that ends at x: [(kind, text)]."""
+    widths = [13 + text_width(t, size) for _, t in items]
+    x -= sum(widths) + 18 * (len(items) - 1)
+    for (kind, t), w in zip(items, widths):
+        status_mark(svg, kind, x + 4.6, y - size * 0.34)
+        svg.text(x + 13, y, t, size=size, fill=GREY)
+        x += w + 18
 
 
 def log_grid(svg, pos, lo, hi, a, b, vertical=True, major="#ffffff", minor="#c9c9c9", major_sw=1.0):
@@ -363,38 +414,98 @@ def draw_network(svg, net, L, val, bits=32):
 
 # ---- the algorithm in one strip ---------------------------------------------------------------------------------
 
+def pictogram(svg, kind, xr, yc):
+    """A picture of a few pixels for a step of the algorithm, its right edge at xr, centred on yc."""
+    light, mid = "#d2d2d2", "#8f8f8f"
+    if kind == "tiles":            # a grid of tiles; the same shade is the same tile, hence the same ID
+        for k, shade in enumerate((light, mid, light, mid, "#ededed", mid)):
+            svg.rect(xr - 24 + (k % 3) * 8, yc - 8 + (k // 3) * 8, 7, 7, fill=shade)
+    elif kind == "window":         # 2 x 2 tiles, their centre tile, and that tile later
+        for k in range(4):
+            svg.rect(xr - 40 + (k % 2) * 8, yc - 8 + (k // 2) * 8, 8, 8, fill="#ffffff", stroke=mid, sw=0.8)
+        svg.rect(xr - 36, yc - 4, 8, 8, fill="#cfe5f5", stroke=INK, sw=1.2)
+        svg.arrow(xr - 21, yc, xr - 11, yc, sw=1.0)
+        svg.rect(xr - 9, yc - 4, 8, 8, fill="#cfe5f5", stroke=INK, sw=1.2)
+    elif kind == "hit":            # found
+        svg.circle(xr - 8, yc, 7.5, fill="#ffffff", stroke=BLUE, sw=1.3)
+        svg.path(f"M{xr - 12:.1f},{yc + 0.2:.1f}l3,3.2l5.2,-6.4", stroke=BLUE, sw=1.6)
+    elif kind == "floor":          # windows by size; below the dashed line nothing is memoized
+        for x, side in ((34, 14), (17, 9)):
+            svg.rect(xr - x, yc + 7 - side, side, side, fill="#ffffff", stroke=mid, sw=1)
+        svg.line(xr - 6.5, yc - 9, xr - 6.5, yc + 9, stroke=INK, sw=1, dash="2 2")
+        svg.rect(xr - 4.5, yc + 2.5, 4.5, 4.5, fill=light)
+    elif kind == "waves":          # a window, the windows half its size, and theirs: one row per wave
+        for row, n in enumerate((1, 2, 4)):
+            w_ = (30 - (n - 1) * 1.5) / n
+            for k in range(n):
+                svg.rect(xr - 30 + k * (w_ + 1.5), yc - 8 + row * 6, w_, 4.5, fill=("#f3c3a5", "#e39a6d", VERMIL)[row])
+    elif kind == "atlas":          # windows side by side, each with the centre that is kept
+        for k in range(6):
+            x, yy = xr - 26 + (k % 3) * 9, yc - 8.5 + (k // 3) * 9
+            svg.rect(x, yy, 8, 8, fill="#3a3a3a")
+            svg.rect(x + 2, yy + 2, 4, 4, fill="#ffffff")
+    elif kind == "circuit":        # gates and wires
+        pts = [(xr - 28, yc - 6, ORANGE), (xr - 28, yc + 6, BLUE), (xr - 16, yc - 1, BLUE), (xr - 16, yc + 7, ORANGE), (xr - 4, yc + 2, GREEN)]
+        for a_, b_ in ((0, 2), (1, 2), (1, 3), (2, 4), (3, 4)):
+            svg.line(pts[a_][0], pts[a_][1], pts[b_][0], pts[b_][1], stroke=mid, sw=0.9)
+        for x, yy, col in pts:
+            svg.circle(x, yy, 2.6, fill=col)
+
+
 def flow(svg, y):
-    h = 28
-    ya, yb = y + 4, y + 52
-
-    def box(x, yy, w, n, label):
-        svg.rect(x, yy, w, h, fill="#f1f1f1", rx=6)
-        svg.badge(x + 16, yy + h / 2, n, r=8.5, size=11)
-        svg.text(x + 31, yy + 18.6, label, size=12.5, weight="bold")
-
-    a1, a2, a3, b3 = (M, 232), (302, 252), (616, 280), (946, 234)
-    box(a1[0], ya, a1[1], 3, "the universe: a grid of tile IDs")
-    box(a2[0], ya, a2[1], 3, "hit path: one probe per tile")
-    box(a3[0], ya, a3[1], 3, "the grid s/2 generations on; repeat")
-    box(a2[0], yb, a2[1], 4, "miss path: waves, one per level")
-    box(a3[0], yb, a3[1], 4, "at the floor: an atlas of windows")
-    box(b3[0], yb, b3[1], 2, "the rule as a circuit")
-    svg.arrow(a1[0] + a1[1] + 5, ya + h / 2, a2[0] - 5, ya + h / 2)
-    svg.arrow(a2[0] + a2[1] + 5, ya + h / 2, a3[0] - 5, ya + h / 2)
-    svg.text((a2[0] + a2[1] + a3[0]) / 2, ya + h / 2 - 6, "hit", anchor="middle", fill=GREY)
-    mx = a2[0] + a2[1] / 2
-    svg.arrow(mx, ya + h + 3, mx, yb - 4)
-    svg.text(mx + 7, (ya + h + yb) / 2 + 3.5, "miss", fill=GREY)
-    svg.arrow(a2[0] + a2[1] + 5, yb + h / 2, a3[0] - 5, yb + h / 2)
-    svg.arrow(a3[0] + a3[1] + 5, yb + h / 2, b3[0] - 5, yb + h / 2)
-    px = b3[0] + b3[1] / 2
-    svg.path(f"M{px:.1f},{yb - 3}V{ya + h / 2:.1f}H{a3[0] + a3[1] + 7:.1f}", stroke=GREY, sw=1.3, marker="grey")
-    svg.text(px - 8, ya + h / 2 - 6, "results interned, memo filled", anchor="end", fill=GREY)
-    svg.rect(a1[0], yb, a1[1], h, fill="#ffffff", stroke=GREY, sw=1, rx=6, dash="3 2")
-    svg.badge(a1[0] + 16, yb + h / 2, 5, r=8.5, size=11)
-    svg.text(a1[0] + 31, yb + 18.6, "measured rates set the floor", size=12.5, weight="bold")
-    svg.arrow(a1[0] + a1[1] + 5, yb + h / 2, a2[0] - 5, yb + h / 2, dash="4 3")
-    return yb + h + 14
+    """The algorithm as a chain of steps, each with the words the panels use, and the legend of the status marks."""
+    gap = 22
+    cw_ = (CW - 3 * gap) / 4
+    xs = [M + k * (cw_ + gap) for k in range(4)]
+    pad, size, lead = 10, 10.5, 13.2
+    cards = {      # (row, column): (panel that shows it, title, text)
+        (0, 0): (3, "The universe: a grid of tile IDs", "tiles",
+                 "The cells are cut into square **tiles** of side s. Equal tiles get the same **ID**, so the GPU holds a grid of numbers, not cells."),
+        (0, 1): (3, "Hit path: one probe per tile", "window",
+                 "A **window** (2×2 tiles) fixes its centre tile s/2 generations ahead. The **memo** is a table of windows seen before; a **probe** looks one up."),
+        (0, 2): (3, "A hit: nothing to compute", "hit",
+                 "**Hit**: the window is in the memo. Its future centre tile is read off, no cell is touched, and the grid is s/2 generations on."),
+        (1, 0): (5, "Measured rates set the floor", "floor",
+                 "The **floor** is the smallest window that is memoized. Smaller ones cost more to look up than to compute."),
+        (1, 1): (4, "Miss path: waves, one per level", "waves",
+                 "**Miss**: not in the memo. The window is built from windows half its size, which may miss too. A **wave**: all misses of one size, as one batch."),
+        (1, 2): (4, "At the floor: an atlas of windows", "atlas",
+                 "Missed floor windows are not split. They are laid side by side, the atlas, and stepped cell by cell: **brute force**."),
+        (1, 3): (2, "The rule as a circuit", "circuit",
+                 "Brute force is a network of logic gates that updates 32 cells per operation. Its results go into the memo."),
+    }
+    lines = {k: wrap(v[3], size, cw_ - 2 * pad) for k, v in cards.items()}
+    h = 30 + lead * max(len(v) for v in lines.values()) + 3
+    ya, yb = y, y + h + 26
+    for (row, col), (n, title, picture, _) in cards.items():
+        x, yy = xs[col], (ya, yb)[row]
+        config = (row, col) == (1, 0)          # not a step: what configures the steps
+        svg.rect(x, yy, cw_, h, fill="#ffffff" if config else "#f3f3f3", stroke=GREY if config else None, sw=1, rx=6, dash="3 2" if config else None)
+        svg.badge(x + pad + 8, yy + 15, n, r=8.5, size=11)
+        svg.text(x + pad + 22, yy + 19.3, title, size=12.5, weight="bold")
+        pictogram(svg, picture, x + cw_ - pad, yy + 15)
+        for q, line in enumerate(lines[(row, col)]):
+            svg.text(x + pad, yy + 38 + q * lead, line, size=size, fill=GREY)
+    ma, mb = ya + h / 2, yb + h / 2
+    for a_, b_, yy, dash in ((0, 1, ma, None), (1, 2, ma, None), (0, 1, mb, "4 3"), (1, 2, mb, None), (2, 3, mb, None)):
+        svg.arrow(xs[a_] + cw_ + 4, yy, xs[b_] - 4, yy, dash=dash)
+    svg.text(xs[1] + cw_ + gap / 2, ma - 7, "hit", size=10.5, anchor="middle", fill=GREY)
+    mx = xs[1] + cw_ / 2
+    svg.arrow(mx, ya + h + 4, mx, yb - 4)
+    svg.text(mx + 7, (ya + h + yb) / 2 + 3.6, "miss", size=10.5, fill=GREY)
+    # what brute force computed goes back into the memo
+    by = yb + h
+    svg.path(f"M{xs[3] + cw_ / 2:.1f},{by + 4:.1f}V{by + 14:.1f}H{mx:.1f}V{by + 5:.1f}", stroke=GREY, sw=1.3, marker="grey")
+    svg.text((mx + xs[3] + cw_ / 2) / 2, by + 27, "the results are stored in the memo, and the probes that missed now hit", size=10.5, anchor="middle", fill=GREY)
+    # the status marks of the panel headings
+    lx = xs[3] + pad
+    svg.text(lx, ya + 19.3, "How far each part is built", size=12.5, weight="bold")
+    yy = ya + 38
+    for kind, t in (("gpu", "built and measured on the GPU"), ("cpu", "the CPU reference engine: not yet on the GPU"), ("model", "model: operation counts at measured rates")):
+        status_mark(svg, kind, lx + 4.6, yy - 3.6)
+        svg.text(lx + 15, yy, t, size=size, fill=GREY)
+        yy += lead
+    return by + 40
 
 
 # ---- 1. the universes -----------------------------------------------------------------------------------------
@@ -437,19 +548,26 @@ def panel_universes(svg, y, D):
             out.append(line)
         return png_grey(out)
 
-    rom, cnt, cha, soup = P["rom"], P["counter"]["gen0"], P["chaotic"], P["soup"]
+    rom, cnt, cha, soup, ulc = P["rom"], P["counter"]["gen0"], P["chaotic"], P["soup"], P["ulc"]
     iw, ih = int(cw), int(bh)
+
+    def size_rule(w, h, key):
+        return f"{thousands(w)} × {thousands(h)} cells · [[{rule_name(P[key]['rule'])}]]"
+
+    def title(key):
+        return f"`{fname(P[key]['file'])}`"
+
     cards = [
-        ("squares", "squares", [f"{sq0['w']} × {sq0['h']} cells · Hutton32", "computes and displays n^{2}", f"shown: generation {thousands(sq['generation'])}"],
+        ("squares", title("squares"), [size_rule(sq0["w"], sq0["h"], "squares"), "computes and displays n^{2}", f"shown: generation {thousands(sq['generation'])}"],
          png_indexed(grid_rows(sq["cells"], mg, mg, sq0["w"], sq0["h"]), pal, 1), sq0["w"], sq0["h"]),
-        ("counter", "8-bit counter", [f"{cnt['w']} × {cnt['h']} cells · Hutton32b", "dense circuit", "period 513,024 generations"], png_indexed(grid_rows(cnt), pal, 2), cnt["w"], cnt["h"]),
-        ("chaotic", "chaotic", [f"{cha['gen0']['w']} × {cha['gen0']['h']} cells · Hutton32b", "dense, chaotic", f"shown: generation {thousands(cha['later_gen'])}"],
+        ("counter", title("counter"), [size_rule(cnt["w"], cnt["h"], "counter"), "an 8-bit counter", "period 513,024 generations"], png_indexed(grid_rows(cnt), pal, 2), cnt["w"], cnt["h"]),
+        ("chaotic", title("chaotic"), [size_rule(cha["gen0"]["w"], cha["gen0"]["h"], "chaotic"), "dense, chaotic", f"shown: generation {thousands(cha['later_gen'])}"],
          png_indexed(grid_rows(cha["later"]), pal, 3), cha["later"]["w"], cha["later"]["h"]),
-        ("rom", "circulating ROM", [f"{thousands(rom['w'])} × {thousands(rom['h'])} · Hutton32b", "dense, period 528", "shown: a detail, cell = pixel"],
+        ("rom", title("rom"), [size_rule(rom["w"], rom["h"], "rom"), "a circulating ROM, period 528", "shown: a detail, cell = pixel"],
          png_indexed(grid_rows(rom["crop"], 0, 0, iw, ih), pal, 2), iw, ih),
-        ("soup", "random soup", [f"{thousands(soup['side'])} × {thousands(soup['side'])} cells · Life", "dense, chaotic", f"shown: a detail, generation {soup['view_gen']}"],
+        ("soup", "random soup", [size_rule(soup["side"], soup["side"], "soup"), f"dense, chaotic; made by `{soup['source']}`", f"shown: a detail, generation {soup['view_gen']}"],
          png_indexed(grid_rows(soup["later"], 0, 0, iw, ih), LIFE_PALETTE, 2), iw, ih),
-        ("ulc", "Unit Life Cell", [f"{P['ulc']['gen0']['w']} × {P['ulc']['gen0']['h']} cells · Life", "sparse", "period 5,760 generations"], ulc_png(), 1, 1),
+        ("ulc", title("ulc"), [size_rule(ulc["gen0"]["w"], ulc["gen0"]["h"], "ulc"), "sparse; simulates one [[Life]] cell", "period 5,760 generations"], ulc_png(), 1, 1),
     ]
     sy = y + bh + 68          # top of the curves
     sh = 34.0
@@ -463,7 +581,8 @@ def panel_universes(svg, y, D):
         svg.rect(x, y, cw, bh, fill="#000000", rx=3)
         s = min(cw / pw, bh / ph)
         svg.image(x + (cw - pw * s) / 2, y + (bh - ph * s) / 2, pw * s, ph * s, png)
-        svg.text(x, y + bh + 17, name, size=13, weight="bold")
+        assert text_width(name, 12, True) <= cw, name
+        svg.text(x, y + bh + 17, name, size=12, weight="bold")
         for q, line in enumerate(lines):
             assert text_width(line, 11) <= cw, line
             svg.text(x, y + bh + 31.5 + 13.5 * q, line, fill=GREY)
@@ -485,11 +604,13 @@ def panel_universes(svg, y, D):
         svg.text(x + cw - 3, sy + 11, "0 %" if late == 0 else pct(late, 0 if late >= 0.095 else 1), weight="bold", anchor="end", fill=VERMIL, halo="#f5f5f5")
         for e in (1, 3, 5):
             svg.text(gx(x, 10 ** e), sy + sh + 11.5, f"10^{{{e}}}" if e > 1 else "10", size=9.5, fill=GREY, anchor="start" if e == 1 else "middle")
+        if k == 0:
+            svg.text(gx(x, 100), sy + sh + 11.5, "generations", size=9.5, fill=GREY, anchor="middle")
     L = learn
-    y = svg.para(M, sy + sh + 29, "Curves: the share of tile-steps not yet in the memo table, for tiles of 16×16 cells (Life: 32×32), against the generations run so far "
-                 f"(log scale; the ROM's curve is that of a smaller ROM of the same kind, {thousands(L['rom']['w'])} × {thousands(L['rom']['h'])} cells, the soup's that of a "
-                 f"{L['soup']['w']} × {L['soup']['h']} soup). The figure is the share over the second half of the run. "
-                 "This novelty, not density, decides the engine: the ROM is new for one period and then entirely known, the soup stays new.", CW)
+    y = svg.para(M, sy + sh + 29, "Curves: how much of each universe is new, as the share of probes that miss, against the generations run so far (log scale); tiles of 16×16 cells, "
+                 f"for [[Life]] 32×32. The number is that share over the second half of the run. The ROM's curve is that of `{fname(L['rom']['file'])}`, a smaller ROM of the same kind "
+                 f"({thousands(L['rom']['w'])} × {thousands(L['rom']['h'])} cells); the soup's, that of a {L['soup']['w']} × {L['soup']['h']} soup. "
+                 "This novelty, not density, decides how a universe is best advanced: the ROM is new for one period and then entirely known; the soup stays new.", CW)
     return y - 4
 
 
@@ -566,8 +687,9 @@ def panel_circuit(svg, y, D, logs):
                     svg.rect(x + start * cell, yy, (i - start) * cell, h, fill=hexpal[run])
                 run, start = s, i
 
-    svg.text(M, y + 11, "32 cells of squares (marked in panel 3) and their four neighbours", size=11.5)
-    svg.text(M, y + 24.5, "as 25 words, one bit-plane each", size=11.5, fill=GREY)
+    sqfile = fname(D["patterns"]["squares"]["file"])
+    svg.text(M, y + 11, f"32 cells of `{sqfile}` (marked in panel 3) and their four neighbours.", size=11.5)
+    svg.text(M, y + 24.5, "A state is 5 bits; bit k of 32 cells in a row is one 32-bit word: 25 words go in, 5 come out.", size=11.5, fill=GREY)
     for gi, (g, gname) in enumerate(GROUPS):
         gy = top + gi * gh
         svg.text(sx - 5, gy + 6, gname, size=10, anchor="end")
@@ -593,7 +715,7 @@ def panel_circuit(svg, y, D, logs):
     strip_cells(ox, ny, out_states)
     svg.text(ox, ny + 21, "the 32 cells, one generation later", size=11.5)
     ty = svg.para(ox, ny + 35, f"Checked while drawing: on all {thousands(gw * sq['cells']['h'])} cells of this frame the network gives the next generation of the pattern's own "
-                  f"rule table, {D['patterns']['squares']['rule']}.", 236)
+                  f"rule table, [[{D['patterns']['squares']['rule']}]].", 236)
     # how the network was found
     steps = optimisation_steps()
     ty = svg.para(ox, ty + 10, "Gates by minutes of optimisation (resubstitution, ABC rewriting, MaxSAT):", 236, fill=INK)
@@ -639,7 +761,7 @@ def panel_circuit(svg, y, D, logs):
             svg.text(xx, ay + 11, str(lv), size=9.5, fill=GREY, anchor="middle")
     svg.line(x_in + L.dx, ay, x_in + L.dx * L.depth, ay, stroke=MID, sw=0.8)
     svg.text(x_in + L.dx * L.depth + 14, ay + 11, "logic level", size=10, fill=GREY)
-    svg.text(x_in + L.dx, ay + 27, "Every gate works on a 32-bit word, one bit per cell. Wire shade: on how many of the 32 cells the signal is 1 (light: none, dark: all). "
+    svg.text(x_in + L.dx, ay + 27, "Every gate works on a 32-bit word, so it serves 32 cells at once. Wire shade: on how many of the 32 cells the signal is 1 (light: none, dark: all). "
              "A signal with several consumers is one wire with branches.", fill=GREY)
     return ay + 36, net, (cx, cy)
 
@@ -681,8 +803,8 @@ def panel_life(svg, y, D, logs):
 
     cell, ph, pitch = 4.0, 7.0, 10.5
     sx = M + 28
-    svg.para(M, y + 11, f"Life-like rules (B/S notation) need one plane. A carry-save adder tree counts the live neighbours of 32 cells in {len(life.gates)} operations; "
-             "the rule's birth and survival sets are decoded from the four count bits.", 620, size=11.5, fill=INK)
+    svg.para(M, y + 11, f"A two-state rule such as [[Life]] needs one bit per cell. An adder tree counts the live neighbours of 32 cells in {len(life.gates)} operations; "
+             "birth and survival are read off the four bits of the count.", 620, size=11.5, fill=INK)
     top = y + 46
     order = ["nw", "n", "ne", "w", "e", "sw", "s", "se"]
     in_y = {}
@@ -711,25 +833,38 @@ def panel_life(svg, y, D, logs):
         svg.rect(bx - 0.5, yy - 0.5, 32 * cell + 1, 9, fill="#000000")
         bit_strip(svg, bx, yy, word, cell, 8, on="#ffffff", off="#000000")
         svg.text(bx + 32 * cell + 5, yy + 7.2, lab, size=9.5, fill=GREY)
-    svg.text(bx, bottom + 5, f"32 cells of the soup, generation {D['patterns']['soup']['view_gen']}", size=10.5, fill=GREY)
+    svg.para(bx, (top + bottom) / 2 + 36, f"32 cells of the random soup, generation {D['patterns']['soup']['view_gen']}", 32 * cell + 30, size=10.5)
 
-    # measured rates of the engine forms
+    # brute force as measured, rule by rule: the table and the circuit on the CPU and on the GPU
     rx = bx + 32 * cell + 46
-    forms = [("CPU, one core, table lookup", logs["cpu_lut"], MID, 2), ("CPU, four cores, the circuit", logs["cpu4"], MID, 2),
-             ("GPU, table lookup, real patterns", logs["rb_lut"], SKY, 3), ("GPU, the circuit, any content", logs["rb_planes"], BLUE, 2),
-             ("GPU, the Life adder tree", logs["rb_life"], BLUE, 3)]
-    lab_w = 176
+    groups = [("[[Hutton32]] and [[Hutton32b]], 32 states",
+               [("CPU, one core, table lookup", logs["cpu_lut"], MID, 2), ("CPU, four cores, the circuit", logs["cpu4"], MID, 2),
+                ("GPU, table lookup, real patterns", logs["rb_lut"], SKY, 3), ("GPU, the circuit, any content", logs["rb_planes"], BLUE, 2)]),
+              ("[[Life]], 2 states",
+               [("CPU, one thread, Golly's QuickLife", logs["ql_cells_s"], MID, 3), ("GPU, the adder tree", logs["rb_life"], GREEN, 3)])]
+    lab_w = 186
     bx0, bw = rx + lab_w, W - M - rx - lab_w - 58
     lo, hi = 8.0, 12.5
-    svg.text(rx, y + 11, "Brute force, measured, in cell-updates per second", size=11.5)
-    log_grid(svg, lambda v: bx0 + bw * (math.log10(v) - lo) / (hi - lo), lo, hi, y + 22, y + 25 + 5 * 17.5 + 3, major="#dcdcdc", minor="#d0d0d0")
-    for k, (lab, v, col, sig) in enumerate(forms):
-        yy = y + 25 + k * 17.5
-        svg.text(rx + lab_w - 8, yy + 10.5, lab, anchor="end")
-        wv = bw * (math.log10(v) - lo) / (hi - lo)
-        svg.rect(bx0, yy + 2, wv, 11, fill=col)
-        svg.text(bx0 + wv + 5, yy + 11, sci(v, sig), weight="bold" if col == BLUE else None, halo="#ffffff")
-    ay = y + 25 + 5 * 17.5 + 3
+    head, row = 16.0, 16.5
+    svg.text(rx, y + 11, "Brute force as measured, in cell-updates per second", size=11.5)
+    y0 = y + 20
+    height = sum(head + row * len(rows_) for _, rows_ in groups) + 8 * (len(groups) - 1)
+    log_grid(svg, lambda v: bx0 + bw * (math.log10(v) - lo) / (hi - lo), lo, hi, y0, y0 + height + 3, major="#dcdcdc", minor="#d0d0d0")
+    yy = y0
+    for gi, (gname, rows_) in enumerate(groups):
+        if gi:
+            svg.line(rx, yy + 1, W - M, yy + 1, stroke=MID, sw=0.8)       # one rule above the line, the other below
+            yy += 8
+        svg.rect(rx, yy + 1, text_width(gname, 11) + 8, head - 2, fill="#ffffff")
+        svg.text(rx, yy + 12, gname, fill=GREY)
+        yy += head
+        for lab, v, col, sig in rows_:
+            svg.text(rx + lab_w - 8, yy + 10.5, lab, anchor="end")
+            wv = bw * (math.log10(v) - lo) / (hi - lo)
+            svg.rect(bx0, yy + 2, wv, 11, fill=col)
+            svg.text(bx0 + wv + 5, yy + 11, sci(v, sig), weight="bold" if col in (BLUE, GREEN) else None, halo="#ffffff")
+            yy += row
+    ay = yy + 3
     svg.line(bx0, ay, bx0 + bw, ay, stroke=MID, sw=0.8)
     for e in range(8, 13):
         xx = bx0 + bw * (e - lo) / (hi - lo)
@@ -767,6 +902,7 @@ def panel_tiles(svg, y, D, net, cells32):
         svg.rect(x0 + c32x - 1.5, y + c32y - 2.5, 35, 6, stroke="#ffffff", sw=1.2)
         left = c32x > pw / 2
         svg.text(x0 + c32x - 6 if left else x0 + c32x + 38, y + c32y + 4, "the 32 cells of panel 2", size=10.5, anchor="end" if left else "start", fill="#ffffff", halo="#000000")
+    sqfile = fname(D["patterns"]["squares"]["file"])
 
     # the window that the panels on the right take apart: 4 x 4 tiles with many different tiles
     # around a result that was missing
@@ -792,9 +928,9 @@ def panel_tiles(svg, y, D, net, cells32):
     cap = y + ph + 17
     svg.rect(x0, cap - 9, 10, 10, fill=VERMIL, opacity=0.55)
     svg.rect(x0 + 0.5, cap - 8.5, 9, 9, stroke=VERMIL, sw=1)
-    cap = svg.para(x0 + 16, cap, f"squares at generation {thousands(sw['generation'])}, cut into {s}×{s}-cell tiles. One sweep advances {s // 2} generations with one probe per tile: "
-                   f"{thousands(sw['windows'])} probes, {thousands(sw['unique'])} distinct keys, {n_miss} results not in the table ({pct(n_miss / sw['windows'])}, marked). "
-                   "Novelty sits where the circuit is computing; everything else is a hit. The white frame is taken apart on the right.", pw - 16, size=11.5, fill=INK)
+    cap = svg.para(x0 + 16, cap, f"`{sqfile}` at generation {thousands(sw['generation'])}, cut into {s}×{s}-cell tiles. One pass over the grid, a sweep, advances it {s // 2} generations "
+                   f"with one probe per tile: {thousands(sw['windows'])} probes for {thousands(sw['unique'])} distinct windows, {n_miss} misses ({pct(n_miss / sw['windows'])}, marked). "
+                   "The misses sit where the circuit is computing; everything else is a hit. The white frame is taken apart on the right.", pw - 16, size=11.5, fill=INK)
 
     # ---- cells become tile IDs ----
     svg.text(rx, y + 10, "Cells become tile IDs", size=12.5, weight="bold")
@@ -817,8 +953,8 @@ def panel_tiles(svg, y, D, net, cells32):
             svg.rect(ix + i * bs, zy + j * bs, bs, bs, fill=fill, stroke=MID, sw=0.8)
             svg.text(ix + i * bs + bs / 2, zy + j * bs + bs / 2 + 3.4, "empty" if v == empty else str(v), size=9.5, anchor="middle", fill=GREY if v == empty else INK)
     nx_ = ix + 4 * bs + 14
-    yy = svg.para(nx_, zy + 10, "A tile's ID is its slot in the tile store, so equal tiles have equal IDs and a universe is a grid of IDs: 4 bytes per tile.", W - M - nx_)
-    svg.para(nx_, yy + 7, "Above the tiles every key is four IDs. Only IDs are hashed, whatever the rule.", W - M - nx_)
+    yy = svg.para(nx_, zy + 10, "A tile's ID is its place in the store of tiles, so equal tiles have equal IDs and a universe is a grid of IDs: 4 bytes per tile.", W - M - nx_)
+    svg.para(nx_, yy + 7, "A window is then four IDs: the memo is looked up by IDs, never by cells, whatever the rule.", W - M - nx_)
 
     # ---- one memo entry: the centre 2 x 2 tiles of the window and what they become ----
     my = zy + zw + 44
@@ -873,8 +1009,8 @@ def panel_tiles(svg, y, D, net, cells32):
     svg.text(vx + bw_ / 2, my + s * ms - bh_ / 2 + 13.2, str(value), size=10, anchor="middle")
     svg.text(vx + bw_ / 2, my + s * ms + bh_ / 2 + 13, "value", size=10.5, anchor="middle", fill=GREY)
     svg.text(ex + bw_, my + wside + 13, "as IDs: 32 bytes", size=10.5, anchor="middle", fill=GREY)
-    ey = svg.para(rx, my + wside + 31, f"A {2 * s}×{2 * s} window and the {s}×{s} tile in its centre {s // 2} generations later. This entry was "
-                  + ("missing" if was_miss else "a hit") + f" in this sweep. Checked while drawing: the circuit of panel 2, applied {s // 2} times, gives the same tile.", W - M - rx)
+    ey = svg.para(rx, my + wside + 31, f"A {2 * s}×{2 * s} window and the {s}×{s} tile in its centre {s // 2} generations later. In this sweep the entry was "
+                  + ("not there yet: a miss" if was_miss else "there: a hit") + f". Checked while drawing: the circuit of panel 2, applied {s // 2} times, gives the same tile.", W - M - rx)
 
     # ---- the table in memory ----
     ty_ = ey + 22
@@ -893,9 +1029,9 @@ def panel_tiles(svg, y, D, net, cells32):
         svg.text(lx + 12, ty_ + k * 12.6 + 8, f"{lab}: {pct(share, 0)}", size=10.5, fill=GREY)
     mib = T["slots"] * T["entry_bytes"] / 2 ** 20
     by = svg.para(rx, ty_ + rws * px + 15,
-                  f"The first {thousands(cols * rws)} of {thousands(T['slots'])} slots ({mib:.0f} MiB) after {thousands(T['generations'])} generations: open addressing, linear probing, "
-                  f"{T['avg_probes']:.2f} probes per insert. {sci(T['windows'], 3)} probes found {thousands(ent)} distinct windows; the floor windows under them took "
-                  f"{pct(T['brute_cell_evals'] / T['delivered'])} of the cell-updates delivered. The rest were hits.", W - M - rx)
+                  f"The first {thousands(cols * rws)} of {thousands(T['slots'])} slots ({mib:.0f} MiB) after {thousands(T['generations'])} generations of `{sqfile}`: a hash table "
+                  f"with linear probing, {T['avg_probes']:.2f} probes per insert. {sci(T['windows'], 3)} probes met {thousands(ent)} distinct windows. The brute force under them "
+                  f"amounts to {pct(T['brute_cell_evals'] / T['delivered'])} of the cell-updates delivered; the rest came out of the table.", W - M - rx)
     return max(cap, by) + 2
 
 
@@ -946,10 +1082,10 @@ def icicle(svg, x, y, w, run, step, row_h=15.0, label_w=66):
     above = [wv for wv in waves if wv[0] > top_full]     # single waves, one per level
     svg.rect(x + label_w + 0.5, y + 0.5, w - 1, row_h - 1, fill="#f1f1f1")
     svg.text(x + label_w + w / 2, y + row_h - 4.2, f"{len(above)} waves, one per level: {' → '.join(thousands(wv[2]) for wv in above)} windows", size=9.5, anchor="middle", fill=GREY)
-    svg.text(x + label_w - 6, y + row_h - 4.2, f"≥ {2 ** (top_full + 1)}", size=9.5, anchor="end", fill=GREY)
+    svg.text(x + label_w - 6, y + row_h - 4.2, "larger", size=9.5, anchor="end", fill=GREY)
     for lv in shown:
         fl = lv == floor
-        svg.text(x + label_w - 6, y + row[lv] * row_h + row_h - 4.2, f"{2 ** lv}×{2 ** lv}" + (" floor" if fl else ""), size=9.5, anchor="end",
+        svg.text(x + label_w - 6, y + row[lv] * row_h + row_h - 4.2, f"{2 ** lv}×{2 ** lv}" + (", floor" if fl else ""), size=9.5, anchor="end",
                  fill=INK if fl else GREY, weight="bold" if fl else None)
     h = (len(shown) + 1) * row_h
     svg.line(x + label_w, y + h + 3, x + label_w + w, y + h + 3, stroke=MID, sw=0.8)
@@ -958,6 +1094,7 @@ def icicle(svg, x, y, w, run, step, row_h=15.0, label_w=66):
         svg.line(xx, y + h + 3, xx, y + h + 7, stroke=MID, sw=0.8)
         svg.text(xx, y + h + 17, str(run["step_gens"] * q // 4), size=9.5, anchor="middle", fill=GREY)
     svg.text(x + label_w + w + 8, y + h + 17, "gens", size=9.5, fill=GREY)
+    svg.text(x + label_w - 6, y + h + 17, "window", size=9.5, anchor="end", fill=GREY)
     return h + 20, sum(wv[2] for wv in waves if wv[0] == floor), len(waves)
 
 
@@ -967,21 +1104,21 @@ def panel_miss(svg, y, D, logs):
     # ---- the waves ----
     x0, iw, lw = M, 366, 66
     col_w = lw + iw + 26
-    svg.text(x0, y + 10, "One wave per level, each a batch for one dispatch", size=12.5, weight="bold")
-    yy = svg.para(x0, y + 26, "A missed window asks for nine windows half its size, then for four more: two waves a level down. Each box is a wave; its number is the windows that missed, "
-                  "its dark part their share of the distinct requests.", col_w)
+    svg.text(x0, y + 10, "One wave per level, each one batch for the GPU", size=12.5, weight="bold")
+    yy = svg.para(x0, y + 26, "A missed window is built from nine windows half its size and then four more: two waves, one level down. Each box is a wave; its number is the windows that "
+                  "missed in it, its dark part their share of the windows it asked for.", col_w)
     sq = Wv["squares"]
     step = sq["steps_logged"][-1]
     yy += 6
-    svg.text(x0, yy, f"squares, the {sq['step_gens']} generations from {thousands(step['generation'])}: mostly known", size=11.5)
+    svg.text(x0, yy, f"`{fname(sq['file'])}`, the {sq['step_gens']} generations from {thousands(step['generation'])}: mostly known", size=11.5)
     h1, f1, n1 = icicle(svg, x0, yy + 6, iw, sq, step, label_w=lw)
     yy += h1 + 28
     rom = Wv["rom"]
     rstep = rom["steps_logged"][0]
-    svg.text(x0, yy, f"a ROM, its first {rom['step_gens']} generations: all new", size=11.5)
+    svg.text(x0, yy, f"`{fname(rom['file'])}`, a ROM, its first {rom['step_gens']} generations: all new", size=11.5)
     h2, f2, n2 = icicle(svg, x0, yy + 6, iw, rom, rstep, label_w=lw)
     yy += h2 + 20
-    bottom1 = svg.para(x0, yy, f"{n1} and {n2} waves brute-force {thousands(f1)} and {thousands(f2)} floor windows. A wave is 16 dispatches of fixed capacity: "
+    bottom1 = svg.para(x0, yy, f"{n1} and {n2} waves end in brute force on {thousands(f1)} and {thousands(f2)} floor windows. A wave is 16 GPU calls (dispatches) of fixed size: "
                        f"{logs['wave_us']:.0f} µs measured for an empty one.", col_w)
 
     # ---- the atlas ----
@@ -999,7 +1136,7 @@ def panel_miss(svg, y, D, logs):
     rw_, rh_ = len(res[0]) * px, len(res) * px
     atlas_w = mw + 40 + rw_
     svg.text(ax, y + 10, "At the floor: an atlas of missed windows", size=12.5, weight="bold")
-    ay = svg.para(ax, y + 26, f"{cols * rws} of the {at['misses']} windows of one floor wave of squares.", atlas_w) + 2
+    ay = svg.para(ax, y + 26, f"{cols * rws} of the {at['misses']} windows of one floor wave of `{fname(sq['file'])}`.", atlas_w) + 2
     svg.image(ax, ay, mw, mh, png_indexed(mos, palw, 2 * px))
     cellp = (side + 1) * px
     q = side // 4 * px
@@ -1009,25 +1146,38 @@ def panel_miss(svg, y, D, logs):
     svg.text(ax + mw + 20, ay + mh / 2 - 7, str(gens), size=10.5, anchor="middle", fill=GREY)
     svg.text(ax + mw + 20, ay + mh / 2 + 15, "gens", size=10.5, anchor="middle", fill=GREY)
     svg.image(rx, ay + (mh - rh_) / 2, rw_, rh_, png_indexed(res, palw, 2 * px))
-    bottom2 = svg.para(ax, ay + mh + 17, f"Each missed {side}×{side} window is copied from its four {half}×{half} base tiles into a grid of bit-planes, the circuit of panel 2 steps the grid {gens} generations, "
-                       "and the centre of every window (outlined) is interned as a base tile. The stages of a wave (claim, expand, evaluate, intern, publish) are each one dispatch over the "
-                       "whole batch. Above the floor a miss costs probes and inserts only.", atlas_w)
+    bottom2 = svg.para(ax, ay + mh + 17, f"Each missed {side}×{side} window is copied from its four {half}×{half} tiles into one grid, the atlas. The circuit of panel 2 steps the whole grid "
+                       f"{gens} generations, and the centre of every window (outlined) becomes a tile with an ID. Every stage of a wave is one GPU call over the whole batch. "
+                       "Above the floor a miss costs probes and inserts only.", atlas_w)
 
-    # depth per universe: the dispatches of a generation are paid once, whatever the universe's size
+    # depth per universe: the GPU calls of a generation are paid once, whatever the universe's size
     dy = bottom2 + 13
-    svg.text(ax, dy, "Per universe, dispatch latency picks the depth", size=12.5, weight="bold")
-    dy = svg.para(ax, dy + 15, f"A generation costs its dispatches (from {logs['dispatch_us']:.1f} µs each) however small the universe, so few active cells cannot pay for a deep "
-                  "recursion. The model's thresholds for the 32-state rule:", atlas_w)
+    svg.text(ax, dy, "Per universe: how deep the recursion may go", size=12.5, weight="bold")
+    dy = svg.para(ax, dy + 15, f"A GPU call costs at least {logs['dispatch_us']:.1f} µs, however little it does, and every generation needs several. Few active cells cannot pay for them: "
+                  "the smaller the universe, the coarser its floor. The model's thresholds for [[Hutton32b]]:", atlas_w)
     P = D["patterns"]
-    marks = [("chaotic", P["chaotic"]["gen0"]["w"] * P["chaotic"]["gen0"]["h"]), ("counter", P["counter"]["gen0"]["w"] * P["counter"]["gen0"]["h"]),
-             ("squares", P["squares"]["gen0"]["w"] * P["squares"]["gen0"]["h"]), ("ROM", P["rom"]["w"] * P["rom"]["h"])]
+    marks = sorted((P[k]["gen0"]["w"] * P[k]["gen0"]["h"] if "gen0" in P[k] else P[k]["w"] * P[k]["h"], fname(P[k]["file"])) for k in ("chaotic", "counter", "squares", "rom"))
     dlo, dhi = 4.0, 8.0
-    bar_y = dy + 16
 
     def DX(v):
         return ax + atlas_w * (math.log10(v) - dlo) / (dhi - dlo)
 
-    bands = [(10 ** dlo, DEPTH_A1, "#e3e3e3", INK, "no memo: plain cells"), (DEPTH_A1, DEPTH_A2, SKY, INK, "floor 32×32"), (DEPTH_A2, 10 ** dhi, BLUE, "#ffffff", "floor 16×16")]
+    # the names over their marks, in two rows where they would collide
+    placed, ends = [], [ax - 99.0, ax - 99.0]
+    for cells, name in marks:
+        wd = text_width(f"`{name}`", 10.5)
+        left = min(max(DX(cells) - wd / 2, ax), ax + atlas_w - wd)
+        r_ = 0 if left >= ends[0] + 8 else 1
+        ends[r_] = left + wd
+        placed.append((cells, name, left, r_))
+    for k, (cells, name, left, r_) in enumerate(placed):
+        wd = text_width(f"`{name}`", 10.5)
+        for cells2, _, _, r2 in placed:
+            if r_ == 0 and r2 > 0 and left - 3 < DX(cells2) < left + wd + 3:
+                placed[k] = (cells, name, DX(cells2) - 6 - wd, r_)
+    rows_used = 1 + max(r_ for *_, r_ in placed)
+    bar_y = dy + 4 + 13 * rows_used
+    bands = [(10 ** dlo, DEPTH_A1, "#e3e3e3", INK, "no memo: brute force only"), (DEPTH_A1, DEPTH_A2, SKY, INK, "floor 32×32"), (DEPTH_A2, 10 ** dhi, BLUE, "#ffffff", "floor 16×16")]
     for a_, b_, col, ink, lab in bands:
         svg.rect(DX(a_), bar_y, DX(b_) - DX(a_), 15, fill=col)
         svg.text((DX(a_) + DX(b_)) / 2, bar_y + 11, lab, size=10.5, anchor="middle", fill=ink)
@@ -1035,13 +1185,13 @@ def panel_miss(svg, y, D, logs):
     for e in range(4, 9):
         svg.text(DX(10 ** e), bar_y + 37, f"10^{{{e}}}", size=10, anchor="middle" if 4 < e < 8 else "start" if e == 4 else "end", fill=GREY)
     svg.text(DX(10 ** 6.5), bar_y + 37, "active cells", size=10, anchor="middle", fill=GREY)
-    for k, (name, cells) in enumerate(marks):
+    for cells, name, left, r_ in placed:
         xx = DX(cells)
+        ly_ = bar_y - 10 - 13 * r_
+        if r_:
+            svg.line(xx, ly_ + 3, xx, bar_y - 7, stroke=MID, sw=0.8)
         svg.path(f"M{xx - 4:.1f},{bar_y - 7}L{xx + 4:.1f},{bar_y - 7}L{xx:.1f},{bar_y - 0.5}Z", stroke=None, fill=INK)
-        # two universes of nearly the same size: their names go to either side
-        before = k + 1 < len(marks) and DX(marks[k + 1][1]) - xx < 50
-        after = k > 0 and xx - DX(marks[k - 1][1]) < 50
-        svg.text(xx + 5 if before else xx - 5 if after else xx, bar_y - 10, name, size=10.5, anchor="end" if before else "start" if after else "middle")
+        svg.text(left, ly_, f"`{name}`", size=10.5, halo="#ffffff")
     bottom2 = bar_y + 40
 
     # ---- the controller ----
@@ -1049,8 +1199,8 @@ def panel_miss(svg, y, D, logs):
     cx = ax + atlas_w + 26
     cw = W - M - cx
     th = C["thumb"]
-    svg.text(cx, y + 10, "Engine per region, by novelty", size=12.5, weight="bold")
-    cy = svg.para(cx, y + 26, f"A universe of 16 patterns, {thousands(C['w'])} × {thousands(C['h'])} cells.", cw) + 2
+    svg.text(cx, y + 10, "Per region: memo or brute force", size=12.5, weight="bold")
+    cy = svg.para(cx, y + 26, f"A universe of {len(C['parts'])} patterns under [[{C['rule']}]], {thousands(C['w'])} × {thousands(C['h'])} cells.", cw) + 2
     ch = cw * C["h"] / C["w"]
     svg.rect(cx, cy, cw, ch, fill="#000000")
     lut = bytes(int(round(255 * (v / 255) ** 0.6)) for v in range(256))
@@ -1071,14 +1221,25 @@ def panel_miss(svg, y, D, logs):
         col = ORANGE if is_cells else SKY
         svg.rect(xa + 0.6, ya + 0.6, wd - 1.2, hd - 1.2, fill=col, opacity=0.5 if is_cells else 0.3)
         svg.rect(xa + 0.6, ya + 0.6, wd - 1.2, hd - 1.2, stroke=col, sw=0.9)
-    ly = cy + ch + 16
+    # which file is where: a number at the corner of every part, and the key to the numbers
+    files = []
+    for part in C["parts"]:
+        f_ = fname(part["file"])
+        if f_ not in files:
+            files.append(f_)
+        px_, py_ = cx + part["x"] * sc, cy + part["y"] * sc
+        svg.text(px_ + 2.5, py_ + 10, str(files.index(f_) + 1), size=10, weight="bold", fill="#ffffff", halo="#000000")
+    count = {f_: sum(fname(part["file"]) == f_ for part in C["parts"]) for f_ in files}
+    key = "   ".join(f"**{k + 1}**\u00a0`{f_}`" + (f"\u00a0×{count[f_]}" if count[f_] > 1 else "") for k, f_ in enumerate(files))
+    ly = svg.para(cx, cy + ch + 14, key, cw, size=10.5, fill=GREY) + 5
     svg.rect(cx, ly - 9, 10, 10, fill=SKY)
     svg.text(cx + 15, ly, f"memo with the 16×16 floor: {memo_n} regions")
     svg.rect(cx, ly + 6, 10, 10, fill=ORANGE)
-    svg.text(cx + 15, ly + 15, f"plain cells, memo only above: {cells_n} regions")
-    bottom3 = svg.para(cx, ly + 33, f"{reg}×{reg}-cell regions, by the mode they spent most of the first {thousands(C['gens'])} generations in. Content that is new at every scale "
-                       f"(the ROM while it is being learned, part of a movie) is stepped as cells; the rest keeps its memo. Model time {C['adaptive_ms']:.1f} ms; "
-                       f"plain cells everywhere, {C['plain_ms']:.1f} ms.", cw)
+    svg.text(cx + 15, ly + 15, f"brute force, memo only above: {cells_n} regions")
+    rom_file = fname(D["waves"]["rom"]["file"])
+    bottom3 = svg.para(cx, ly + 33, f"{reg}×{reg}-cell regions, coloured by what they spent most of the first {thousands(C['gens'])} generations in. Where content is new at every scale "
+                       f"(`{rom_file}` while it is being learned, part of the movie) every probe would miss, so the region is stepped by brute force. The rest keeps its memo. "
+                       f"Model time for those generations: {C['adaptive_ms']:.1f} ms; with brute force everywhere, {C['plain_ms']:.1f} ms.", cw)
     return max(bottom1, bottom2, bottom3) + 2
 
 
@@ -1086,10 +1247,11 @@ def panel_miss(svg, y, D, logs):
 
 def panel_why(svg, y, D, logs):
     rp = logs["rp"]
-    rb = [("32 states, table lookup", logs["rb_lut"], SKY, 3), ("32 states, the circuit", logs["rb_planes"], BLUE, 2), ("Life, the adder tree", logs["rb_life"], GREEN, 3)]
+    rb = [("[[Hutton32]], table lookup", logs["rb_lut"], SKY, 3), ("[[Hutton32b]], the circuit", logs["rb_planes"], BLUE, 2), ("[[Life]], the adder tree", logs["rb_life"], GREEN, 3)]
     x0, w0 = M, 452
-    svg.text(x0, y + 10, "Measured rates put the memo floor", size=12.5, weight="bold")
-    svg.para(x0, y + 26, "A probe costs as much as ρ = R_{B} / R_{P} cell-updates of brute force. The probe rate is the same for every rule; the brute-force rate is not. Rates per second:", w0)
+    svg.text(x0, y + 10, "Measured rates put the floor", size=12.5, weight="bold")
+    svg.para(x0, y + 26, "A probe costs as much as ρ = R_{B} / R_{P} cell-updates of brute force: R_{B} is the rate of brute force, R_{P} that of probes. "
+             "R_{P} is the same for every rule; R_{B} is not. Per second:", w0)
     lo, hi = 8.7, 12.5
     ax0, aw = x0 + 4, w0 - 12
 
@@ -1132,12 +1294,12 @@ def panel_why(svg, y, D, logs):
         return 2 ** (3 * lv - 4)           # w^3 / 16 cell-updates
 
     def GX(lv):
-        return gx0 + gw * (lv - 3 + 0.35) / 3.7
+        return gx0 + gw * (lv - 3 + 0.6) / 3.95
 
     def GY(v):
         return gy + gh * (1 - (math.log10(v) - ylo) / (yhi - ylo))
 
-    svg.text(x0, gy - 14, "What a hit saves, V / ρ: a w×w window gives its centre w/4 generations later, V = w^{3}/16", fill=GREY)
+    svg.text(x0, gy - 14, "What a hit saves, V / ρ. A w×w window gives its centre w/4 generations later: V = w^{3}/16 cell-updates", fill=GREY)
     log_grid(svg, GY, ylo, yhi, gx0, gx0 + gw, vertical=False, major="#dcdcdc", minor="#d0d0d0")
     for e in range(-1, 3):
         svg.text(gx0 - 6, GY(10 ** e) + 3.5, "0.1×" if e < 0 else f"{10 ** e}×", size=10, anchor="end", fill=GREY)
@@ -1160,21 +1322,24 @@ def panel_why(svg, y, D, logs):
         else:
             svg.text(a + 9, b + 14, f"{floors[-1][1]:.1f}×", weight="bold", fill=col, halo="#ffffff")
         a, b = pts[levels.index(fl) - 1]
-        svg.text(a + 8, b + 12, f"{floors[-1][2]:.2f}×", size=10, fill=col, halo="#ffffff")
+        if k == 0:                         # beside its own line: below it the other rule's line passes
+            svg.text(a - 8, b + 3.5, f"{floors[-1][2]:.2f}×", size=10, anchor="end", fill=col, halo="#ffffff")
+        else:
+            svg.text(a + 8, b + 12, f"{floors[-1][2]:.2f}×", size=10, fill=col, halo="#ffffff")
         a, b = pts[-1]
         svg.text(a + 10, b + 4, lab, size=10.5, fill=col)
     (fh, gh_, bh_), (fl_, gl_, bl_) = floors
-    bottom1 = svg.para(x0, gy + gh + 36, f"A window is worth a memo entry only if its result is worth more than the probe that finds it: from {2 ** fh}×{2 ** fh} windows on for the 32-state rule "
-                       f"({gh_:.1f}×; {2 ** (fh - 1)}×{2 ** (fh - 1)} windows: {bh_:.2f}×) and from {2 ** fl_}×{2 ** fl_} for Life ({gl_:.1f}×; {2 ** (fl_ - 1)}×{2 ** (fl_ - 1)}: {bl_:.2f}×). "
-                       "That is each rule's memo floor: a larger ρ puts it one level coarser. Golly memoizes down to 4×4 blocks, worth V = 4.", w0)
+    bottom1 = svg.para(x0, gy + gh + 36, f"A window is worth a memo entry only if a hit saves more than the probe costs: from {2 ** fh}×{2 ** fh} windows on for [[Hutton32b]] "
+                       f"({gh_:.1f}×; {2 ** (fh - 1)}×{2 ** (fh - 1)} windows: {bh_:.2f}×) and from {2 ** fl_}×{2 ** fl_} for [[Life]] ({gl_:.1f}×; {2 ** (fl_ - 1)}×{2 ** (fl_ - 1)}: {bl_:.2f}×). "
+                       "That is each rule's floor: a larger ρ puts it one level coarser. Golly's HashLife memoizes down to 4×4 blocks, worth V = 4.", w0)
 
     # ---- against Golly ----
     rows, same = ghl_logs.outcomes(logs)
     assert same
     ox = x0 + w0 + 34
     ow = W - M - ox
-    svg.text(ox, y + 10, "Against Golly 5.1 at its best step size: rate of the GHL component that ran, over Golly's", size=12.5, weight="bold")
-    lab_w = 196
+    svg.text(ox, y + 10, "Against Golly 5.1, HashLife at its best step size: rate of the GHL part that ran, over Golly's", size=12.5, weight="bold")
+    lab_w = 218
     px0, pw = ox + lab_w, ow - lab_w - 4
     lo, hi = -2.6, 6.75
 
@@ -1182,18 +1347,22 @@ def panel_why(svg, y, D, logs):
         return px0 + pw * (math.log10(v) - lo) / (hi - lo)
 
     ty = y + 44
-    rh = 24.0
-    n = len(rows)
+    rh, gh2 = 24.0, 17.0                    # a row; the heading of a group of rows
+    groups = []
+    for r_ in rows:
+        if r_["group"] not in groups:
+            groups.append(r_["group"])
+    total = len(rows) * rh + len(groups) * gh2
     one = PX(1)
-    svg.rect(px0, ty - 4, one - px0, n * rh + 8, fill="#f3f3f3")
-    svg.rect(one, ty - 4, px0 + pw - one, n * rh + 8, fill="#e9f2f9")
-    log_grid(svg, PX, lo, hi, ty - 4, ty + n * rh + 4, minor="#c4ccd2")
+    svg.rect(px0, ty - 4, one - px0, total + 8, fill="#f3f3f3")
+    svg.rect(one, ty - 4, px0 + pw - one, total + 8, fill="#e9f2f9")
+    log_grid(svg, PX, lo, hi, ty - 4, ty + total + 4, minor="#c4ccd2")
     for e in range(-2, 7):
         xx = PX(10 ** e)
-        svg.text(xx, ty + n * rh + 17, "1×" if e == 0 else f"10^{{{e}}}×" if e > 0 else ("0.1×" if e == -1 else "0.01×"), size=10, anchor="middle", fill=GREY)
-    svg.line(one, ty - 4, one, ty + n * rh + 4, stroke=INK, sw=1.2)
+        svg.text(xx, ty + total + 17, "1×" if e == 0 else f"10^{{{e}}}×" if e > 0 else ("0.1×" if e == -1 else "0.01×"), size=10, anchor="middle", fill=GREY)
+    svg.line(one, ty - 4, one, ty + total + 4, stroke=INK, sw=1.2)
     svg.text(one - 7, ty - 10, "Golly faster", size=10.5, anchor="end", fill=GREY)
-    svg.text(one + 7, ty - 10, "GHL component faster", size=10.5, fill=BLUE)
+    svg.text(one + 7, ty - 10, "GHL part faster", size=10.5, fill=BLUE)
 
     def shade_at(xx):
         return "#f3f3f3" if xx < one else "#e9f2f9"
@@ -1212,9 +1381,12 @@ def panel_why(svg, y, D, logs):
         if r_["group"] != group:
             group = r_["group"]
             if yy > ty:
-                svg.line(ox, yy, px0 + pw, yy, stroke=MID, sw=0.8)
-            svg.text(ox, cy + 4, group, size=10.5, weight="bold", fill=GREY)
-        svg.text(px0 - 9, cy - 0.5, r_["name"], size=11.5, anchor="end")
+                svg.line(ox, yy, px0 + pw, yy, stroke=MID, sw=0.8)       # one rule family above the line, the other below
+            svg.rect(ox, yy + 1.5, pw + lab_w, gh2 - 3, fill="#ffffff", opacity=0.82)
+            svg.text(ox, yy + 12.5, group, fill=GREY)
+            yy += gh2
+            cy = yy + rh / 2
+        svg.text(px0 - 9, cy - 0.5, r_["name"], anchor="end")
         svg.text(px0 - 9, cy + 10, r_["note"], size=9.5, anchor="end", fill=GREY)
         if "range" in r_:
             kind, a, b = r_["range"]
@@ -1237,17 +1409,19 @@ def panel_why(svg, y, D, logs):
                     txt = "≥ " + times(math.floor(v / unit) * unit)
                 else:
                     txt = times(v)
+                if left and xs[k] - 12 - text_width(txt, 10.5) < one < xs[k] - 8:
+                    left = False
                 svg.text(xs[k] - 10 if left else xs[k] + 10, cy + 3.8, txt, size=10.5, anchor="end" if left else "start",
                          halo=shade_at(xs[k] - 30 if left else xs[k] + 30))
         yy += rh
-    ly = ty + n * rh + 38
+    ly = ty + total + 38
     lx = ox
-    for kind, lab in (("gpu", "GPU, measured and verified"), ("learn", "the same with the CPU's learning time counted"), ("cpu", "the recursion on one CPU thread")):
+    for kind, lab in (("gpu", "on the GPU, measured and verified"), ("learn", "the same, with the time to fill the memo on the CPU"), ("cpu", "the recursion on one CPU thread")):
         mark(kind, lx + 6, ly - 4)
         svg.text(lx + 16, ly, lab, size=10.5, fill=GREY)
-        lx += 16 + text_width(lab, 10.5) + 20
-    bottom2 = svg.para(ox, ly + 17, "Golly leads where content recurs sparsely and runs are long; there GHL falls back to the recursion. Every GPU result was checked against the CPU, "
-                       "and the CPU engine's final states equal Golly's.", ow, size=10.5)
+        lx += 16 + text_width(lab, 10.5) + 18
+    bottom2 = svg.para(ox, ly + 17, "Golly leads where content recurs sparsely and runs are long; there GHL falls back to the recursion on the CPU. Every GPU result was checked "
+                       "against the CPU, and the CPU engine's final states equal Golly's.", ow, size=10.5)
     return max(bottom1, bottom2)
 
 
@@ -1259,22 +1433,23 @@ def build():
     svg = Svg()
     svg.text(M, 34, "GPU HashLife (GHL)", size=26, weight="bold")
     tx = M + text_width("GPU HashLife (GHL)", 26, True) + 16
-    svg.text(tx, 34, "HashLife above a memo floor, the rule as a bit-sliced circuit below it", size=14)
-    svg.text(M, 53, "Every picture and number is drawn from the measurement harness. The components were measured separately: GHL has not yet run as one program.", fill=GREY)
-    chips(svg, W - M, 18, [("measured on the GPU", "gpu"), ("CPU reference engine", "cpu"), ("model", "model")], right=True)
+    svg.text(tx, 34, "HashLife above a memo floor, the rule as a circuit of logic gates below it", size=14)
+    svg.text(W - M, 34, "Every picture and number is drawn from the measurement harness.", anchor="end", fill=GREY)
+    svg.text(M, 53, "How a universe advances, and the words used below; the number on a step is the panel that shows it. "
+             "The parts were measured separately: GHL has not yet run as one program.", fill=GREY)
     y = flow(svg, 64)
-    y = section(svg, y, 1, "Six universes, two rules", "real patterns; colour is the cell state")
+    y = section(svg, y, 1, "Six universes, two rules", "real patterns, named by their files; colour is the cell state")
     y = panel_universes(svg, y, D)
-    y = section(svg, y + 10, 2, "Below the floor: the rule as a circuit", "Hutton32b, 32 states, as two-input gates on bit-planes", badge=[("built, measured on the GPU", "gpu")])
+    y = section(svg, y + 10, 2, "Below the floor: the rule as a circuit", "[[Hutton32b]], 32 states, as a network of two-input gates", built=[("gpu", "built and measured on the GPU")])
     y, net, cells32 = panel_circuit(svg, y, D, logs)
     y = panel_life(svg, y + 4, D, logs)
-    y = section(svg, y + 10, 3, "Above the floor: tiles, IDs and a memo table", "the hit path: a gather of four IDs and one probe per tile",
-                badge=[("hit path built on the GPU", "gpu"), ("picture: CPU reference engine", "cpu")])
+    y = section(svg, y + 10, 3, "Above the floor: tiles, IDs and a memo table", "the hit path: four IDs read, one probe",
+                built=[("gpu", "the hit path runs on the GPU"), ("cpu", "this picture: CPU reference engine")])
     y = panel_tiles(svg, y, D, net, cells32)
-    y = section(svg, y + 10, 4, "A miss: the recursion in waves, level by level", "and the engine per region",
-                badge=[("CPU reference engine", "cpu"), ("controller: model", "model")])
+    y = section(svg, y + 10, 4, "A miss: the recursion in waves, level by level", "and how deep to go",
+                built=[("cpu", "CPU reference engine"), ("model", "depth per universe and per region: model")])
     y = panel_miss(svg, y, D, logs)
-    y = section(svg, y + 10, 5, "Why a floor, and what it buys", None, badge=[("rates and ratios: measured", "gpu"), ("floor: model", "model")])
+    y = section(svg, y + 10, 5, "Why a floor, and what it buys", None, built=[("gpu", "rates and ratios measured"), ("model", "the floor: model")])
     y = panel_why(svg, y, D, logs)
     return svg.finish(y + 6)
 

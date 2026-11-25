@@ -83,6 +83,13 @@ class Logs:
         return blocks
 
 
+# the patterns of the comparison, by the file names the logs give them
+ROM, SQUARES, CHAOTIC, COUNTER = "lotr1.ANSI-1M.rle", "squares.rle", "chaotic.rle", "advanced counter v2.rle"
+ULC, SOUP = "Unit-Life-Cell-512x512.rle", "soup2048.rle"
+H32, LIFE = "[[Hutton32]] and [[Hutton32b]], 32 states", "[[Life]], 2 states"
+WORDS = dict(enumerate("zero one two three four five six seven eight nine ten eleven twelve".split()))
+
+
 def collect(logs=None):
     """Every measured number the diagram shows, as one dictionary."""
     L = logs or Logs()
@@ -112,15 +119,16 @@ def collect(logs=None):
 
     # ---- Golly ----
     g = L.golly("golly.txt")
-    rom = [r for r in g if r["pattern"] == "lotr1.ANSI-1M.rle"]
+    rom = [r for r in g if r["pattern"] == ROM]
     best = max(rom, key=lambda r: r["cells_s"])
-    rom_cells = 9467605
-    d["golly_rom_gens_s"] = best["cells_s"] / rom_cells
+    d["rom_cells"] = 9467605                         # the ROM's bounding box, 3095 x 3059
+    d["golly_rom_gens_s"] = best["cells_s"] / d["rom_cells"]
     d["golly_rom_cells_s"] = best["cells_s"]
     lg = L.golly("life-golly.txt")
-    d["golly_soup_hl"] = max(r["gens_s"] for r in lg if r["pattern"] == "soup2048.rle" and r["algo"] == "HashLife")
-    d["golly_soup_ql"] = max(r["gens_s"] for r in lg if r["pattern"] == "soup2048.rle" and r["algo"] == "QuickLife")
-    d["golly_ulc"] = max(r["gens_s"] for r in lg if r["pattern"].startswith("Unit-Life-Cell") and r["algo"] == "HashLife")
+    d["golly_soup_hl"] = max(r["gens_s"] for r in lg if r["pattern"] == SOUP and r["algo"] == "HashLife")
+    ql = max((r for r in lg if r["pattern"] == SOUP and r["algo"] == "QuickLife"), key=lambda r: r["gens_s"])
+    d["golly_soup_ql"], d["ql_cells_s"] = ql["gens_s"], ql["cells_s"]
+    d["golly_ulc"] = max(r["gens_s"] for r in lg if r["pattern"] == ULC and r["algo"] == "HashLife")
 
     # ---- GPU components ----
     d["rom_planes_gens_s"] = L.find("bitplane-sizes.txt", rf"\[ROM 3104x3067\] bit-plane kernel: .* = {NUM} gens/s")[0]
@@ -140,6 +148,9 @@ def collect(logs=None):
     for key, name in (("sparse", "sparse.txt"), ("sparse_ulc", "life-sparse.txt")):
         d[key + "_gpu"] = L.find(name, rf"active blocks : .* = {NUM} gens/s")[0]
         d[key + "_learn_s"] = L.find(name, rf"learned in {NUM}s")[0]
+        d[key + "_file"] = L.find(name, r"^pattern (.+?) rule \S+: tile ")[0]
+        nx, ny, cells = L.find(name, rf"universe: (\d+)x(\d+) copies .* cells \({NUM}\)")
+        d[key + "_copies"], d[key + "_cells"] = int(nx) * int(ny), cells
         steps = L.golly(name)            # two runs: 16,384 generations, then 2^20
         d[key + "_golly"] = max(r["gens_s"] for r in steps if r["run"] == 0)
         d[key + "_golly_long"] = max(r["gens_s"] for r in steps if r["run"] == 1)
@@ -147,16 +158,16 @@ def collect(logs=None):
     # ---- the recursion on one CPU thread against Golly ----
     h = L.h2h("head2head.txt")
     d["idle"] = {k: v for k, v in h[0].items()}
-    d["h2h_squares"] = h[1]["squares.rle"]
+    d["h2h_squares"] = h[1][SQUARES]
     d["h2h_movie"] = h[1]["32x32 movie.mc"]
     d["h2h_replicator"] = h[2]["Hutton-replicator.rle"]
     rl = L.h2h("runlength.txt")          # blocks: 2^14, 2^16, 2^18, 2^20, 2^22, 2^24 generations
-    d["runlength"] = [{k.replace(".rle", ""): v for k, v in b.items()} for b in rl]
+    d["runlength"] = rl
     lh = L.h2h("life-h2h.txt")
     life = {}
     for b in lh:
         life.update(b)
-    d["h2h_ulc"] = life.pop("Unit-Life-Cell-512x512.rle")
+    d["h2h_ulc"] = life.pop(ULC)
     d["life_eventful"] = life
     return d
 
@@ -176,19 +187,28 @@ def outcomes(d):
     idle = [e / g for g, e, _ in d["idle"].values()]
     ev = [e / g for g, e, _ in d["life_eventful"].values()]
     same = all(s for _, _, s in list(d["idle"].values()) + list(d["life_eventful"].values()))
+    assert d["sparse_file"] == COUNTER and d["sparse_ulc_file"] == ULC
+
+    def power(v):
+        """6.0e10 as 6·10^{10}, 1.0e10 as 10^{10}."""
+        e = int(f"{v:.0e}".split("e")[1])
+        m = round(v / 10 ** e)
+        return f"10^{{{e}}}" if m == 1 else f"{m}·10^{{{e}}}"
+
+    # names: pattern files in backticks (the figure sets them in a monospaced font)
     rows = [
-        dict(group="32 states", name="ROM, first period", note="9.5 M cells, dense and new", points=[("gpu", d["rom_planes_gens_s"] / d["golly_rom_gens_s"])]),
-        dict(group="32 states", name="ROM, once learned", note="hit path, 32×32 tiles", points=[("gpu", d["rom_hit_gens_s"] / d["golly_rom_gens_s"]), ("learn>", rom_learn)]),
-        dict(group="32 states", name="squares", note="65,536 generations", points=[("gpu", d["tile_squares"] / d["h2h_squares"][0])]),
-        dict(group="32 states", name="chaotic", note="active phase", points=[("gpu", d["tile_chaotic"] / g14["chaotic"][0]), ("cpu", g24["chaotic"][1] / g24["chaotic"][0])]),
-        dict(group="32 states", name="counter", note="2^{20} and 2^{24} generations", points=[("gpu", d["tile_counter"] / g20["advanced counter v2"][0]), ("cpu", g24["advanced counter v2"][1] / g24["advanced counter v2"][0])]),
-        dict(group="32 states", name="2,304 counters, sparse", note="10^{10} cells", points=[("gpu", d["sparse_gpu"] / d["sparse_golly"]), ("learn", sp_learn)]),
-        dict(group="32 states", name="seven idle circuits", note="2^{24} generations", range=("cpu", min(idle), max(idle))),
-        dict(group="Life", name="random soup, against QuickLife", note="2,048 × 2,048, dense and chaotic", points=[("gpu", d["soup_gpu"] / d["golly_soup_ql"])]),
-        dict(group="Life", name="random soup, against HashLife", note="the same run", points=[("gpu", d["soup_gpu"] / d["golly_soup_hl"])]),
-        dict(group="Life", name="Unit Life Cell", note="2^{20} and 2^{24} generations", points=[("gpu", d["ulc_hit_gens_s"] / d["golly_ulc"]), ("cpu", d["h2h_ulc"][1] / d["h2h_ulc"][0])]),
-        dict(group="Life", name="2,304 Unit Life Cells, sparse", note="6·10^{10} cells", points=[("gpu", d["sparse_ulc_gpu"] / d["sparse_ulc_golly"]), ("learn", su_learn)]),
-        dict(group="Life", name="nine eventful patterns", note="2^{20} or 2^{24} generations", range=("cpu", min(ev), max(ev))),
+        dict(group=H32, name=f"`{ROM}`, first period", note=f"{d['rom_cells'] / 1e6:.1f} M cells, dense, all new", points=[("gpu", d["rom_planes_gens_s"] / d["golly_rom_gens_s"])]),
+        dict(group=H32, name=f"`{ROM}`, once learned", note="the memo holds a period; 32×32 tiles", points=[("gpu", d["rom_hit_gens_s"] / d["golly_rom_gens_s"]), ("learn>", rom_learn)]),
+        dict(group=H32, name=f"`{SQUARES}`", note="65,536 generations", points=[("gpu", d["tile_squares"] / d["h2h_squares"][0])]),
+        dict(group=H32, name=f"`{CHAOTIC}`", note="16,384 and 2^{24} generations", points=[("gpu", d["tile_chaotic"] / g14[CHAOTIC][0]), ("cpu", g24[CHAOTIC][1] / g24[CHAOTIC][0])]),
+        dict(group=H32, name=f"`{COUNTER}`", note="2^{20} and 2^{24} generations", points=[("gpu", d["tile_counter"] / g20[COUNTER][0]), ("cpu", g24[COUNTER][1] / g24[COUNTER][0])]),
+        dict(group=H32, name=f"{d['sparse_copies']:,} × `{COUNTER}`", note=f"sparse, {power(d['sparse_cells'])} cells", points=[("gpu", d["sparse_gpu"] / d["sparse_golly"]), ("learn", sp_learn)]),
+        dict(group=H32, name=f"{WORDS.get(len(idle), len(idle))} idle circuits", note="2^{24} generations", range=("cpu", min(idle), max(idle))),
+        dict(group=LIFE, name="random soup, against QuickLife", note="2,048 × 2,048 cells, dense, chaotic", points=[("gpu", d["soup_gpu"] / d["golly_soup_ql"])]),
+        dict(group=LIFE, name="random soup, against HashLife", note="the same run", points=[("gpu", d["soup_gpu"] / d["golly_soup_hl"])]),
+        dict(group=LIFE, name=f"`{ULC}`", note="2^{20} and 2^{24} generations", points=[("gpu", d["ulc_hit_gens_s"] / d["golly_ulc"]), ("cpu", d["h2h_ulc"][1] / d["h2h_ulc"][0])]),
+        dict(group=LIFE, name=f"{d['sparse_ulc_copies']:,} × `{ULC}`", note=f"sparse, {power(d['sparse_ulc_cells'])} cells", points=[("gpu", d["sparse_ulc_gpu"] / d["sparse_ulc_golly"]), ("learn", su_learn)]),
+        dict(group=LIFE, name=f"{WORDS.get(len(ev), len(ev))} eventful patterns", note="2^{20} or 2^{24} generations", range=("cpu", min(ev), max(ev))),
     ]
     return rows, same
 
@@ -201,7 +221,7 @@ if __name__ == "__main__":
     print("\nagainst Golly (ratio > 1: the GHL component is faster); same final states:", same)
     for r in rows:
         if "range" in r:
-            print(f"  {r['group']:10} {r['name']:32} {r['range'][0]}: {r['range'][1]:.3g} .. {r['range'][2]:.3g}")
+            print(f"  {r['name']:44} {r['range'][0]}: {r['range'][1]:.3g} .. {r['range'][2]:.3g}   ({r['note']})")
         else:
-            print(f"  {r['group']:10} {r['name']:32} " + ", ".join(f"{k}: {v:.4g}" for k, v in r["points"]))
+            print(f"  {r['name']:44} " + ", ".join(f"{k}: {v:.4g}" for k, v in r["points"]) + f"   ({r['note']})")
     print(f"\nrho: byte LUT {d['rb_lut'] / d['rp']:.1f}, bit-planes {d['rb_planes'] / d['rp']:.1f}, Life {d['rb_life'] / d['rp']:.1f}")

@@ -265,8 +265,14 @@ fn sweep_run(g: &Grid, lut: &crate::ca::Rule, a: usize, lt: usize, gens: u64, sn
   SweepRun { series, snapshot, table: t.done(), period, nx, ny, nonempty, w: g.w, h: g.h }
 }
 
-fn series_json(r: &SweepRun, lt: usize) -> String {
+/// The fields `file` (relative to patterns/) and `rule` of a run, for the figure's labels.
+fn source(o: &mut Obj, file: &str, rule: &str) {
+  o.text("file", file).text("rule", rule);
+}
+
+fn series_json(r: &SweepRun, lt: usize, file: &str, rule: &str) -> String {
   let mut o = Obj::default();
+  source(&mut o, file, rule);
   o.num("tile", 1usize << lt).num("gens_per_sweep", 1usize << (lt - 1)).num("nx", r.nx).num("ny", r.ny).num("nonempty_tiles", r.nonempty);
   o.num("w", r.w).num("h", r.h);
   match r.period {
@@ -283,7 +289,8 @@ fn series_json(r: &SweepRun, lt: usize) -> String {
 
 /// Step `g` from the root by `2^k` generations `steps` times; record the waves of the steps in
 /// `logged` (1-based) and, for those steps, the windows of the largest floor wave.
-fn waves(g: &Grid, lut: &crate::ca::Rule, a: usize, k: usize, steps: u64, logged: &[u64], atlas_max: usize) -> String {
+#[allow(clippy::too_many_arguments)]
+fn waves(g: &Grid, lut: &crate::ca::Rule, file: &str, rule: &str, a: usize, k: usize, steps: u64, logged: &[u64], atlas_max: usize) -> String {
   let mut e = Engine::new(lut, a, k);
   let (mut root, mut level) = e.from_grid(g);
   for lv in e.levels.iter_mut() {
@@ -335,6 +342,7 @@ fn waves(g: &Grid, lut: &crate::ca::Rule, a: usize, k: usize, steps: u64, logged
     }
   }
   let mut o = Obj::default();
+  source(&mut o, file, rule);
   o.num("a", a).num("k", k).num("step_gens", 1u64 << k).num("steps", steps).num("floor_window", side);
   let totals: Vec<String> = e
     .levels
@@ -367,20 +375,27 @@ pub fn run(args: &[String]) {
   let mut o = Obj::default();
   o.raw("palette", format!("[{}]", HUTTON32_COLORS.iter().map(|c| list(c.iter())).collect::<Vec<_>>().join(",")));
 
-  // ---- the universes of the evaluation, as cells ----
-  let (counter, _) = dense(&p.join("advanced counter v2.rle"));
-  let (chaotic, _) = dense(&p.join("misc/chaotic.rle"));
-  let (rom, _) = dense(&p.join("misc/extra/lotr1.ANSI-1M.rle"));
-  let (ppmd, _) = dense(&p.join("misc/extra/lotr1.PPMd-244K.rle"));
-  let (ulc, _) = dense(&p.join("life/Unit-Life-Cell-512x512.rle"));
-  let (squares, _) = dense(&p.join("misc/squares.rle"));
+  // ---- the universes of the evaluation, as cells; files relative to patterns/ ----
+  const COUNTER: &str = "advanced counter v2.rle";
+  const CHAOTIC: &str = "misc/chaotic.rle";
+  const ROM: &str = "misc/extra/lotr1.ANSI-1M.rle";
+  const ROM_SMALL: &str = "misc/extra/lotr1.PPMd-244K.rle";
+  const ULC: &str = "life/Unit-Life-Cell-512x512.rle";
+  const SQUARES: &str = "misc/squares.rle";
+  const SOUP: &str = "life-soup"; // not a file: `life-soup --side S --seed 1`
+  let (counter, _) = dense(&p.join(COUNTER));
+  let (chaotic, _) = dense(&p.join(CHAOTIC));
+  let (rom, _) = dense(&p.join(ROM));
+  let (ppmd, _) = dense(&p.join(ROM_SMALL));
+  let (ulc, _) = dense(&p.join(ULC));
+  let (squares, _) = dense(&p.join(SQUARES));
   let h32 = crate::load_lut(&RuleSpec::parse("hutton32").unwrap());
   let cha_gen: u64 = opt_or(args, "--chaotic-gen", 8192);
   let soup_gen: usize = opt_or(args, "--soup-gen", 128);
   let mut pats = Obj::default();
   if want("patterns") {
     let mut c = Obj::default();
-    c.text("file", "advanced counter v2.rle").text("rule", "Hutton32b").grid("gen0", &counter);
+    c.text("file", COUNTER).text("rule", "Hutton32b").grid("gen0", &counter);
     // one generation later, on the pattern's own bounding box: checks the netlist in the figure
     let (x0, y0) = (1usize, 1usize);
     let padded = counter.padded(x0, y0, counter.w + 2, counter.h + 2);
@@ -390,12 +405,12 @@ pub fn run(args: &[String]) {
     pats.raw("counter", c.done());
 
     let mut c = Obj::default();
-    c.text("file", "misc/squares.rle").text("rule", "Hutton32").grid("gen0", &squares);
+    c.text("file", SQUARES).text("rule", "Hutton32").grid("gen0", &squares);
     pats.raw("squares", c.done());
 
     let mut c = Obj::default();
     let (later, dx, dy) = advance(&chaotic, &h32b, cha_gen, 64);
-    c.text("file", "misc/chaotic.rle").text("rule", "Hutton32b").grid("gen0", &chaotic);
+    c.text("file", CHAOTIC).text("rule", "Hutton32b").grid("gen0", &chaotic);
     c.num("later_gen", cha_gen).num("later_dx", dx).num("later_dy", dy).grid("later", &later);
     pats.raw("chaotic", c.done());
 
@@ -403,12 +418,12 @@ pub fn run(args: &[String]) {
     // a window of the ROM at one cell per pixel (the whole pattern is a uniform texture)
     let (cw, ch) = (192usize, 160usize);
     let (cx, cy) = (rom.w / 2 - cw / 2, rom.h / 2 - ch / 2);
-    c.text("file", "misc/extra/lotr1.ANSI-1M.rle").text("rule", "Hutton32b").num("w", rom.w).num("h", rom.h).num("population", rom.population());
+    c.text("file", ROM).text("rule", "Hutton32b").num("w", rom.w).num("h", rom.h).num("population", rom.population());
     c.num("crop_x", cx).num("crop_y", cy).grid("crop", &rom.crop(cx, cy, cx + cw, cy + ch));
     pats.raw("rom", c.done());
 
     let mut c = Obj::default();
-    c.text("file", "life/Unit-Life-Cell-512x512.rle").text("rule", "B3/S23").grid("gen0", &ulc);
+    c.text("file", ULC).text("rule", "B3/S23").grid("gen0", &ulc);
     pats.raw("ulc", c.done());
 
     // the soup of the Life targets (`life-soup --side 2048 --seed 1`): a window of it after
@@ -422,7 +437,7 @@ pub fn run(args: &[String]) {
     for _ in 0..soup_gen {
       sim.step();
     }
-    c.text("rule", "B3/S23").num("side", side).num("density", 0.5).num("seed", 1).num("population", soup.population());
+    c.text("source", SOUP).text("rule", "B3/S23").num("side", side).num("density", 0.5).num("seed", 1).num("population", soup.population());
     c.num("view_x", side / 2 - view / 2).num("view_gen", soup_gen);
     c.grid("gen0", &soup.crop(side / 2 - view / 2, side / 2 - view / 2, side / 2 + view / 2, side / 2 + view / 2));
     c.grid("later", &sim.grid().crop(soup_gen, soup_gen, soup_gen + view, soup_gen + view));
@@ -438,7 +453,6 @@ pub fn run(args: &[String]) {
     lap("tiles and nodes");
   }
 
-  // ---- hit path: the counter swept at 16x16 tiles; one sweep window by window; its memo table ----
   // ---- hit path: `squares` swept at 16x16 tiles over the 65,536 generations the paper times; the
   // sweep that starts at `--snapshot-gen` window by window (at 20,480 its displays read 00025);
   // the memo table at the end ----
@@ -453,14 +467,14 @@ pub fn run(args: &[String]) {
     // ---- miss rates over time at each rule's floor tile ----
     if want("learning") {
       let mut learn = Obj::default();
-      learn.raw("squares", series_json(&run, 4));
-      learn.raw("counter", series_json(&sweep_run(&counter, &h32b, 3, 4, 262144, None, false), 4));
-      learn.raw("chaotic", series_json(&sweep_run(&chaotic, &h32b, 3, 4, 16384, None, false), 4));
-      learn.raw("rom", series_json(&sweep_run(&ppmd, &h32b, 3, 4, 1584, None, false), 4));
+      learn.raw("squares", series_json(&run, 4, SQUARES, "Hutton32"));
+      learn.raw("counter", series_json(&sweep_run(&counter, &h32b, 3, 4, 262144, None, false), 4, COUNTER, "Hutton32b"));
+      learn.raw("chaotic", series_json(&sweep_run(&chaotic, &h32b, 3, 4, 16384, None, false), 4, CHAOTIC, "Hutton32b"));
+      learn.raw("rom", series_json(&sweep_run(&ppmd, &h32b, 3, 4, 1584, None, false), 4, ROM_SMALL, "Hutton32b"));
       let ulc_run = sweep_run(&ulc, &life, 4, 5, 17280, None, true);
-      learn.raw("ulc", series_json(&ulc_run, 5));
+      learn.raw("ulc", series_json(&ulc_run, 5, ULC, "B3/S23"));
       let soup512 = cmd_life::soup(512, 0.5, 1);
-      learn.raw("soup", series_json(&sweep_run(&soup512, &life, 4, 5, 1024, None, false), 5));
+      learn.raw("soup", series_json(&sweep_run(&soup512, &life, 4, 5, 1024, None, false), 5, SOUP, "B3/S23"));
       o.raw("learning", learn.done());
       o.raw("table_life", ulc_run.table.clone());
       lap("miss rates over time");
@@ -471,10 +485,10 @@ pub fn run(args: &[String]) {
   if want("waves") {
     let mut w = Obj::default();
     let at = snap_gen / 64 + 1; // the step that starts at the snapshot's generation
-    w.raw("squares", waves(&squares, &h32, 3, 6, at, &[1, at], 400));
-    w.raw("counter", waves(&counter, &h32b, 3, 6, 64, &[1, 2, 64], 160));
-    w.raw("chaotic", waves(&chaotic, &h32b, 3, 6, 64, &[1, 2, 64], 160));
-    w.raw("rom", waves(&ppmd, &h32b, 3, 6, 1, &[1], 160));
+    w.raw("squares", waves(&squares, &h32, SQUARES, "Hutton32", 3, 6, at, &[1, at], 400));
+    w.raw("counter", waves(&counter, &h32b, COUNTER, "Hutton32b", 3, 6, 64, &[1, 2, 64], 160));
+    w.raw("chaotic", waves(&chaotic, &h32b, CHAOTIC, "Hutton32b", 3, 6, 64, &[1, 2, 64], 160));
+    w.raw("rom", waves(&ppmd, &h32b, ROM_SMALL, "Hutton32b", 3, 6, 1, &[1], 160));
     o.raw("waves", w.done());
     lap("waves");
   }
@@ -482,6 +496,19 @@ pub fn run(args: &[String]) {
   // ---- the controller on the composite universe of the `controller` target ----
   if want("controller") {
     let spec = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tools/composite_spec.txt")).expect("tools/composite_spec.txt");
+    // every item is `file@x,y[+generations run before][~seed of a perturbation]`
+    let parts: Vec<String> = spec
+      .trim()
+      .split(';')
+      .filter(|item| !item.trim().is_empty())
+      .map(|item| {
+        let (path, rest) = item.trim().split_once('@').expect("compose item needs @x,y");
+        let (x, y) = rest.split(['~', '+']).next().unwrap().split_once(',').expect("x,y");
+        let mut po = Obj::default();
+        po.text("file", path.trim_start_matches("patterns/")).num("x", x).num("y", y);
+        po.done()
+      })
+      .collect();
     // the spec's paths are relative to research/
     let spec: String = spec.trim().split(';').map(|item| format!("{}/{}", env!("CARGO_MANIFEST_DIR"), item)).collect::<Vec<_>>().join(";");
     let gens: u64 = opt_or(args, "--controller-gens", 1024);
@@ -490,6 +517,7 @@ pub fn run(args: &[String]) {
     let (a, k, rl) = (3usize, 4usize, 8usize);
     let m = cmd_adapt::controller_map(&g, &lut, a, k, rl, gens);
     let mut c = Obj::default();
+    c.text("rule", "Hutton32b").raw("parts", format!("[{}]", parts.join(",")));
     c.num("w", g.w).num("h", g.h).num("population", g.population()).num("region", 1usize << rl).num("step_gens", 1usize << k).num("gens", gens);
     c.num("adaptive_ms", format!("{:.4}", m.adaptive_ms)).num("plain_ms", format!("{:.4}", m.plain_ms)).text("note", &m.note);
     c.raw("hist", format!("[{}]", m.hist.iter().map(|(n, s)| format!("[{},{s:.3}]", quote(n))).collect::<Vec<_>>().join(",")));
