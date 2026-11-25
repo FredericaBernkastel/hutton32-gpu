@@ -2,7 +2,7 @@
 
 *[Author names, affiliations and contact details: to be supplied by the authors.]*
 
-**Abstract**—HashLife, as implemented in Golly, is the state of the art for long runs of large cellular automata, but it degrades by orders of magnitude on dense universes whose content does not repeat: on a dense universe of 9.5 million cells in the 32-state Hutton32b rule it reaches $2.4 \cdot 10^{7}$ cell-updates/s (2.5 generations/s). Brute-force GPU stepping avoids that failure but cannot exploit repetition. We measure, on a consumer GPU, the four rates that decide between the two (brute-force evaluation, random table probes, concurrent inserts and dispatch latency) and derive from them GPU HashLife (GHL), a single algorithm that memoizes only windows of 16×16 cells and larger, evaluates everything below that floor with a 367-gate bit-sliced circuit, runs the HashLife recursion level-synchronously as data-parallel waves under a positional sweep, and chooses its engine per region and per universe from measured novelty and active area. On an RTX 5060 Ti its components run at $3.0 \cdot 10^{11}$ cell-updates/s by brute force on any content and at up to $6.8 \cdot 10^{16}$ cell-updates/s ($6.7 \cdot 10^{6}$ generations/s) on a dense universe of $10^{10}$ cells whose content repeats. Against Golly 5.1, GHL is 1.3–43× faster on small dense universes; on a large dense universe it is $1.6 \cdot 10^{4}$× faster while the content is new and $6.4 \cdot 10^{5}$× once it repeats; on a sparse universe of $10^{5} \times 10^{5}$ cells it is 64× faster. On universes that are idle, which Golly memoizes completely, GHL's CPU implementation of the recursion runs at 0.57–1.9× Golly's speed. Final states are identical to Golly's throughout. The on-GPU miss path is specified and its primitives are measured, but it is not yet assembled; projections for it are reported separately.
+**Abstract**—HashLife, as implemented in Golly, is the state of the art for long runs of large cellular automata, but on dense universes whose content does not repeat it degrades by orders of magnitude: on a dense universe of 9.5 million cells in the 32-state Hutton32b rule its best step size reaches $2.7 \cdot 10^{7}$ cell-updates/s (2.9 generations/s), and it exhausts 8 GB of memory shortly after the universe's 528-generation period. Brute-force GPU stepping avoids that failure but cannot exploit repetition. We measure, on a consumer GPU, the four rates that decide between the two (brute-force evaluation, random table probes, concurrent inserts and dispatch latency) and derive from them GPU HashLife (GHL), an algorithm that memoizes only windows of 16×16 cells and larger, evaluates everything below that floor with a 367-gate bit-sliced circuit, runs the HashLife recursion level-synchronously as data-parallel waves under a positional sweep, and chooses its engine per region and per universe from novelty and active area. GHL has not yet run as one program: its components were measured separately, and the component for each workload was chosen by hand. On an RTX 5060 Ti the brute-force engine runs at $3.0 \cdot 10^{11}$ cell-updates/s on any content; on the dense universe above that is $1.4 \cdot 10^{4}$× Golly and 60× a bit-sliced loop on four CPU cores. With a table learned beforehand on the CPU, the memo hit path steps a dense universe of $10^{10}$ cells whose content repeats at up to $7.3 \cdot 10^{16}$ cell-updates/s, and a sparse universe of $10^{5} \times 10^{5}$ cells at 1.6× Golly's average over $2^{20}$ generations, or 1.03× when the learning is counted. On small dense universes the brute-force engine leads Golly by 1.2–18× over runs of $10^{4}\text{–}10^{6}$ generations; in longer runs Golly's memo overtakes it, and HashLife is the engine to use. On idle universes, which Golly memoizes completely, GHL's recursion on one CPU thread runs at 0.36–1.07× Golly's speed. Final states match Golly's wherever both were run to the same generation. The on-GPU miss path is specified and its primitives are measured, but it is not yet assembled.
 
 **Index Terms**—Cellular automata, HashLife, memoization, hash consing, GPU computing, bit slicing, von Neumann neighbourhood.
 
@@ -10,16 +10,16 @@
 
 ## I. Introduction
 
-HashLife [\[1\]] represents a universe as a hash-consed quadtree and memoizes the future of every node, so that regions which recur cost nothing to advance again. Golly [\[2\]] implements it for arbitrary rule tables, and for most patterns built in such rules it is the fastest simulator available: it advances idle circuits of up to millions of cells at up to $5.4 \cdot 10^{14}$ cell-updates/s ($10^{9}$ generations/s), because every block in them has been seen before.
+HashLife [\[1\]] represents a universe as a hash-consed quadtree and memoizes the future of every node, so that regions which recur cost nothing to advance again. Golly [\[2\]] implements it for arbitrary rule tables, and for most patterns built in such rules it is the fastest simulator available: it advances idle circuits of up to millions of cells at up to $1.6 \cdot 10^{15}$ cell-updates/s ($2.7 \cdot 10^{9}$ generations/s), because every block in them has been seen before.
 
-This paper concerns two rules of the von Neumann family that Golly runs: Hutton32 [\[3\]], which Golly also implements natively [\[2\]], and Hutton32b [\[4\]], a variant with a 3×3 XNOR gate and two added rule sets in which the Hutton32-Computer project builds counters, ROMs, displays and a CPU. Both have 32 states and a five-cell neighbourhood, so a rule table has $2^{25}$ entries. Their patterns are dense. A circulating ROM of 9.5 million cells has a period of 528 generations, and every 16×16 block of it differs from every other at every moment of the period. On it Golly reaches $2.4 \cdot 10^{7}$ cell-updates/s (2.5 generations/s) and collects garbage 18 times in 180 s, while one CPU core stepping cells through a lookup table does $3.0 \cdot 10^{8}$ cell-updates/s, 13× more. Brute-force stepping on a GPU reaches $1.86 \cdot 10^{11}$ cell-updates/s on any pattern (Section III-B) but cannot exploit recurrence at all.
+This paper concerns two rules of the von Neumann family that Golly runs: Hutton32 [\[3\]], which Golly also implements natively [\[2\]], and Hutton32b [\[4\]], a variant with a 3×3 XNOR gate and two added rule sets in which the Hutton32-Computer project builds counters, ROMs, displays and a CPU. Both have 32 states and a five-cell neighbourhood, so a rule table has $2^{25}$ entries. Their patterns are dense. A circulating ROM of 9.5 million cells has a period of 528 generations, and every 16×16 block of it differs from every other at every moment of the period. On it Golly reaches at best $2.7 \cdot 10^{7}$ cell-updates/s (2.9 generations/s) and runs out of its 8 GB just after one period, while one CPU core stepping cells through a lookup table does $3.4 \cdot 10^{8}$ cell-updates/s, 13× more. Brute-force stepping on a GPU reaches $1.74 \cdot 10^{11}$ cell-updates/s on real patterns with a lookup table (Section III-B) and $3.0 \cdot 10^{11}$ on any content with the circuit of Section IV-C, but cannot exploit recurrence at all.
 
 We ask what HashLife should look like when its memo table lives in GPU memory, and answer with measurements. The contributions are:
 
-1. A cost model of memoized stepping in four measured rates (Section III). Its central quantity, the exchange rate $\rho$ between a table probe and a brute-force cell-update, is about 50 on the measured GPU, which places the optimal memo floor at 16×16-cell windows rather than HashLife's 2×2 leaves.
-2. GPU HashLife (GHL), one algorithm for dense, sparse, novel and recurring content (Section IV), every parameter of which is set by a measurement (Table VIII).
+1. A cost model of memoized stepping in four measured rates (Section III). Its central quantity, the exchange rate $\rho$ between a table probe and a brute-force cell-update, is about 47 on the measured GPU. Together with the recursion's operation counts priced by the model, it places the memo floor at 16×16-cell windows on 8×8 base tiles (Sections III-C and VI-G) rather than at HashLife's 2×2 leaves.
+2. GPU HashLife (GHL), one algorithm for dense, sparse, novel and recurring content (Section IV), whose parameters are set by measurements wherever they were varied (Table VIII). Its components were measured separately; GHL has not yet run as one program (Table IX).
 3. A 367-gate bit-sliced circuit for Hutton32b, equal to the rule table on all $2^{25}$ neighbourhoods, which serves as GHL's brute-force engine at $3.0 \cdot 10^{11}$ cell-updates/s independent of content (Section IV-C).
-4. An evaluation against Golly 5.1 on 13 patterns and a sparse composite universe with exact final-state comparisons that separates measured GPU components, a measured CPU implementation of the recursion and model projections (Sections V–VI).
+4. An evaluation against Golly 5.1 at its best step size and against a four-core CPU brute-force loop, on 13 patterns and a sparse composite universe, that states the run length and the learning time with every ratio, compares final states with Golly's, and separates measured GPU components, a measured CPU implementation of the recursion and model projections (Sections V–VI).
 5. A reproduction package in which every table is one command (Appendix A).
 
 Section II reviews related work. Section III measures the costs and derives the model. Section IV presents GHL. Section V describes the evaluation, Section VI reports it, Section VII discusses projections and limitations, and Section VIII concludes.
@@ -44,7 +44,7 @@ GPU hash tables reach $2\text{–}4 \cdot 10^{9}$ lookups/s out of cache on larg
 
 ### E. Approaches not pursued
 
-FFT convolution computes neighbour sums in *O*(*N* log *N*) time independent of radius and is used by SmoothLife and Lenia for radii of 10–30 [\[20\]], [\[21\]]. At radius 1 it loses: FFT Life is 3× slower than direct convolution in one benchmark [\[22\]], and convolution-based Life in PyTorch is 121× slower than a bit-packed CUDA kernel in another [\[23\]]. For a non-totalistic 32-state rule the only linear statistic from which the next state follows is an injective code of the neighbourhood, which is the table index a direct kernel builds anyway. Generations can be skipped in closed form only for additive rules [\[24\]] and rules that decompose into linear ones [\[25\]]; predicting general automata is P-complete [\[26\]]. Coarse-graining [\[27\]] looks for automata on blocks of cells; the tile automaton of Section IV-D is an exact instance whose alphabet is discovered lazily.
+FFT convolution computes neighbour sums in *O*(*N* log *N*) time independent of radius and is used by SmoothLife and Lenia for radii of 10–30 [\[20\]], [\[21\]]. At radius 1 it loses: FFT Life is 3–8× slower than direct convolution in one benchmark [\[22\]], and Life written with PyTorch tensor operations is 121× slower than a bit-packed CUDA kernel in another [\[23\]]. For a non-totalistic 32-state rule the only linear statistic from which the next state follows is an injective code of the neighbourhood, which is the table index a direct kernel builds anyway. Generations can be skipped in closed form only for additive rules [\[24\]] and rules that decompose into linear ones [\[25\]]; predicting general automata is P-complete [\[26\]]. Coarse-graining [\[27\]] looks for automata on blocks of cells; the tile automaton of Section IV-D is an exact instance whose alphabet is discovered lazily.
 
 Not found in the literature searched: a memo table of CA block transitions held in GPU memory; a bounded-depth HashLife that falls back to a brute-force kernel on a miss; a tile automaton swept positionally; a measured level-synchronous HashLife. The search could not reach forum threads behind logins.
 
@@ -66,21 +66,23 @@ A tile-step can be obtained by brute force (cost $V_L / R_B$), by a memo hit (co
 
 | Constant | Value | Measured with |
 |---|---|---|
-| $R_B$, brute-force evaluation, byte-LUT kernel | $1.86 \cdot 10^{11}$ cell-updates/s | `gpu-brute` |
+| $R_B$, brute-force evaluation, byte-LUT kernel | $1.74 \cdot 10^{11}$ cell-updates/s | `gpu-brute` |
 | $R_B$, brute-force evaluation, bit-plane circuit | $3.0 \cdot 10^{11}$ cell-updates/s | `gpu-bitslice` |
-| $R_P$, random 32-byte fetch, table ≤ 16 MiB | $3.2\text{–}3.5 \cdot 10^{10}$/s | `gpu-probe` |
+| $R_P$, random 32-byte fetch, table ≤ 16 MiB | $3.4\text{–}3.5 \cdot 10^{10}$/s | `gpu-probe` |
 | $R_P$, table of 32 MiB | $1.3 \cdot 10^{10}$/s | `gpu-probe` |
-| $R_P$, table of 128 MiB … 8 GiB | **$3.7\text{–}4.0 \cdot 10^{9}$/s, flat** | `gpu-probe` |
-| $R_I$, concurrent find-or-insert (32-bit CAS) | $1.0\text{–}1.9 \cdot 10^{9}$/s | `gpu-insert` |
-| Dispatch chained inside one compute pass | 3.3–4.2 µs (typically 3.4) | `gpu-latency` |
+| $R_P$, table of 128 MiB … 8 GiB | **$3.7\text{–}4.1 \cdot 10^{9}$/s, flat** (median $3.7 \cdot 10^{9}$) | `gpu-probe` |
+| $R_I$, concurrent find-or-insert (32-bit CAS) | $1.0\text{–}1.3 \cdot 10^{9}$/s ($4.9 \cdot 10^{8}$/s for the first batch) | `gpu-insert` |
+| Dispatch chained inside one compute pass | 3.2–4.2 µs (typically 3.4), of which 1.0 µs recording on the CPU | `gpu-latency` |
 | New compute pass | 49–97 µs | `gpu-latency` |
-| Separate `queue.submit` | 150–460 µs | `gpu-latency` |
+| Separate `queue.submit` | 150–490 µs | `gpu-latency` |
 | Dispatch and 16-byte read-back to the CPU | 0.1–2.4 ms | `gpu-latency` |
-| Miss-path wave of 16 dispatches, indirect dispatch (three passes) | 260–490 µs | `gpu-latency` |
-| The same with wgpu's indirect-call validation removed | 135–165 µs | `gpu-latency` |
-| The same at fixed capacity with early exit (one pass) | **51–55 µs** | `gpu-latency` |
+| Miss-path wave of 16 dispatches, indirect dispatch (three passes) | 230–490 µs | `gpu-latency` |
+| The same with wgpu's indirect-call validation removed | 130–165 µs | `gpu-latency` |
+| The same at fixed capacity with early exit (one pass) | **50–55 µs** | `gpu-latency` |
 
-The byte-LUT kernel (`gpu-brute`) looks up each cell's next state in the $2^{25}$-byte rule table. It stores four cells per `u32`, runs 8×8 workgroups on ping-pong buffers with a zero ring, and advances all generations of a submit inside one compute pass. It reaches $1.86 \cdot 10^{11}$ (371 GB/s of 448 GB/s), and workgroup shape (8×8 to 64×4) and backend (Vulkan, DX12) change this by less than 2 %. The bit-plane kernel of Section IV-C reaches $3.0 \cdot 10^{11}$ at 1.25 bytes of traffic per cell-update instead of 2.
+Ranges in the latency rows span separate runs on different days; the pass, submit and read-back costs varied most.
+
+The byte-LUT kernel (`gpu-brute`) looks up each cell's next state in the $2^{25}$-byte rule table. It stores four cells per `u32`, runs 8×8 workgroups on ping-pong buffers with a zero ring, and advances all generations of a submit inside one compute pass. On a grid of $1.7 \cdot 10^{8}$ cells it reaches $1.74 \cdot 10^{11}$ (348 GB/s, 78 % of the bus's 448 GB/s); workgroup shape (8×8 to 64×4) changes this by less than 1 % and the DX12 backend by 4 %. The bit-plane kernel of Section IV-C reaches $3.0 \cdot 10^{11}$ at 1.25 bytes of traffic per cell-update instead of 2.
 
 The probe rate is the same from 128 MiB to 8 GiB: there is no address-translation cliff, so VRAM converts directly into memo capacity. wgpu caps one binding below 2 GiB, so large tables are sharded across bindings; `gpu-probe` runs 8 × 1 GiB this way at full speed.
 
@@ -90,18 +92,18 @@ The ratio
 
 $$\rho = \frac{R_B}{R_P} \qquad (2)$$
 
-is the number of cell-updates that cost as much as one probe. It is about 50 for a table larger than L2 with the byte-LUT kernel, 80 with the bit-plane kernel, and 5.5 when the table fits L2. A memo level pays only if $V_L \gg \rho$; Table II gives the best possible gain of a hit over brute force.
+is the number of cell-updates that cost as much as one probe. With the median out-of-cache probe rate it is about 47 for the byte-LUT kernel and 80 for the bit-plane kernel, and 5.0 when the table fits L2. A memo level pays only if $V_L \gg \rho$; Table II gives the best possible gain of a hit over brute force.
 
 **TABLE II.** Value of a tile-step and best possible gain of a memo hit, $V_L / \rho$
 
-| Tile | Generations | $V_L$ | $V_L / \rho$, byte LUT ($\rho = 50$) | $V_L / \rho$, bit-planes ($\rho = 80$) |
+| Tile | Generations | $V_L$ | $V_L / \rho$, byte LUT ($\rho = 47$) | $V_L / \rho$, bit-planes ($\rho = 80$) |
 |---|---|---|---|---|
-| 8×8 | 4 | 256 | 5× | 3.2× |
-| 16×16 | 8 | 2,048 | 41× | 26× |
-| 32×32 | 16 | 16,384 | 330× | 205× |
-| 64×64 | 32 | 131,072 | 2,600× | 1,640× |
+| 8×8 | 4 | 256 | 5.4× | 3.2× |
+| 16×16 | 8 | 2,048 | 44× | 26× |
+| 32×32 | 16 | 16,384 | 350× | 205× |
+| 64×64 | 32 | 131,072 | 2,800× | 1,640× |
 
-On a CPU core the ratio comes out similar ($R_B \approx 3\text{–}4 \cdot 10^{8}$ with a table, $R_P \approx 10^{7}$ out of cache, $\rho \approx 30\text{–}60$) and rises to a few hundred with bit-sliced evaluation (Section VI-H). Golly's bottom memo entry is worth $V = 4$, an order of magnitude below $\rho$. That costs nothing while everything hits and a great deal when content is new.
+On a CPU core the ratio comes out similar ($R_B \approx 3\text{–}4 \cdot 10^{8}$ with a table, $R_P \approx 10^{7}$ out of cache, assumed from a memory latency of about 100 ns rather than measured, $\rho \approx 30\text{–}60$) and rises to a few hundred with bit-sliced evaluation (Section VI-H). Golly's bottom memo entry is worth $V = 4$, an order of magnitude below $\rho$. That costs nothing while everything hits and a great deal when content is new.
 
 ### D. Memory per memoized cell-update
 
@@ -114,9 +116,9 @@ A Golly node is 48 B and covers four cell-updates at the bottom level; summed ov
 | Golly [`ghashbase`] | 13.7 | ≈ 70 GB |
 | Memo at 16×16 tiles, entry only | 0.016 | 79 MB |
 | Memo at 16×16 tiles, every result tile new | 0.094 | 473 MB |
-| Memo at 32×32 tiles, entry only | 0.002 | 20 MB |
+| Memo at 32×32 tiles, entry only | 0.002 | 20 MB, over the two periods that 32×32 tiles take to learn |
 
-This is why the ROM never completes a period in Golly under an 8 GB limit, yet its whole period fits a tenth of the GPU's memory at a coarser grain. At 16×16 tiles a 16 GB card holds about $4 \cdot 10^{8}$ entries ($8 \cdot 10^{11}$ cell-updates) when result tiles recur, or $8 \cdot 10^{7}$ ($1.7 \cdot 10^{11}$ cell-updates) when every result tile is new.
+By this model the ROM's period would need about 70 GB in Golly; measured, Golly fills 3.7 GiB within its first minute on the ROM and reaches its 8 GB limit just past the first period (Section VI-A). At a coarser grain the whole period fits a tenth of the GPU's memory. Tables are filled to at most 50 % (Table VI), so an entry occupies 64 B of VRAM. At 16×16 tiles a 16 GB card then holds about $2.5 \cdot 10^{8}$ entries ($5 \cdot 10^{11}$ cell-updates) when result tiles recur, or $7 \cdot 10^{7}$ ($1.5 \cdot 10^{11}$ cell-updates) when every result tile is new.
 
 ### E. The speedup law
 
@@ -124,7 +126,7 @@ With miss rate $\mu_L$ (fraction of tile-steps not found) and a miss costing $\k
 
 $$S_L = \frac{1}{\rho / V_L + \kappa \mu_L} \qquad (3)$$
 
-Memoization at level $L$ wins while $\mu_L < (1 - \rho/V_L)/\kappa$. For a miss that evaluates the whole $2s \times 2s$ window plus two inserts, $\kappa \approx 4.5$ at $L = 4$ and the break-even miss rate is about 22 %; evaluating contiguous misses as one region with a halo approaches $\kappa \approx 1.1$ and break-even near 85 %.
+Memoization at level $L$ wins while $\mu_L < (1 - \rho/V_L)/\kappa$. For a miss that evaluates the whole $2s \times 2s$ window plus two inserts, $\kappa \approx 4.5$ at $L = 4$ and the break-even miss rate is about 22 %; evaluating contiguous misses as one region with a halo approaches $\kappa \approx 1.1$ and break-even near 89 %.
 
 Table IV gives $\mu_L$ for the flat tile automaton of Section IV-D on the project's patterns, measured over the second half of each run so that start-up transients are excluded.
 
@@ -155,7 +157,7 @@ The counter never repeats a global state within the run, yet 98.3 % of its 16×1
 | 256×256 | 99.5 % | 45 % | 89 % | 74 % | 55 % |
 | Live cells in bounding box | 86 % | 64 % | 80 % | 77 % | 35 % |
 
-Four of the five patterns are equally dense and want opposite treatment. Logic misses 20–55 % at every scale, so every level earns its keep. The ROM, while it is new, misses everything above 16×16: no tile size helps until the whole period has been seen, after which the largest tiles hit too. **The signal that selects an engine is novelty, not density.**
+Four of the five patterns are equally dense and want opposite treatment. The counter and `squares` miss 21–55 % at every scale, so every level earns its keep; `chaotic` and the movie climb to 57–93 % and 65–74 % at the largest windows. The ROM, while it is new, misses everything above 16×16: no tile size helps until the whole period has been seen, after which the largest tiles hit too. **The signal that selects an engine is novelty, not density.**
 
 ## IV. The GHL Algorithm
 
@@ -172,22 +174,23 @@ GHL is HashLife with five changes, each forced by a measurement of Section III:
 Algorithm 1 is the whole method; Algorithms 2 and 3 are its two non-trivial steps.
 
 ```
-Algorithm 1  GHL: advance a universe
+Algorithm 1  GHL: advance a universe          [B] built and measured on the GPU  [C] on the CPU only
+                                              [M] model only  [-] specified, not built
 Input: universe as hash-consed tiles of 8x8 cells; tables in VRAM
  1  for each epoch (a fixed number of waves, all inside one compute pass per frame):
  2      A <- live cells in active blocks
  3      if A < A1:                                    # dispatch latency dominates
- 4          run the fastest of {host HashLife recursion, shared-tile kernel (k = 16),
-            plain bit-plane kernel}; time the others again with exponential back-off
+ 4          run the fastest of {host HashLife recursion [C], shared-tile kernel (k = 16) [B],
+            plain bit-plane kernel [B]}; time the others again with exponential back-off [-]
  5      else:                                         # throughput dominates
- 6          f <- 32x32 windows if A < A2 else 16x16 windows      # universe-wide floor
+ 6          f <- 32x32 windows if A < A2 else 16x16 windows      # universe-wide floor [M]
  7          for each wave of the epoch:
- 8              HitSweep(top level s, active blocks)  # one gather + one probe per tile
- 9              Solve(misses of the sweep, floor f)   # Algorithm 2
-10              step regions in plain-cells mode as cells under a region-level memo
-11          Controller(regions)                       # Algorithm 3
-12          raise s while its hit rate stays above 40 %; lower it when it stops paying
-13      hash the ID grid (global cycles); rebuild tables past their load limit
+ 8              HitSweep(top level s, active blocks)  # one gather + one probe per tile [B]
+ 9              Solve(misses of the sweep, floor f)   # Algorithm 2 [C]
+10              step regions in plain-cells mode as cells under a region-level memo [M]
+11          Controller(regions)                       # Algorithm 3 [M]
+12          raise s while its hit rate stays above 40 %; lower it when it stops paying [M]
+13      hash the ID grid (global cycles); rebuild tables past their load limit [-]
 ```
 
 ```
@@ -236,7 +239,7 @@ phase A (tiles at k*s)          phase B (tiles at k*s + s/2)        phase A
 | Structure | Layout | Size |
 |---|---|---|
 | ID grids A, B | one `u32` per tile of the sweep level, two phases | 4 B per 256 cells at 16×16 tiles |
-| Memo table per level | open addressing, linear probing; 32 B entries: four key IDs, value, spare | $2 \cdot 10^{8}$ entries in 6.4 GB |
+| Memo table per level | open addressing, linear probing; 32 B entries: four key IDs, value, spare | $2 \cdot 10^{8}$ slots in 6.4 GB, filled to at most 50 % |
 | Claim words | one `atomic<u32>` per slot | 4 B per slot |
 | Tile store | 8×8 base tiles as five bit-planes, indexed by tile ID | 40 B per distinct base tile |
 | Active-block list | origins of blocks that are not known to be empty | a few words per block |
@@ -246,7 +249,7 @@ A node's ID is its slot index, so there is no separate allocator and the childre
 
 ### C. Brute-force engine: the rule as a bit-sliced circuit
 
-The rule tells apart 15 classes of states per neighbour and 29 for the centre. Starting from a network written by hand from the rule's structure (473 gates), global resubstitution with observability don't-cares, ABC rewriting scripts run through Yosys, and an inverter placement solved as MaxSAT reduce canonical Hutton32b to **367 two-input gates** (165 AND, 137 OR, 14 XOR, 51 NOT; depth 25) in 24 minutes. Every intermediate network was kept only if it agreed with the table on all $2^{25}$ entries; the final netlist, its WGSL emission and its Rust emission were each checked exhaustively, after a deliberately corrupted gate was confirmed to be caught. The network is not proven minimal.
+The rule tells apart 15 classes of states per neighbour and 29 for the centre. Starting from a network written by hand from the rule's structure (473 gates), global resubstitution with observability don't-cares, ABC rewriting scripts run through Yosys, and an inverter placement solved as MaxSAT reduce canonical Hutton32b to **367 gates** (165 AND, 137 OR and 14 XOR gates with two inputs, and 51 NOT; depth 25), reached after 24 minutes of a 25-minute optimisation budget. Every intermediate network was kept only if it agreed with the table on all $2^{25}$ entries; the final netlist, its WGSL emission and its Rust emission were each checked exhaustively, after a deliberately corrupted gate was confirmed to be caught. The network is not proven minimal.
 
 Applied to bit-planes, the gates update 32 cells per operation. A cell is five bits in five `u32` words, one per bit; an invocation loads its group and the groups above and below, forms the east and west neighbours of each plane with two shifts and an OR, evaluates the network and stores five words. Table VII compares this form with the alternatives.
 
@@ -294,7 +297,7 @@ $$h^{*} = \frac{p + \iota}{8p + \iota} \qquad (5)$$
 
 about 40 %. GHL raises the sweep tile while its hit rate stays above that. Each level takes twice as long to learn as the one below: a tile of side $2^L$ sees the same content again only after $\mathrm{lcm}(528, 2^L)$ generations on the ROM.
 
-*Floor.* Brute-forcing large isolated windows is the worst choice everywhere: each carries its own halo and the recursion asks for thirteen of them where eight would tile the result. Below 16×16 windows hashing costs more than the cells: an 8×8 window is 0.7 ns of brute force and 3.5 ns of bookkeeping. GHL therefore stores 8×8 base tiles and brute-forces missed 16×16 windows (F16); Table XIX gives the measurements.
+*Floor.* Brute-forcing large isolated windows is the worst choice everywhere: each carries its own halo and the recursion asks for thirteen of them where eight would tile the result. Below 16×16 windows hashing costs more than the cells: an 8×8 window is 0.7 ns of brute force and 3.5 ns of bookkeeping. GHL therefore stores 8×8 base tiles and brute-forces missed 16×16 windows (F16); Table XXI gives the measurements.
 
 *Engine per region.* The recursion is already a per-window switch between memo and brute force: a window that hits costs a probe, one that misses at the floor is brute-forced. A second engine pays only where content is new at every scale below the region: plain cells stepped per 256×256 region, with memo only above the region. Algorithm 3 enters it on sustained novelty at 32×32 windows and above and leaves it lazily. Two simpler controllers failed and shaped this one (Section VI-G): experiments must jump to a depth where being wrong is cheap, and the evidence for finer depths must be sampled, not obtained by whole-step trials. While anything is being learned, steps stay at 16 generations, because a step that does not divide a period multiplies the learning time.
 
@@ -302,21 +305,21 @@ about 40 %. GHL raises the sweep tile while its hit rate stays above that. Each 
 
 $$C(f) = L(f) + \sum_{r} w_r(f) \qquad (6)$$
 
-with $L(f)$ the dispatch latency per generation at floor $f$ and $w_r(f)$ the work of region $r$; regions may only go coarser than $f$. With the counter's measured work per region this gives the thresholds $A_1$ and $A_2$ of Algorithm 1 (Table XXII).
+with $L(f)$ the dispatch latency per generation at floor $f$ and $w_r(f)$ the work of region $r$; regions may only go coarser than $f$. With the counter's measured work per region this gives the thresholds $A_1$ and $A_2$ of Algorithm 1 (Table XXIV).
 
 **TABLE VIII.** Parameters of GHL and the measurements that set them
 
 | Parameter | Value | Set by |
 |---|---|---|
-| Base tile | 8×8 cells, five bit-planes | floors (Table XIX) |
-| Memo floor | 16×16 windows (F16); 32×32 (F32) for mid-sized active areas | $V_L / \rho$ (Table II), floors (Table XIX), depth (Table XXII) |
-| Brute-force engine | 367-gate circuit on five bit-planes | Tables XII, XIII |
-| Generations per dispatch on small grids | $k = 16$ in a shared tile | Table XII |
-| Sweep tile | start at 16×16; raise while the hit rate exceeds 40 % | (5), Tables XV, XVI |
-| Step while learning | 16 generations | Table XX |
-| Engine region | 256×256 cells; plain cells on sustained novelty at ≥ 32×32 windows | Tables V, XX, XXI |
-| $A_1$: below it, no memo | $\approx 1.0 \cdot 10^{6}$ active cells | Table XXII |
-| $A_2$: F32 between $A_1$ and $A_2$, F16 above | $\approx 1.3 \cdot 10^{7}$ active cells | Table XXII |
+| Base tile | 8×8 cells, five bit-planes | floors (Table XXI) |
+| Memo floor | 16×16 windows (F16); 32×32 (F32) for mid-sized active areas | $V_L / \rho$ (Table II), floors (Table XXI), depth (Table XXIV) |
+| Brute-force engine | 367-gate circuit on five bit-planes | Tables XIII, XIV |
+| Generations per dispatch on small grids | $k = 16$ in a shared tile | Table XIII |
+| Sweep tile | start at 16×16; raise while the hit rate exceeds 40 % | (5), Tables XVI, XVIII |
+| Step while learning | 16 generations | Table XXII |
+| Engine region | 256×256 cells; plain cells on sustained novelty at ≥ 32×32 windows | Tables V, XXII, XXIII |
+| $A_1$: below it, no memo | $\approx 1.0 \cdot 10^{6}$ active cells | Table XXIV |
+| $A_2$: F32 between $A_1$ and $A_2$, F16 above | $\approx 1.3 \cdot 10^{7}$ active cells | Table XXIV |
 | Miss-path dispatch | fixed capacity with early exit, one pass, ≈ 54 µs per 16-dispatch wave | Table I |
 | Memo entries | 32 B, open addressing; tables sharded across bindings below 2 GiB | Table I |
 
@@ -328,17 +331,21 @@ Keys are compared in full and tiles by content. There is no probabilistic hashin
 
 ### A. Baseline
 
-The state-of-the-art baseline is Golly 5.1's command-line `bgolly` without rendering, with an 8 GB memory limit and the best of several step sizes per pattern. Golly 5.1 is the official 64-bit Windows release of November 2026, built from branch `master` of Golly's repository [\[2\]]. The release is not tagged and its build commit is not recorded, but Golly's source is the same in every commit from 9a7079a8 ("updated version to 5.1", 2026-11-06) to 53bdb74e (2026-11-15), the head of `master`; the commits in between change only patterns and the change log. All references to Golly's source are to commit 53bdb74e. Hutton32b patterns run under RuleLoader with the published [`Hutton32b.rule`][Hutton32b.rule] [\[4\]] and Hutton32 patterns under Golly's native JvN algorithm, which is equal to [`Hutton32.table`] [\[3\]] on all $2^{25}$ neighbourhoods (Appendix B). Load time is subtracted. On the GPU, the byte-LUT brute-force kernel of Section III-B is the baseline.
+The state-of-the-art baseline is Golly 5.1's command-line `bgolly` without rendering, with an 8 GB memory limit (`-M 8000`) on a 16 GB host. Each pattern is run at one to seven step sizes, and the step size with the best median rate is reported; every ratio uses that figure. Golly 5.1 is the official 64-bit Windows release of November 2026, built from branch `master` of Golly's repository [\[2\]]. The release is not tagged and its build commit is not recorded, but Golly's source is the same in every commit from 9a7079a8 ("updated version to 5.1", 2026-11-06) to 53bdb74e (2026-11-15), the head of `master`; the commits in between change only patterns and the change log. All references to Golly's source are to commit 53bdb74e. Hutton32b patterns run under RuleLoader with the published [`Hutton32b.rule`][Hutton32b.rule] [\[4\]] and Hutton32 patterns under Golly's native JvN algorithm, which is equal to [`Hutton32.table`] [\[3\]] on all $2^{25}$ neighbourhoods (Appendix B). The published Hutton32b rule is an `@TABLE`; Section VI-A also reports Golly with the same rule as an `@TREE`. Load time is subtracted. The brute-force baselines are the byte-LUT GPU kernel of Section III-B and the bit-sliced circuit on all four cores of the host CPU (Section VI-H).
 
 ### B. Patterns
 
-Fifteen patterns of the Hutton32-Computer collection and two further 8-bit counters, a [Hutton32b counter] of the same size as `advanced counter v2` (191×197) and a [Hutton32 counter] (633×449) that is tiled into the large brute-force grids, all listed with their rules and bounding boxes in [`README.md`]: an 8-bit counter ([`advanced counter v2`], 191×197, period 513,024), an active display ([`squares`], 650×423), a chaotic circuit ([`chaotic`], 151×132), two circulating ROMs ([`lotr1.ANSI-1M`], 3095×3059, and [`lotr1.PPMd-244K`], 1548×1461, period 528), circuits that are idle most of the time ([serial] and [parallel] displays, a [segmented ROM], a [demultiplexer], two movies, [16×16] and [32×32], a [CPU], a [BCD converter], a [component sheet]) and Tim Hutton's [replicator], which grows to 6813×6691. Large universes are built from phase-shifted copies, so that no two large blocks are equal.
+Fifteen patterns of the Hutton32-Computer collection and two further 8-bit counters, a [Hutton32b counter] of the same size as `advanced counter v2` (191×197) and a [Hutton32 counter] (633×449) that is tiled into the large brute-force grids, all listed with their rules and bounding boxes in [`README.md`]: an 8-bit counter ([`advanced counter v2`], 191×197, period 513,024), an active display ([`squares`], 650×423), a chaotic circuit ([`chaotic`], 151×132), two circulating ROMs ([`lotr1.ANSI-1M`], 3095×3059, and [`lotr1.PPMd-244K`], 1548×1461, period 528), circuits that are idle most of the time ([serial] and [parallel] displays, a [segmented ROM], a [demultiplexer], two movies, [16×16] and [32×32], a [CPU], a [BCD converter], a [component sheet]) and Tim Hutton's [replicator], which grows to 6813×6691. Large universes are built from phase-shifted copies, so that no two large blocks are equal at the same moment. Copies are placed at whole-tile offsets, so one learned period of a pattern covers every copy; Section VI-D measures copies at arbitrary cell offsets. The sparse universe's list of active blocks is fixed when the universe is built, so the activation of new blocks described in Section IV-D is not exercised.
 
 ### C. Verification
 
-Every GPU throughput figure was followed by a read-back and a cell-exact or tile-exact comparison with the CPU. The CPU reference engine agrees with per-cell stepping in 22 configurations and with Golly (same population, bounding box and content hash) on 10 patterns after $2^{24}$ generations, on the replicator after 262,144 generations and on a 98,304 × 104,448 universe. The harness's CPU rule implementation and the circuit equal the canonical rule tables on all $2^{25}$ neighbourhoods (Appendix B).
+Every GPU throughput figure was followed by a read-back and a cell-exact or tile-exact comparison with the CPU. The CPU reference engine agrees with per-cell stepping in 22 configurations and with Golly (same population, bounding box and content hash) on 12 patterns after 16,384 to $2^{24}$ generations and on a 98,304 × 104,448 universe after 16,384 generations. The harness's CPU rule implementation and the circuit equal the canonical rule tables on all $2^{25}$ neighbourhoods (Appendix B).
 
-### D. Implementation status and evidence classes
+### D. Repetitions and timing
+
+Every GPU rate in Section VI is the median of five timed runs that follow one untimed warm-up run in the same process, with the five runs' range given where it matters; each run restarts from the same initial state, and the verification checks the last one. Golly rates are medians of three runs per step size, with Golly's load time subtracted, and its peak working set is recorded. In the head-to-head of Section VI-F both programs are run, without writing output, until the runs add up to at least a second (at most five runs), and the median is reported; the final states come from a separate untimed run. All runs were made one at a time on an otherwise idle machine. The timed region of a GPU run covers recording, submission and execution of its commands; for a chained dispatch, recording takes 1.0 µs of the 3.2 µs it costs. Golly's runs on the ROM are bounded at 60 s per step size and report the generations reached; a longer run is reported separately. Raw logs of every run are in [`logs/`].
+
+### E. Implementation status and evidence classes
 
 GHL is not yet one program. Table IX lists where each component runs in this evaluation. Results are labelled accordingly: **GPU** (measured on the GPU and verified), **CPU** (the same algorithm measured on the CPU reference engine) and **model** (operation counts of the reference engine priced with the constants of Table I).
 
@@ -347,7 +354,7 @@ GHL is not yet one program. Table IX lists where each component runs in this eva
 | Component | Status | Evidence |
 |---|---|---|
 | Plain and shared-tile bit-plane kernels | built, GPU | GPU |
-| Positional hit-path sweep (dense) and active-block sweep (sparse) | built, GPU; table learned on the CPU | GPU |
+| Positional hit-path sweep (dense) and active-block sweep (sparse) | built, GPU; table learned on the CPU; active-block list fixed, block activation not built | GPU |
 | Claim protocol for find-or-insert | built, GPU benchmark | GPU |
 | Fixed-capacity 16-dispatch wave | built as a benchmark of empty waves | GPU |
 | Level-synchronous recursion with memo floor | built, CPU reference engine ([`hl.rs`]) | CPU |
@@ -359,111 +366,157 @@ GHL is not yet one program. Table IX lists where each component runs in this eva
 
 ### A. The baseline
 
-**TABLE X.** Golly 5.1 HashLife on the project's patterns (best step size)
+**TABLE X.** Golly 5.1 HashLife on the project's patterns at the best step size; medians of three runs
 
-| Pattern | Size | Golly, cell-updates/s (gens/s) | Notes |
-|---|---|---|---|
-| [`advanced counter v2`] | 191 × 197 | $2.2 \cdot 10^{10}$ ($5.8 \cdot 10^{5}$) | $1.9 \cdot 10^{9}$ ($5 \cdot 10^{4}$) at step 1 |
-| [`squares`] | 650 × 423 | $3.7\text{–}8.2 \cdot 10^{9}$ ($1.3\text{–}3.0 \cdot 10^{4}$) | active display |
-| [`chaotic`] (active phase) | 151 × 132 | $6.1\text{–}9.8 \cdot 10^{8}$ ($3.1\text{–}4.9 \cdot 10^{4}$) | 22 collections in 16 k gens |
-| [`32x32 movie`] (while playing) | 928 × 1513 | $1.4 \cdot 10^{10}$ ($\approx 1.0 \cdot 10^{4}$) | 524 k gens of activity, then idle |
-| [`lotr1.ANSI-1M`] | 3095 × 3059 | **$2.4 \cdot 10^{7}$** (2.5) | 18 collections in 180 s; one step of 4096 never finished |
-| [Hutton replicator] | grows to 6813 × 6691 | at most $1.1 \cdot 10^{11}$ ($2.4 \cdot 10^{3}$) | final bounding box; 34 collections for 262 k gens |
-| Idle circuits ([serial] and [parallel] displays, [segmented ROM], [demultiplexer], [`16x16 movie`], [`cpu`], [`BIN2BCD`]) | $1.2 \cdot 10^{5}\text{–}5.7 \cdot 10^{6}$ cells | $4.9 \cdot 10^{12}\text{–}5.4 \cdot 10^{14}$ ($4.8 \cdot 10^{6}\text{–}9.9 \cdot 10^{8}$) over $2^{24}$ gens; $1.3 \cdot 10^{11}\text{–}7.3 \cdot 10^{12}$ ($8.2 \cdot 10^{4}\text{–}1.2 \cdot 10^{7}$) over 65,536 gens | fully memoized; the rate grows with the run |
+| Pattern | Size | Generations | Best step | Golly, cell-updates/s (gens/s) | Other step sizes, gens/s | Peak working set |
+|---|---|---|---|---|---|---|
+| [`advanced counter v2`] | 191 × 197 | $2^{20}$ | 262,144 | $2.3 \cdot 10^{10}$ (609,604) | 49,477 at 1; 333,849 at 8; 553,050–604,630 at 64 to 32,768 | 119 MiB; 1.8 GiB at step 1 |
+| [`squares`] | 650 × 423 | 65,536 | 1024 | $8.2 \cdot 10^{9}$ (29,761) | 24,310 at 8; 29,241 at 64; 29,443 at 16,384 | 235 MiB |
+| [`chaotic`], active phase | 151 × 132 | 16,384 | 1024 | $9.4 \cdot 10^{8}$ (47,158) | 31,995 at 8; 43,773 at 64 | 36 MiB; 22 collections |
+| [`lotr1.ANSI-1M`], first minute | 3095 × 3059 | 128–168 | 8 | **$2.7 \cdot 10^{7}$** (2.9) | 1.4 at 1; 2.7 at 16; 2.2 at 64 | 3.7 GiB after a minute; 8 GB, its limit, at generation 538 |
+| [`32x32 movie`], playing | 928 × 1513 | 65,536 | 1024ᵃ | $1.4 \cdot 10^{10}$ (9,832) | | |
+| [Hutton replicator] | grows to 4564 × 3187 | 65,536 | 4096ᵃ | at most $3.5 \cdot 10^{11}$ (24,186) | | |
+| Seven idle circuits ([serial] and [parallel] displays, [segmented ROM], [demultiplexer], [`16x16 movie`], [`cpu`], [`BIN2BCD`]) | $1.2 \cdot 10^{5}\text{–}5.7 \cdot 10^{6}$ cells | $2^{24}$ | 1024ᵃ | $5.0 \cdot 10^{12}\text{–}1.6 \cdot 10^{15}$ ($4.9 \cdot 10^{6}\text{–}2.7 \cdot 10^{9}$) | | fully memoized; the rate grows with the run |
 
-On the ROM a single CPU core stepping cells with the byte table does $3.0 \cdot 10^{8}$ cell-updates/s (32 gens/s), 13× Golly; the byte-LUT GPU kernel does $1.8 \cdot 10^{11}$ (18,992 gens/s).
+ᵃ One step size, from the head-to-head runs of Section VI-F. The ROM's runs stop after 60 s; its rate is the generations reached over that time.
+
+On the ROM Golly is bounded by memory, not by its step size. Every step size fills 3.7 GiB within a minute, and a run at step 1 with a ten-minute limit reached Golly's 8 GB limit at generation 538, just past the first period, and stopped with an error after 431 s (1.25 gens/s). With Hutton32b converted to an `@TREE` rule (6,582 nodes, written by the harness's `ruletree`), Golly is 5–12 % faster than with the published `@TABLE`: 655,566 against 609,604 gens/s on the counter, 53,018 against 47,158 on `chaotic` and 3.0 against 2.9 gens/s on the ROM. The ratios below use the `@TABLE` rule; with `@TREE` they shrink by at most 12 %. On the ROM one CPU core stepping cells through the byte table does $3.4 \cdot 10^{8}$ cell-updates/s (36 gens/s), 13× Golly; four cores running the bit-sliced circuit do $6.5 \cdot 10^{9}$ (Section VI-H), and the byte-LUT GPU kernel does $1.84 \cdot 10^{11}$ (19,403 gens/s).
 
 ### B. Overall comparison
 
-Table XI places GHL against both baselines on every workload class. The GHL column gives the engine that Algorithm 1 selects for the workload and the rate of that engine.
+Table XI places GHL's components against Golly and the brute-force baselines on every workload class. GHL has not run as one program (Table IX), so each row names the component that ran; where Algorithm 1 would race candidates, the component was chosen by hand. Ratios are against Golly's fastest measured run at the run length given.
 
-**TABLE XI.** GHL against Golly 5.1 HashLife and the byte-LUT brute-force GPU kernel, in cell-updates/s (generations/s)
+**TABLE XI.** GHL's components against Golly 5.1 HashLife and the brute-force baselines, in cell-updates/s (generations/s)
 
-| Workload | Cells | Golly 5.1 | Brute-force GPU kernel (byte LUT) | GHL engine | GHL | GHL vs Golly | Evidence |
-|---|---|---|---|---|---|---|---|
-| [Counter] | 37,627 | $2.2 \cdot 10^{10}$ ($5.8 \cdot 10^{5}$) | $1.0 \cdot 10^{10}$ (274,544)ᵃ | shared tile, $k = 16$ | $2.9\text{–}3.0 \cdot 10^{10}$ (770,000–785,000) | 1.33–1.35× | GPU, cell-exact |
-| [`squares`] | 274,950 | $3.7\text{–}8.2 \cdot 10^{9}$ ($1.3\text{–}3.0 \cdot 10^{4}$) | $4.9 \cdot 10^{10}$ (177,445) | shared tile, $k = 16$ | $1.5 \cdot 10^{11}$ (556,000–563,000) | 19–43× | GPU, cell-exact |
-| [`chaotic`] | 19,932 | $6.1\text{–}9.8 \cdot 10^{8}$ ($3.1\text{–}4.9 \cdot 10^{4}$) | — | plain kernel | $\approx 5.4 \cdot 10^{9}$ ($\approx 2.7 \cdot 10^{5}$) | 5.5–8.7× | model: dispatch-bound rate of a small grid |
-| [ROM][lotr1.ANSI-1M.rle], first period | $9.5 \cdot 10^{6}$ | $2.4 \cdot 10^{7}$ (2.5) | $1.8 \cdot 10^{11}$ (18,992) | plain cells (bit-planes) | $3.9 \cdot 10^{11}$ (40,999) | $1.6 \cdot 10^{4}$× | GPU, cell-exact over a period |
-| [ROM][lotr1.ANSI-1M.rle], after one period | $9.5 \cdot 10^{6}$ | $2.4 \cdot 10^{7}$ (2.5) | $1.8 \cdot 10^{11}$ (18,992) | sweep, 32×32 tiles | $1.5 \cdot 10^{13}$ (1,607,022) | $6.4 \cdot 10^{5}$× | GPU hit path, tile-exact |
-| 32×32 phase-shifted [ROMs] | $1.0 \cdot 10^{10}$ | not attempted | does not fit | sweep, 16×16 to 256×256 tiles | $8.6 \cdot 10^{12}$ (858) to $6.8 \cdot 10^{16}$ (6,714,020) | — | GPU hit path, tile-exact |
-| 2304 [counters], sparse (0.79 % of tiles non-empty) | $1.0 \cdot 10^{10}$ | $4.4 \cdot 10^{13}$ (4,323) over the first 16,384 gens; $6.4\text{–}9.9 \cdot 10^{14}$ (61,878–96,581) over $2^{20}$ | does not fit | active-block sweep | $2.9 \cdot 10^{15}$ (278,648) | 64× / 2.9–4.5× | GPU hit path, same final state as Golly |
-| Idle circuits | $1.2 \cdot 10^{5}\text{–}5.7 \cdot 10^{6}$ | $4.9 \cdot 10^{12}\text{–}5.4 \cdot 10^{14}$ ($4.8 \cdot 10^{6}\text{–}9.9 \cdot 10^{8}$) | — | host recursion | $5.8 \cdot 10^{12}\text{–}1.0 \cdot 10^{15}$ ($5.3 \cdot 10^{6}\text{–}1.7 \cdot 10^{9}$) | 0.57–1.9× | CPU, same final states |
-| [Hutton replicator], 262,144 gens | at most $4.6 \cdot 10^{7}$ | at most $1.1 \cdot 10^{11}$ (2,351) | — | memoized recursion | at most $5.5 \cdot 10^{10}$ (1,196) on the CPU | 0.51× (CPU); 7–21× projected on the GPU | CPU; model |
+| Workload | Generations | Golly 5.1, fastest run | CPU brute force, 4 cores | GPU byte LUT | GHL component that ran | Its rate | vs Golly | Evidence |
+|---|---|---|---|---|---|---|---|---|
+| [Counter], 37,627 cells | $2^{20}$ | $2.4 \cdot 10^{10}$ (648,717)ᵃ | | $1.06 \cdot 10^{10}$ (280,510) | shared-tile kernel, $k = 16$ | $3.0 \cdot 10^{10}$ (801,737) | 1.2× | GPU, cell-exact |
+| the same | $2^{24}$ | $3.8 \cdot 10^{11}$ (10,068,380)ᵃ | | | recursion, one CPU thread | $3.4 \cdot 10^{11}$ (8,943,556) | 0.89× | CPU, same final state as Golly |
+| [`squares`], 274,950 cells | 65,536 | $8.6 \cdot 10^{9}$ (31,208)ᵃ | | $4.89 \cdot 10^{10}$ (177,773) | shared-tile kernel, $k = 16$ | $1.56 \cdot 10^{11}$ (569,161) | 18× | GPU, cell-exact against Hutton32 |
+| [`chaotic`], 19,932 cells, active phase | 16,384 | $1.0 \cdot 10^{9}$ (50,982)ᵃ | | | shared-tile kernel, $k = 16$ | $1.79 \cdot 10^{10}$ (900,168) | 18× | GPU, cell-exact |
+| the same | $2^{24}$ | $6.3 \cdot 10^{10}$ (3,154,029)ᵃ | | | recursion, one CPU thread | $4.0 \cdot 10^{10}$ (2,031,091) | 0.64× | CPU, same final state as Golly |
+| [ROM][lotr1.ANSI-1M.rle], $9.5 \cdot 10^{6}$ cells, first period | 528 | $2.7 \cdot 10^{7}$ (2.9)ᵇ | $6.5 \cdot 10^{9}$ | $1.84 \cdot 10^{11}$ (19,403) | plain bit-plane kernel | $3.9 \cdot 10^{11}$ (41,321) | $1.4 \cdot 10^{4}$× (60× the CPU) | GPU, cell-exact over a period |
+| [ROM][lotr1.ANSI-1M.rle], after its first period | from 1,056 | stops at its 8 GB limit at generation 538 | $6.5 \cdot 10^{9}$ | $1.84 \cdot 10^{11}$ (19,403) | hit path, 32×32 tiles, table learned on the CPU in 82 s | $1.6 \cdot 10^{13}$ (1,652,238) | $5.9 \cdot 10^{5}$×; at least 4.4× with learningᶜ | GPU hit path, tile-exact |
+| 32×32 phase-shifted [ROMs], $1.0 \cdot 10^{10}$ cells | | not attempted | | does not fit | hit path, 16×16 to 256×256 tiles, tables learned on the CPU in 45–85 s | $8.4 \cdot 10^{12}$ (823) to $7.3 \cdot 10^{16}$ (7,190,399) | — | GPU hit path, tile-exact |
+| 2304 [counters], sparse, $1.03 \cdot 10^{10}$ cells (0.79 % of tiles non-empty) | 16,384 | $4.4 \cdot 10^{13}$ (4,310) | | does not fit | active-block sweep, the counter's cycle learned on the CPU in 3.1 s | $2.0 \cdot 10^{15}$ (193,203) | 45×; 1.19× with learning | GPU hit path, same final state as Golly |
+| the same | $2^{20}$ | $1.2 \cdot 10^{15}$ (119,828) | | does not fit | the same | the same | 1.6×; 1.03× with learning | GPU hit path |
+| Seven idle circuits | $2^{24}$ | $5.0 \cdot 10^{12}\text{–}1.6 \cdot 10^{15}$ ($4.9 \cdot 10^{6}\text{–}2.7 \cdot 10^{9}$) | | | recursion, one CPU thread | $5.3 \cdot 10^{12}\text{–}7.1 \cdot 10^{14}$ ($4.4 \cdot 10^{6}\text{–}1.2 \cdot 10^{9}$) | 0.36–1.07× | CPU, same final states |
+| [Hutton replicator] | 65,536 | at most $3.5 \cdot 10^{11}$ (24,186) | | | recursion, one CPU thread | at most $1.0 \cdot 10^{11}$ (7,104) | 0.29× | CPU, same final state |
 
-ᵃ On the [Hutton32b counter], a different counter of the same size; at this size every kernel waits for the dispatch, not for the content. The byte LUT needs 1 B per cell in each of two buffers, which does not fit $10^{10}$ cells in 16 GB. Idle circuits: $2^{24}$ generations at step 1024 (Table XVIII); the ratio is per pattern. Rates count every cell of the bounding box, empty ones included; the sparse universe and the idle circuits are therefore credited far above the brute-force ceiling of $3.0 \cdot 10^{11}$, and their rows compare engines on the same cells, not work done.
+ᵃ Step 1024 without progress output (Tables XII and XX), up to 8 % faster than the best step of Table X, which prints a line per step. ᵇ Over the first minute; Golly is memory-bound on this pattern (Section VI-A). ᶜ At its first-minute rate Golly would need at least 368 s for 1,056 generations; GHL needs 82 s of learning on the CPU and 0.6 ms on the GPU. Rates count every cell of the bounding box (for the replicator, the final one), empty ones included; the sparse universe and the idle circuits are therefore credited far above the brute-force ceiling of $3.0 \cdot 10^{11}$, and their rows compare engines on the same cells, not work done. The CPU column is the bit-sliced circuit on the four cores of the i5-6600K (Section VI-H) on a $4096^{2}$ grid that holds the ROM, counting the grid's cells (389 gens/s). The byte LUT needs 1 B per cell in each of two buffers, which does not fit $10^{10}$ cells in 16 GB. "With learning" adds the CPU's learning time to GHL's side and compares whole runs.
 
-GHL is faster than Golly on every workload measured on the GPU, by 1.3× on the small active counter and by four to six orders of magnitude on dense novel content. The hit-path rates assume a table that the CPU learned (80–90 s per ROM period at 16×16 tiles, 3.2 s for the counter's cycle); Section VII-A projects the on-GPU learning time. Where Golly is at its best, on idle circuits and small universes with little novelty, GHL hands the work to the host recursion, which is HashLife and runs at Golly's speed within a factor of two.
+Two things decide which component wins: the content and the length of the run. On dense content that does not repeat, the GPU's brute-force engine is $1.4 \cdot 10^{4}$× Golly on the ROM; most of that factor reflects HashLife being the wrong method for such content, and a factor of 60 remains against the best brute-force loop on four CPU cores. On small universes the brute-force engine leads Golly by 1.2× on the counter and by 18× on `squares` and on `chaotic`'s active phase, over runs of $10^{4}\text{–}10^{6}$ generations. With a table learned beforehand, the hit path is $5.9 \cdot 10^{5}$× Golly on the ROM and 1.6–45× on the sparse universe; counted with the learning, which ran on the CPU, the margins shrink to at least 4.4× and to 1.03–1.19×. Those rows therefore measure the steady state of a memo table, not GHL's learning, which Section VII-A projects. Where Golly is at its best, on idle circuits and on small universes run long enough to repeat, the GPU engines lose and HashLife is the engine to use; GHL's recursion runs at 0.29–1.07× Golly's speed on one CPU thread.
+
+Table XII and Fig. 2 locate the crossover for the two small universes. Golly's and the recursion's average rates grow with the run as their memos fill; the shared-tile kernel's rate does not depend on it.
+
+**TABLE XII.** Average rate over the whole run by run length, in generations/s. Golly and the recursion (8×8 base tiles, one CPU thread) at step 1024, same final states in every row; GPU: the shared-tile kernel (Table XIII)
+
+| Generations | Counter: Golly | Counter: recursion | Counter: GPU | `chaotic`: Golly | `chaotic`: recursion | `chaotic`: GPU |
+|---|---|---|---|---|---|---|
+| 16,384 | 265,899 | 134,959 | **801,737** | 50,982 | 28,561 | **900,168** |
+| 65,536 | 363,749 | 200,692 | **801,737** | 30,675 | 21,995 | **900,168** |
+| 262,144 | 482,473 | 261,503 | **801,737** | 93,072 | 55,357 | **900,168** |
+| $2^{20}$ | 648,717 | 592,048 | **801,737** | 327,611 | 185,205 | **900,168** |
+| $2^{22}$ | **2,511,205** | 2,331,335 | 801,737 | **1,121,131** | 604,759 | 900,168 |
+| $2^{24}$ | **10,068,380** | 8,943,556 | 801,737 | **3,154,029** | 2,031,091 | 900,168 |
+
+![Average rate against run length](research/figures/runlength.svg)
+
+**Fig. 2.** The data of Table XII. The GPU kernel's rate is flat; Golly's and the recursion's grow once their memos hold a period.
+
+Both universes cross over between $2^{20}$ and $2^{22}$ generations. The counter's period is 513,024 generations; once it is memoized, further generations cost HashLife almost nothing, and the average rate grows with the run. `chaotic`'s rates dip at 65,536 generations and then grow in the same way, which suggests that it settles into a cycle after its active phase. For small universes Algorithm 1 races exactly these engines (line 4); the racing is not built, so for each run length the faster one was picked by hand. In long runs that is the recursion, at 0.89× Golly's speed on the counter and 0.64× on `chaotic` after $2^{24}$ generations.
 
 ### C. Brute-force engines
 
-**TABLE XII.** Brute-force kernels, in cell-updates/s (generations/s for single patterns)
+**TABLE XIII.** Brute-force kernels, in cell-updates/s (generations/s for single patterns); medians of five runs, range in generations/s where given
 
 | Grid | Byte-LUT kernel | Bit-plane, plain | Bit-plane, shared tile |
 |---|---|---|---|
-| One [counter], 37,627 cells | $1.0 \cdot 10^{10}$ (274,544)ᵃ | $1.0 \cdot 10^{10}$ (270,000–273,000) | **$2.9\text{–}3.0 \cdot 10^{10}$** (770,000–785,000; $k = 16$, tiles of 224 × 16 cells) |
-| [`squares`], 274,950 cells | $4.9 \cdot 10^{10}$ (177,445) | $4.6\text{–}4.8 \cdot 10^{10}$ (169,000–175,000) | **$1.5 \cdot 10^{11}$** (556,000–563,000; $k = 16$, tiles of 192 × 48) |
-| One [ROM][lotr1.ANSI-1M.rle], $9.5 \cdot 10^{6}$ cells, a full period | $1.8 \cdot 10^{11}$ (18,992) | **$3.9 \cdot 10^{11}$** (40,999) | $2.2 \cdot 10^{11}$ (23,000; $k = 4$) |
-| Tiled, 18 M cells | $1.75 \cdot 10^{11}$ | | |
-| Tiled, 169 M cells | $1.86 \cdot 10^{11}$ | | |
-| Random states, $16384^{2}$ cells | $1.3 \cdot 10^{10}$ | **$3.0 \cdot 10^{11}$** | $2.5 \cdot 10^{11}$ ($k = 3$) |
-| Random states, $5.4 \cdot 10^{8}$ cells | | $2.3 \cdot 10^{11}$ | |
-| Random states, $1.07 \cdot 10^{9}$ cells | | $2.8 \cdot 10^{11}$ | |
+| One [counter], 37,627 cells | $1.06 \cdot 10^{10}$ (280,510; 271,000–283,000) | $1.07 \cdot 10^{10}$ (283,760; 278,000–286,000) | **$3.02 \cdot 10^{10}$** (801,737; 792,000–804,000; $k = 16$, tiles of 224 × 16 cells) |
+| [`chaotic`], 19,932 cells | | | **$1.79 \cdot 10^{10}$** (900,168; 887,000–904,000; $k = 16$, tiles of 160 × 16) |
+| [`squares`], 274,950 cells | $4.89 \cdot 10^{10}$ (177,773; 176,600–178,000) | $4.96 \cdot 10^{10}$ (180,336; 178,700–181,800) | **$1.56 \cdot 10^{11}$** (569,161; 568,300–571,000; $k = 16$, tiles of 192 × 48) |
+| One [ROM][lotr1.ANSI-1M.rle], $9.5 \cdot 10^{6}$ cells, a full period | $1.84 \cdot 10^{11}$ (19,403; 18,800–19,500) | **$3.91 \cdot 10^{11}$** (41,321; 40,300–41,400) | $2.21 \cdot 10^{11}$ (23,330; $k = 4$) |
+| Tiled, 18.7 M cells | $1.68 \cdot 10^{11}$ (one of five runs at $1.17 \cdot 10^{11}$) | | |
+| Tiled, 169 M cells | $1.74 \cdot 10^{11}$ | | |
+| Random states, $16384^{2}$ cells | $1.48 \cdot 10^{10}$ | **$2.97 \cdot 10^{11}$** | $1.58 \cdot 10^{11}$ ($k = 3$) |
+| Random states, $5.4 \cdot 10^{8}$ cells | | $3.01 \cdot 10^{11}$ | |
+| Random states, $1.07 \cdot 10^{9}$ cells | | $3.02 \cdot 10^{11}$ | |
 
-ᵃ On the Hutton32b counter of the same size. The tiled grids are copies of the [Hutton32 counter]. Each kernel pads a single pattern differently (the counter is stepped as 199×205 cells by the byte-LUT kernel and 224×205 by the bit-plane kernels); only the pattern's bounding box is counted. The largest bit-plane rows are steady-state rates over 256 and 512 generations; the first 32 generations after upload averaged $1.3\text{–}1.8 \cdot 10^{11}$.
+The tiled grids are copies of the [Hutton32 counter]. Each kernel pads a single pattern differently (the counter is stepped as 199×205 cells by the byte-LUT kernel and 224×205 by the bit-plane kernels); only the pattern's bounding box is counted. On the [Hutton32b counter] of the same size the byte-LUT kernel runs at 279,193 gens/s. After a warm-up run the largest grids run at the same rate as $16384^{2}$.
 
-On small grids every kernel waits for the dispatch: 3.65 µs, whatever it does. A further generation inside a shared tile costs about 1.1 µs, so sixteen take 20 µs instead of 58, which makes the shared-tile kernel 2.9× the plain kernel on the counter and 3.3× on [`squares`]. Tile shape matters by up to 1.6× ([`squares`] at $k = 16$: $9.4 \cdot 10^{10}$, $1.0 \cdot 10^{11}$ and $1.5 \cdot 10^{11}$ cell-updates/s, or 342 k, 373 k and 563 k gens/s, for tiles 16, 32 and 48 rows high). On large grids the same kernel loses: at $k = 1$ it reaches 55 % of the plain kernel, so the detour through shared memory costs more than the traffic it saves; at $16384^{2}$ it does $1.7 \cdot 10^{11}$ at $k = 1$, $2.5 \cdot 10^{11}$ at $k = 3$ and $1.8 \cdot 10^{11}$ at $k = 8$, and on the ROM $2.2 \cdot 10^{11}$ (23 k gens/s, $k = 4$). The crossover lies between $3 \cdot 10^{5}$ and $9.5 \cdot 10^{6}$ cells and was not located, which is why Algorithm 1 races the two kernels.
+On small grids every kernel waits for the dispatch: 3.5 µs, whatever it does. A further generation inside a shared tile costs about 1.1 µs, so sixteen take 20 µs instead of 56, which makes the shared-tile kernel 2.8× the plain kernel on the counter and 3.2× on [`squares`]. Tile shape matters by up to 1.7×: [`squares`] at $k = 16$ runs at $9.4 \cdot 10^{10}$, $1.03 \cdot 10^{11}$ and $1.56 \cdot 10^{11}$ cell-updates/s (342,850, 376,028 and 569,161 gens/s) with tiles 16, 32 and 48 rows high, [`chaotic`] at $1.79 \cdot 10^{10}$, $1.46 \cdot 10^{10}$ and $1.23 \cdot 10^{10}$ (900,168, 731,838 and 616,177 gens/s). On large grids the same kernel loses: at $k = 1$ it reaches 41 % of the plain kernel, so the detour through shared memory costs more than the traffic it saves; at $16384^{2}$ it does $1.21 \cdot 10^{11}$ at $k = 1$, $1.58 \cdot 10^{11}$ at $k = 3$ and $1.28 \cdot 10^{11}$ at $k = 8$, and on the ROM $2.21 \cdot 10^{11}$ (23,330 gens/s, $k = 4$). The crossover lies between $3 \cdot 10^{5}$ and $9.5 \cdot 10^{6}$ cells and was not located, which is why Algorithm 1 races the two kernels. Fig. 3 plots the three kernels against grid size.
 
-**TABLE XIII.** Large grids ($16384^{2}$ cells), same content for every kernel; 0 mismatching cells in every row
+![Brute-force rate against grid size](research/figures/brute_by_size.svg)
+
+**Fig. 3.** Brute-force kernels by grid size (medians of Table XIII and Section VI-C; the plain bit-plane points from $2^{20}$ cells up, except the ROM, are random states). Below about $10^{6}$ cells every kernel is bound by dispatch latency and the shared tile leads; above it the plain bit-plane kernel is bound by memory bandwidth at $3.0 \cdot 10^{11}$ cell-updates/s, with a cache-resident peak near $1.7 \cdot 10^{7}$ cells.
+
+**TABLE XIV.** Large grids ($16384^{2}$ cells), same content for every kernel; byte-LUT columns from the content kernel `gpu-brute2`; 0 mismatching cells in every row
 
 | Content | Byte LUT, 32 MiB | Byte LUT, 2 MiB | Bit-planes | Gain over the 32 MiB LUT |
 |---|---|---|---|---|
-| uniform random states, held constant | $1.3 \cdot 10^{10}$ | $4.2 \cdot 10^{10}$ | **$3.0 \cdot 10^{11}$** | 22× |
-| tiled [counter] | $1.8 \cdot 10^{11}$ | $1.3 \cdot 10^{11}$ | **$2.9 \cdot 10^{11}$** | 1.6× |
-| tiled [`chaotic`] | $1.8 \cdot 10^{11}$ | $1.3 \cdot 10^{11}$ | **$3.0 \cdot 10^{11}$** | 1.6× |
-| tiled [`lotr1.ANSI-1M`] | $1.6 \cdot 10^{11}$ | $1.2 \cdot 10^{11}$ | **$3.0 \cdot 10^{11}$** | 1.8× |
+| uniform random states, held constant | $1.48 \cdot 10^{10}$ | $3.62 \cdot 10^{10}$ | **$2.97 \cdot 10^{11}$** | 20× |
+| tiled [counter] | $1.24 \cdot 10^{11}$ | $9.55 \cdot 10^{10}$ | **$2.96 \cdot 10^{11}$** | 2.4× |
+| tiled [`chaotic`] | $1.10 \cdot 10^{11}$ | $8.57 \cdot 10^{10}$ | **$2.97 \cdot 10^{11}$** | 2.7× |
+| tiled [`lotr1.ANSI-1M`] | $1.13 \cdot 10^{11}$ | $9.24 \cdot 10^{10}$ | **$2.97 \cdot 10^{11}$** | 2.6× |
 
-The byte-LUT kernel depends on content because random states touch the whole $2^{25}$-byte table and miss L2. At $8192^{2}$ it does $1.8 \cdot 10^{11}$ on tiled [`chaotic`], $3.8 \cdot 10^{10}$ on decaying random states and $1.4 \cdot 10^{10}$ on random states held constant; the 2 MiB class-compressed table, which always fits L2, gives $1.3 \cdot 10^{11}$, $1.0 \cdot 10^{11}$ and $4.3 \cdot 10^{10}$. The bit-plane kernel has no table and no such dependence.
+At this size the content kernel reaches only $1.1\text{–}1.24 \cdot 10^{11}$ on real content, below the $1.74 \cdot 10^{11}$ of `gpu-brute` on $1.7 \cdot 10^{8}$ cells; the cause was not investigated. It depends on content because random states touch the whole $2^{25}$-byte table and miss L2. At $8192^{2}$ it does $1.80 \cdot 10^{11}$ on tiled [`chaotic`], $3.78 \cdot 10^{10}$ on decaying random states and $1.55 \cdot 10^{10}$ on random states held constant; the 2 MiB class-compressed table, which always fits L2, gives $1.26 \cdot 10^{11}$, $1.05 \cdot 10^{11}$ and $4.20 \cdot 10^{10}$. The bit-plane kernel has no table and no such dependence.
 
-It is memory-bound. A cell-update reads and writes five bits (1.25 B); $2.97 \cdot 10^{11}$ × 1.25 B is 371 GB/s, the same 83 % of the bus as the byte kernel's $1.86 \cdot 10^{11}$ × 2 B, so the gain on real content is exactly the saving in bytes. A circuit that returns its input unchanged gives the same rate ($3.0 \cdot 10^{11}$ at $16384^{2}$, $2.8 \cdot 10^{11}$ at $32768^{2}$); cache-resident grids reach $4.3 \cdot 10^{11}$ at $4096^{2}$ (identity circuit: $3.8 \cdot 10^{11}$). Chaining $k$ dependent evaluations per invocation gives pass rates of 3.0, 2.4, 1.4 and $0.76 \cdot 10^{11}$ for $k = 1, 2, 4, 8$, so the gates alone sustain $5.4\text{–}6.1 \cdot 10^{11}$ evaluations/s, twice what memory lets through. Synthesis was stopped at 367 gates for that reason.
+It is memory-bound. A cell-update reads and writes five bits (1.25 B); $2.97 \cdot 10^{11}$ × 1.25 B is 371 GB/s (83 % of the bus), against 348 GB/s for the byte kernel's $1.74 \cdot 10^{11}$ × 2 B, so its gain over `gpu-brute` on real content, 1.7×, is close to the saving in bytes. A circuit that returns its input unchanged gives the same rate ($2.97 \cdot 10^{11}$ at $16384^{2}$, $3.0 \cdot 10^{11}$ at $32768^{2}$); cache-resident grids reach $4.6 \cdot 10^{11}$ at $4096^{2}$ (identity circuit: $3.8 \cdot 10^{11}$). Chaining $k$ dependent evaluations per invocation gives pass rates of 3.0, 2.4, 1.4 and $0.77 \cdot 10^{11}$ for $k = 1, 2, 4, 8$, so the gates alone sustain $4.8\text{–}6.1 \cdot 10^{11}$ evaluations/s, up to twice what memory lets through. Synthesis was stopped at 367 gates for that reason.
 
-A negative result constrains the miss path. Stepping a missed window through all its generations inside one dispatch with one thread per window (Table XIV) is slower at every batch size than eight chained dispatches of the plain kernel on an atlas, by 21× where latency matters and by 6× where throughput does. One thread performs 240 circuit evaluations in sequence: on a 64×64 grid a dispatch with $k$ dependent evaluations takes 3.65, 3.66, 5.7, 5.7, 7.7 and 18.0 µs for $k = 1, 2, 4, 8, 16, 32$, about half a microsecond per evaluation even with all state in registers, and 2.6 µs with state in private arrays. Generations per dispatch pay only when a workgroup shares the work.
+A negative result constrains the miss path. Stepping a missed window through all its generations inside one dispatch with one thread per window (Table XV) is slower at every batch size than eight chained dispatches of the plain kernel on an atlas, by 22× where latency matters and by 5.5× where throughput does. One thread performs 240 circuit evaluations in sequence: on a 64×64 grid a dispatch with $k$ dependent evaluations takes 3.52, 3.51, 5.53, 5.57, 7.60 and 17.9 µs for $k = 1, 2, 4, 8, 16, 32$, about half a microsecond per evaluation even with all state in registers, and 2.6 µs with state in private arrays. Generations per dispatch pay only when a workgroup shares the work.
 
-**TABLE XIV.** One thread per 32×32 window, 8 generations per dispatch, against 8 chained dispatches of the plain kernel
+**TABLE XV.** One thread per 32×32 window, 8 generations per dispatch, against 8 chained dispatches of the plain kernel
 
 | Windows per dispatch | Window kernel, time per dispatch | Plain kernel, 8 chained dispatches |
 |---|---|---|
-| 1 | 619 µs | 29 µs |
-| 64 | 623 µs | 31 µs |
-| 1,024 | 627 µs | 60 µs |
-| 4,096 | 639 µs | 115 µs |
-| 16,384 | 2.8 ms | 0.5 ms |
-| 262,144 | 41 ms (155 ns per window) | 7 ms (27 ns per window) |
+| 1 | 615 µs | 28 µs |
+| 64 | 621 µs | 26 µs |
+| 1,024 | 623 µs | 56 µs |
+| 4,096 | 636 µs | 98 µs |
+| 16,384 | 2.80 ms | 0.29 ms |
+| 65,536 | 10.6 ms | 1.86 ms |
+| 262,144 | 39.8 ms (152 ns per window) | 7.2 ms (27 ns per window) |
 
-The right column was measured for $64^{2}$, $1024^{2}$ and $2048^{2}$ cells (3.65, 7.5 and 14 µs per generation) and is 3.65 µs plus 27 ns per window for the rest.
+The right column is eight times the plain kernel's measured time per generation on a grid that holds as many cells as the windows: $64^{2}$, $256^{2}$, $1024^{2}$, $2048^{2}$, $4096^{2}$, $8192^{2}$ and $16384^{2}$.
 
 ### D. Recurring content: the hit path
 
-Universe: $N \times N$ copies of [`lotr1.ANSI-1M`], each started at a different phase of its 528-generation period. The CPU reference engine learned the table over one period (2,462,688 entries at 16×16 tiles); the GPU ran sweeps; every tile was then compared with the CPU's prediction.
+Universe: $N \times N$ copies of [`lotr1.ANSI-1M`], each started at a different phase of its 528-generation period. The CPU reference engine learned the table over one period; the GPU ran sweeps; every tile was then compared with the CPU's prediction.
 
-**TABLE XV.** Memo hit path on phase-shifted ROMs (`gpu-sweep`); every tile checked against the CPU
+**TABLE XVI.** Memo hit path on phase-shifted ROMs (`gpu-sweep`); every tile checked against the CPU, 0 wrong in every row
 
-| Tile | Universe | Cells counted | Table | Memo entries | cell-updates/s (gens/s) | Generations to learn |
-|---|---|---|---|---|---|---|
-| 16×16 | 1 ROM | $9.5 \cdot 10^{6}$ | 256 MiB | | $4.4 \cdot 10^{12}$ (**468,929**) | 528 |
-| 32×32 | 1 ROM | $9.5 \cdot 10^{6}$ | 64 MiB | | $1.5 \cdot 10^{13}$ (**1,607,022**) | 1,056 |
-| 16×16 | 8×8 ROMs, 25,344 × 25,088 | $6.4 \cdot 10^{8}$ | 256 MiB | | $6.7 \cdot 10^{12}$ (10,585) | 528 |
-| 16×16 | 32×32 ROMs, 101,376 × 100,352 | $1.02 \cdot 10^{10}$ | 256 MiB | 2,462,688 | $8.6\text{–}8.7 \cdot 10^{12}$ (848–858) | 528 |
-| 32×32 | 32×32 ROMs | $1.02 \cdot 10^{10}$ | 64 MiB | 628,903 | $2.1 \cdot 10^{14}$ (20,349) | 1,056 |
-| 64×64 | 32×32 ROMs | $1.02 \cdot 10^{10}$ | 16 MiB | 162,691 | $1.9 \cdot 10^{15}$ (191,061) | 2,112 |
-| 128×128 | 32×32 ROMs | $1.02 \cdot 10^{10}$ | 4 MiB | 43,759 | $1.2 \cdot 10^{16}$ (1,149,321) | 4,224 |
-| 256×256 | 32×32 ROMs | $1.02 \cdot 10^{10}$ | 1 MiB | 12,475 | **$6.8 \cdot 10^{16}$** (6,714,020) | 8,448 |
+| Tile | Universe | Cells counted | Table | Memo entries | Learning on the CPU | cell-updates/s (gens/s) | Generations to learn |
+|---|---|---|---|---|---|---|---|
+| 16×16 | 1 ROM | $9.5 \cdot 10^{6}$ | 256 MiB | 2,462,688 | 81 s | $4.5 \cdot 10^{12}$ (**471,546**) | 528 |
+| 32×32 | 1 ROM | $9.5 \cdot 10^{6}$ | 64 MiB | 628,903 | 82 s | $1.6 \cdot 10^{13}$ (**1,652,238**) | 1,056 |
+| 16×16 | 8×8 ROMs, 25,344 × 25,088 | $6.4 \cdot 10^{8}$ | 256 MiB | 2,462,688 | 82 s | $6.8 \cdot 10^{12}$ (10,768) | 528 |
+| 16×16 | 32×32 ROMs, 101,376 × 100,352 | $1.02 \cdot 10^{10}$ | 256 MiB | 2,462,688 | 85 s | $8.4 \cdot 10^{12}$ (823) | 528 |
+| 32×32 | 32×32 ROMs | $1.02 \cdot 10^{10}$ | 64 MiB | 628,903 | 82 s | $2.1 \cdot 10^{14}$ (20,686) | 1,056 |
+| 64×64 | 32×32 ROMs | $1.02 \cdot 10^{10}$ | 16 MiB | 162,691 | 46 s | $1.9 \cdot 10^{15}$ (189,513) | 2,112 |
+| 128×128 | 32×32 ROMs | $1.02 \cdot 10^{10}$ | 4 MiB | 43,759 | 45 s | $1.3 \cdot 10^{16}$ (1,305,890) | 4,224 |
+| 256×256 | 32×32 ROMs | $1.02 \cdot 10^{10}$ | 1 MiB | 12,475 | 45 s | **$7.3 \cdot 10^{16}$** (7,190,399) | 8,448 |
 
-Larger tiles pad every copy to a multiple of the tile, so the universe they step grows to $1.06 \cdot 10^{10}$, $1.16 \cdot 10^{10}$, $1.36 \cdot 10^{10}$ and $1.83 \cdot 10^{10}$ cells; only the $1.02 \cdot 10^{10}$ cells of the 16×16-tile universe are counted, and the single ROM is counted over its bounding box. Probe rates were $2.3 \cdot 10^{9}$/s and $1.0 \cdot 10^{9}$/s for the single ROM at 16×16 and 32×32 tiles, $3.3 \cdot 10^{9}$/s and $4.2 \cdot 10^{9}$/s for the 8×8 and 32×32 universes at 16×16, and $1.3 \cdot 10^{10}$/s for the 32×32 universe at 32×32. The rows with 16×16 and 32×32 tiles found 0 wrong tiles of 38,808, 10,100, 2.5 M, 39.7 M and 10.3 M. The single ROM is limited by dispatch latency, not by probes. At $10^{10}$ cells the gain over the byte-LUT brute kernel is 46× at 16×16 and 1,110× at 32×32, as $V_L R_P / R_B$ predicts. Each further level is worth 6–24×: 8× from the tile-step and the rest from the table sliding into L2. The ID buffer shrinks from 151 MiB at 16×16 tiles to 1 MiB at 256×256.
+Larger tiles pad every copy to a multiple of the tile, so the universe they step grows to $1.06 \cdot 10^{10}$, $1.16 \cdot 10^{10}$, $1.36 \cdot 10^{10}$ and $1.83 \cdot 10^{10}$ cells; only the $1.02 \cdot 10^{10}$ cells of the 16×16-tile universe are counted, and the single ROM is counted over its bounding box. The three largest tiles learn with 16×16 base tiles, hence the shorter learning. Probe rates were $2.3 \cdot 10^{9}$/s and $1.05 \cdot 10^{9}$/s for the single ROM at 16×16 and 32×32 tiles, $3.3 \cdot 10^{9}$/s and $4.1 \cdot 10^{9}$/s for the 8×8 and 32×32 universes at 16×16, and $1.3\text{–}1.7 \cdot 10^{10}$/s for the 32×32 universe at 32×32 and above. The single ROM probes more slowly than the large universes: a sweep over its 38,808 tiles takes about 17 µs, which suggests that so few tiles do not fill the GPU (not investigated further). At $10^{10}$ cells the gain over the byte-LUT brute kernel is 48× at 16×16 and 1,210× at 32×32; $V_L R_P / R_B$ predicts 48× and 1,260×. Each further level is worth 5.5–25×. A level cuts the probes per generation by 8; the first step also shrinks the table from 256 MiB to 64 MiB, and at the largest tiles the gain falls below 8×. The ID buffer shrinks from 151 MiB at 16×16 tiles to 1 MiB at 256×256. Fig. 4 plots the hit path against the tile.
 
-When content does not recur, larger sweep tiles cost little. Table XVI counts hash operations per generation for a flat sweep at the given tile with the recursion below it.
+![Hit path against sweep tile](research/figures/hitpath_by_tile.svg)
 
-**TABLE XVI.** Hash operations per generation by sweep tile (`flat`, model)
+**Fig. 4.** Generations per second of the hit path by sweep tile (Table XVI), on the universe of 32×32 ROMs and on one ROM, against the plain bit-plane kernel on one ROM. Each doubling of the tile divides the probes per generation by eight.
+
+These universes are a best case: every copy sits at a whole-tile offset, so one period of one ROM covers them all. Table XVII shifts copies by sub-tile cell offsets.
+
+**TABLE XVII.** 8×8 copies of the ROM at 16×16 tiles in $k$ alignment classes (copy $(c_x, c_y)$ in class $(c_x + 8 c_y)$ mod $k$, each class at its own cell offset inside a tile)
+
+| Alignment classes | Memo entries | Table | Learning on the CPU | cell-updates/s (gens/s) |
+|---|---|---|---|---|
+| 1 (whole-tile offsets) | 2,462,688 | 256 MiB | 82 s | $6.8 \cdot 10^{12}$ (10,746) |
+| 2 | 4,925,643 | 512 MiB | 212 s | $6.4 \cdot 10^{12}$ (10,132) |
+| 4 | 9,851,385 | 1,024 MiB | 312 s | $6.0 \cdot 10^{12}$ (9,497) |
+
+Entries grow in proportion to the number of alignment classes, and learning grows with them; the hit path slows by 12 % at four classes as the table grows to 1 GiB. Copies at arbitrary cell offsets fall into up to 256 classes at 16×16 tiles: about $6.3 \cdot 10^{8}$ entries, or 40 GB at the 50 % load limit, more than the card holds.
+
+When content does not recur, larger sweep tiles cost little. Table XVIII counts hash operations per generation for a flat sweep at the given tile with the recursion below it.
+
+**TABLE XVIII.** Hash operations per generation by sweep tile (`flat`, model)
 
 | Pattern | 8×8 | 16×16 | 32×32 | 64×64 | 128×128 | 256×256 |
 |---|---|---|---|---|---|---|
@@ -479,47 +532,49 @@ Empty and idle regions collapse, active logic saturates near 32–64 cells, and 
 
 Universe: 2304 copies of [`advanced counter v2`], one per 2048 × 2176-cell block, each at a different phase of its period: 98,304 × 104,448 cells, $5.5 \cdot 10^{7}$ live cells, 0.79 % of tiles non-empty. The same universe was exported as a macrocell file and run by Golly and by the CPU engine.
 
-**TABLE XVII.** Sparse 98,304 × 104,448 universe, 16,384 generations
+**TABLE XIX.** Sparse 98,304 × 104,448 universe, 16,384 generations
 
 | Engine | Time | cell-updates/s (gens/s) | Final state |
 |---|---|---|---|
-| Golly HashLife, step 16 | 15.95 s | $1.1 \cdot 10^{13}$ (1,027) | |
-| Golly HashLife, step 1024 | 3.88 s | $4.3 \cdot 10^{13}$ (4,224) | population 55,478,381, hash `144be5c0cde9cb81` |
-| Golly HashLife, step 16,384 | 3.79 s | $4.4 \cdot 10^{13}$ (4,323) | |
-| CPU reference engine, step 1024 | 2.78 s | $6.1 \cdot 10^{13}$ (5,894) | identical |
-| GPU, flat sweep (all 40 M tiles) | 1.81 s | $9.3 \cdot 10^{13}$ (9,059) | 0 of 40.1 M tiles wrong |
-| **GHL, GPU active-block sweep** | 0.059 s | **$2.9 \cdot 10^{15}$** (278,648) | identical to Golly's |
+| Golly HashLife, step 16 | 15.44 s | $1.1 \cdot 10^{13}$ (1,061) | |
+| Golly HashLife, step 1024 | 3.88 s | $4.3 \cdot 10^{13}$ (4,223) | population 55,478,381, hash `144be5c0cde9cb81` |
+| Golly HashLife, step 16,384 | 3.80 s | $4.4 \cdot 10^{13}$ (4,310) | |
+| CPU reference engine, step 1024 | 2.98 s | $5.6 \cdot 10^{13}$ (5,501) | identical |
+| GPU, flat sweep (all 40 M tiles) | 1.84 s | $9.1 \cdot 10^{13}$ (8,903) | 0 of 40.1 M tiles wrong |
+| **GHL, GPU active-block sweep** | 0.085 s, after 3.1 s of learning on the CPU | **$2.0 \cdot 10^{15}$** (193,203) | identical to Golly's |
 
-Rates count all $1.03 \cdot 10^{10}$ cells of the universe, of which $5.5 \cdot 10^{7}$ are live; they are effective rates, not work done. Over $2^{20}$ generations Golly averages $6.4 \cdot 10^{14}$ (61,878 gens/s, step 1024) to $9.9 \cdot 10^{14}$ (96,581 gens/s, step 65,536) as its memo warms. The GPU figure is a steady-state hit-path rate with the counter's cycle already learned (3.2 s on the CPU).
+Rates count all $1.03 \cdot 10^{10}$ cells of the universe, of which $5.5 \cdot 10^{7}$ are live; they are effective rates, not work done. Over $2^{20}$ generations Golly averages $6.4 \cdot 10^{14}$ (62,782 gens/s, step 1024) to $1.2 \cdot 10^{15}$ (119,828 gens/s, step 65,536) as its memo warms, with a peak working set of 0.2–0.55 GB. The GPU's hit path starts with the counter's whole 513,024-generation cycle learned on the CPU in 3.1 s. Counted with that learning, GHL takes 3.19 s for 16,384 generations against Golly's 3.80 s (1.19×) and 8.53 s for $2^{20}$ against 8.75 s (1.03×). Against Golly's best average over $2^{20}$ generations (step 65,536) the hit path alone is 1.6× faster; against Golly's first 16,384 generations (step 16,384), 45×.
 
 ### F. The recursion against Golly on the CPU
 
-Table XVIII runs GHL's recursion (Algorithm 2 with a 4×4 floor) on one CPU thread against Golly at step 1024 (16,384 for the replicator). The engine is unoptimized: a general-purpose `HashMap` per level and a sort per wave, against Golly's hand-rolled chained table with prefetching.
+Table XX runs GHL's recursion (Algorithm 2 with 8×8 base tiles, as in GHL; a missed 16×16 window is stepped cell by cell through the byte table) on one CPU thread against Golly at step 1024 (4096 for the replicator). The engine is unoptimized: a general-purpose `HashMap` per level and a sort per wave, against Golly's hand-rolled chained table with prefetching.
 
-**TABLE XVIII.** Same pattern, same rule, one thread
+**TABLE XX.** Same pattern, same rule, same step, one thread; median times of the runs that add up to at least a second
 
-| Pattern | Gens | Golly (s) | Engine (s) | Same final state |
-|---|---|---|---|---|
-| [Segmented ROM (256k)] | $2^{24}$ | 1.83 | 1.55 | yes |
-| [serial display (32×32)] | $2^{24}$ | 0.16 | 0.28 | yes |
-| [parallel display (16×16)] | $2^{24}$ | 0.019 | 0.010 | yes |
-| [16×16 movie] | $2^{24}$ | 3.48 | 3.17 | yes |
-| [efficient demultiplexer] | $2^{24}$ | 0.024 | 0.030 | yes |
-| [cpu] | $2^{24}$ | 0.017 | 0.020 | yes |
-| [BIN2BCD] | $2^{24}$ | 0.047 | 0.060 | yes |
-| [advanced counter v2] | $2^{24}$ | 1.73 | 1.50 | yes |
-| [chaotic] | $2^{24}$ | 5.27 | 7.95 | yes |
-| [32×32 movie] | $2^{24}$ | 52.5 | 55.6 | yes |
-| [squares] | $2^{20}$ | 80.8 | 134.4 | yes |
-| [Hutton replicator] (step 16,384) | 262,144 | 111.5 | 219.2 | yes |
+| Pattern | Gens | Golly (s) | Engine (s) | Engine speed / Golly's | Same final state |
+|---|---|---|---|---|---|
+| [Segmented ROM (256k)] | $2^{24}$ | 1.82 | 1.70 | 1.07 | yes |
+| [16×16 movie] | $2^{24}$ | 3.43 | 3.85 | 0.89 | yes |
+| [serial display (32×32)] | $2^{24}$ | 0.155 | 0.427 | 0.36 | yes |
+| [BIN2BCD] | $2^{24}$ | 0.0426 | 0.0631 | 0.68 | yes |
+| [parallel display (16×16)] | $2^{24}$ | 0.0063 | 0.0145 | 0.43 | yes |
+| [efficient demultiplexer] | $2^{24}$ | 0.0202 | 0.0352 | 0.57 | yes |
+| [cpu] | $2^{24}$ | 0.0136 | 0.0230 | 0.59 | yes |
+| [advanced counter v2] | $2^{24}$ | 1.67 | 1.88 | 0.89 | yes |
+| [chaotic] | $2^{24}$ | 5.32 | 8.26 | 0.64 | yes |
+| [32×32 movie] | 65,536 | 6.67 | 7.28 | 0.92 | yes |
+| [squares] | 65,536 | 2.10 | 4.06 | 0.52 | yes |
+| [Hutton replicator] (step 4096) | 65,536 | 2.71 | 9.23 | 0.29 | yes |
 
-The engine runs at 0.51–1.9× Golly's speed and is faster on four of the twelve. It is the same algorithm doing a comparable number of node operations; the gap is table engineering. On the replicator it counts $1.45 \cdot 10^{9}$ node probes and 262 k waves for 262,144 generations, and creates 148 M nodes, an estimated 7 GB, because it never reclaims.
+Golly's times exclude loading (a run of zero generations is subtracted); the engine reports its own high-resolution timer, which also excludes loading. Each side was repeated until its runs added up to a second, at most five times; neither program wrote output in a timed run. The counter and `chaotic` rows are the last row of Table XII.
+
+The engine runs at 0.29–1.07× Golly's speed and is faster only on the segmented ROM. It is the same algorithm with a different schedule; Golly's node counts were not recorded, so the gap is attributed to table engineering without being measured. The gap is widest on the idle displays, which both programs finish in milliseconds, and on the replicator, which keeps creating new nodes as it grows. Over 262,144 generations of the replicator at step 16,384 with 4×4 base tiles (`batches`), the engine counts $1.45 \cdot 10^{9}$ node probes and 262 k waves and creates 148 M nodes, an estimated 7 GB, because it never reclaims.
 
 ### G. Choosing floor, engine and depth
 
 These results count the reference engine's operations and price them with the constants of Table I: 0.27 ns per find, 1 ns per insert, 5.4 ps per cell evaluation, every brute-forced window stepped whole. Every policy was checked to produce the same universe.
 
-**TABLE XIX.** Model time for fixed floors ("F16": missed 16×16 windows brute-forced, everything above memoized) and for plain cells per region under a memo of region-sized windows
+**TABLE XXI.** Model time for fixed floors ("F16": missed 16×16 windows brute-forced, everything above memoized) and for plain cells per region under a memo of region-sized windows
 
 | Content, horizon | Plain cells, ideal | F8 | F16 | F32 | F64 | F128 | F256 | Plain cells + coarse memo |
 |---|---|---|---|---|---|---|---|---|
@@ -530,11 +585,11 @@ These results count the reference engine's operations and price them with the co
 | [ROM][lotr1.PPMd-244K.rle], first 512 gens, all new (4×4) | 7.6 | 86.9 | 39.4 | 46.5 | | | | **10.0** |
 | same (8×8) | 7.6 | — | 24.5 | 31.7 | | | | **8.6** |
 
-"Ideal" is every non-empty region stepped as cells with no halo; the last column includes the halo and the conversion to IDs. With 4×4 base tiles F8 is 15 % ahead on logic and 2.2× behind on new content; 8×8 base tiles with F16 beat both.
+"Ideal" is every non-empty region stepped as cells with no halo; the last column includes the halo and the conversion to IDs. With 4×4 base tiles F8 is 15 % ahead of F16 on the counter, 22 % on `chaotic` and 2.2× behind on new content; 8×8 base tiles with F16 beat both.
 
-**TABLE XX.** Engine per content: model time (ms) and memory (MiB) over 4,096 generations, 8×8 base tiles. F = memoize everything, brute-force missed 16×16 or 32×32 windows; C = plain cells per 256×256 region with memo only above it, at 64- or 16-generation steps
+**TABLE XXII.** Engine per content: model time (ms) and memory (MiB) over 4,096 generations, 8×8 base tiles. F = memoize everything, brute-force missed 16×16 or 32×32 windows; C = plain cells per 256×256 region with memo only above it, at 64- or 16-generation steps
 
-| Content | F16 | F32 | C64 | C16 | Best vs worst |
+| Content | F16 | F32 | C64 | C16 | Best F against best C |
 |---|---|---|---|---|---|
 | ROM [`lotr1.PPMd`] | 25.5 ms, 201 MiB | 33.5, 94 | 35.6, 63 | **9.8, 63** | C16 2.6× ahead of F16 |
 | [`chaotic`] (perturbed) | **0.60**, 3.0 | 1.29, 1.6 | 2.36, 0.3 | 1.97, 0.7 | F16 3.3× |
@@ -546,9 +601,9 @@ These results count the reference engine's operations and price them with the co
 | [`16x16 movie`] | **0.52**, 2.5 | 1.12, 1.5 | 38.4, 0.3 | 39.9, 0.9 | F16 74× |
 | All eight | 35.1 | 53.8 | 177 | 154 | best per content: **19.4** |
 
-F16 is the safe default: its worst case is 2.6× behind, while plain cells are up to 74× behind because one moving signal forces a whole 256×256 region to be stepped. The step matters as much as the engine: the ROM learned through 64-generation steps needs 2,112 generations (35.6 ms), through 16-generation steps 528 (9.8 ms). Choosing per content is worth 1.8× on this mix, all of it from the ROM. At the bit-plane kernel's rate ($2.9 \cdot 10^{11}$) no ranking changes: uniform F16 costs 29.1 ms instead of 35.1 and the best engine per content 15.2 instead of 19.4.
+F16 is the safe default: its worst case is 2.6× behind, while plain cells are up to 74× behind because one moving signal forces a whole 256×256 region to be stepped. The step matters as much as the engine: the ROM learned through 64-generation steps needs 2,112 generations (35.6 ms), through 16-generation steps 528 (9.8 ms). Choosing per content is worth 1.8× on this mix, all of it from the ROM. At the bit-plane kernel's rate ($2.9 \cdot 10^{11}$) the best engine per content stays the same, although two lower places swap (F32 and C64 on the ROM, C64 and C16 on `squares`): uniform F16 costs 29.1 ms instead of 35.1 and the best engine per content 15.2 instead of 19.4.
 
-**TABLE XXI.** Algorithm 3 against uniform F16 (8×8 base tiles, 16-generation steps; model)
+**TABLE XXIII.** Algorithm 3 against uniform F16 (8×8 base tiles, 16-generation steps; model)
 
 | Universe | Uniform F16 | GHL controller |
 |---|---|---|
@@ -557,9 +612,11 @@ F16 is the safe default: its worst case is 2.6× behind, while plain cells are u
 | [counter], 16,384 gens | 0.67 ms | 0.67 ms (never leaves F16) |
 | 8 perturbed [`chaotic`], 8,192 gens | 5.42 ms | 5.42 ms (never leaves F16) |
 
+Uniform F16 costs 0.67 and 5.42 ms here against 0.62 and 5.21 ms in Table XXI because this table steps 16 generations at a time and Table XXI 64.
+
 Three earlier controllers did not work (64-generation steps, 4×4 base tiles). Walking down one level at a time from plain cells cost 97.8 ms on the ROM's learning phase against 38.6 ms for plain cells and 40.4 ms for F16 throughout: the first step down is a 256×256 brute window, the most expensive mode there is, so the experiment always failed. Whole-step trials of the next finer level cost 64.1 ms on the mixed universe against 55.1 ms for uniform F16 and 46.8 ms for the best fixed mode per region. Sampled evidence with 64-generation steps cost 78.5 ms, because plain cells learn the ROM four times slower at that step and mode boundaries cost a halo that a contiguous block would not.
 
-**TABLE XXII.** Dispatch time per generation of each engine (fixed-capacity dispatches at 3.4 µs), independent of the universe's size, and the active area at which each becomes the best engine
+**TABLE XXIV.** Dispatch time per generation of each engine (fixed-capacity dispatches at 3.4 µs), independent of the universe's size, and the active area at which each becomes the best engine
 
 | Engine | Generations per floor wave | Dispatches per generation | Dispatch time per generation | Best for, byte-LUT pricing | Best for, bit-plane pricing |
 |---|---|---|---|---|---|
@@ -573,9 +630,9 @@ The thresholds use the counter's measured work per region and generation: 38 ns 
 
 ### H. CPU kernels
 
-The circuit also changes the host side. Table XXIII gives one i5-6600K thread ([`bench/`]; all engines compared cell by cell before timing; ranges span two sets of runs, which differed by up to 30 %).
+The circuit also changes the host side. Table XXV gives one i5-6600K thread ([`bench/`]; all engines compared cell by cell before timing; ranges span two sets of runs, which differed by up to 30 %).
 
-**TABLE XXIII.** Cell-updates per second on one CPU thread
+**TABLE XXV.** Cell-updates per second on one CPU thread
 
 | Engine | Uniform random states | Tiled counter |
 |---|---|---|
@@ -585,7 +642,9 @@ The circuit also changes the host side. Table XXIII gives one i5-6600K thread ([
 | form B, `u64` | $0.9\text{–}1.7 \cdot 10^{9}$ ($2.3\text{–}2.8 \cdot 10^{9}$ on long rows with `target-cpu=native`) | $0.9\text{–}1.7 \cdot 10^{9}$ ($2.2\text{–}2.8 \cdot 10^{9}$) |
 | form B, 256-bit AVX2 | $3.0\text{–}4.5 \cdot 10^{9}$ | $2.7\text{–}4.4 \cdot 10^{9}$ |
 
-Bit-planes are 2.0–3.5× the table on real content in portable `u64` code and 6–8× with AVX2, and 17–73× on random states. A core's brute-force rate rises to $0.9\text{–}4.5 \cdot 10^{9}$ while an out-of-cache probe stays near $10^{7}$/s, so the host's $\rho$ moves from 30–60 to a few hundred. By (3) the host recursion's floor then belongs at 16×16 tiles as well. That is an inference: the engine of Table XVIII uses a 4×4 floor and scalar evaluation and was not rebuilt.
+Bit-planes are 2.0–3.5× the table on real content in portable `u64` code and 6–8× with AVX2, and 17–73× on random states. A core's brute-force rate rises to $0.9\text{–}4.5 \cdot 10^{9}$ while an out-of-cache probe stays near $10^{7}$/s (assumed, as in Section III-C), so the host's $\rho$ moves from 30–60 to a few hundred. By (3) the host recursion's floor then belongs at 16×16 tiles as well. That is an inference: the engine of Table XX steps its 16×16 floor windows through the byte table and was not rebuilt with the circuit.
+
+On all four cores, with one band of rows per thread, the bit-sliced forms reach $6.9\text{–}7.0 \cdot 10^{9}$ cell-updates/s on random states and $6.4\text{–}6.5 \cdot 10^{9}$ on a $4096^{2}$ grid that holds the ROM (389 gens/s), about twice one AVX2 thread, and the 256-bit form gains nothing over `u64`; that suggests the host's memory bandwidth as the limit, which was not measured. This is the CPU column of Table XI; the GPU's bit-plane kernel is 60× it.
 
 ## VII. Discussion
 
@@ -593,42 +652,45 @@ Bit-planes are 2.0–3.5× the table on real content in portable `u64` code and 
 
 The on-GPU miss path is a composition of measured parts. Per tile-step at 16×16 tiles,
 
-$$t = \frac{1}{R_P} + \mu \left( \frac{4 V_L}{R_B} + \frac{2}{R_I} + t_\text{gather} \right) \approx 0.27\ \text{ns} + \mu \cdot 50\ \text{ns} \qquad (7)$$
+$$t = \frac{1}{R_P} + \mu \left( \frac{4 V_L}{R_B} + \frac{2}{R_I} + t_\text{gather} \right) \approx 0.27\ \text{ns} + \mu \cdot 53\ \text{ns} \qquad (7)$$
 
-**TABLE XXIV.** Projected rates of memoized stepping with the miss path on the GPU (byte-LUT pricing)
+Here $1/R_P$ is one probe out of cache, $4 V_L / R_B$ = 47 ns brute-forces the $2s \times 2s$ window with the byte-LUT kernel, $2/R_I$ = 1.5–2 ns pays two inserts, and $t_\text{gather}$, copying the four tiles of a missed window into the atlas, is taken as about 4 ns; that last term is an estimate, not a measurement.
 
-| Workload | $\mu$ at 16×16 | Projected cell-updates/s | vs Golly | vs byte-LUT brute force |
-|---|---|---|---|---|
-| [ROM][lotr1.ANSI-1M.rle] after its first period | 0 | $8.6 \cdot 10^{12}$ (measured, Table XV) | $3.6 \cdot 10^{5}$× | 46× |
-| [Segmented ROM], movies, component sheet | 0.07–0.16 % | $6\text{–}7 \cdot 10^{12}$ | | 32–38× |
-| Counter array, non-repeating | 1.7 % | $1.8 \cdot 10^{12}$ | 80× | 9.7× |
-| [`squares`]-like displays | 3.5 % | $1.0 \cdot 10^{12}$ | 120–270× | 5.4× |
-| [`chaotic`]-like | 25 % | $1.6 \cdot 10^{11}$, so brute force: $1.8 \cdot 10^{11}$ | 180× | 1× |
-| [ROM][lotr1.ANSI-1M.rle] during its first period | 96 % | $4 \cdot 10^{10}$ for 0.12 s | | 0.2× |
+**TABLE XXVI.** Projected rates of memoized stepping with the miss path on the GPU, against GHL's own brute-force engine
 
-The Golly column compares with Golly's rate on a single instance of the pattern (Table X), the last column with the byte-LUT kernel's $1.86 \cdot 10^{11}$. The projections hold when a sweep contains enough tiles to hide dispatch latency, roughly $10^{5}$ tiles or $2.6 \cdot 10^{7}$ cells. Below that a sweep with misses costs about 54 µs per 8 generations, 6.8 µs per generation against 3.65 µs for one dispatch of the plain kernel, which is why Algorithm 1 does not memoize small universes. A shared tile on the atlas would take a wave from about 54 µs to about 37 µs; that was not run. On the GPU, learning one ROM period would take 0.1–0.5 s instead of the CPU's 80–90 s, and the replicator would take 0.4 s of probes plus 5–15 s of wave latency against Golly's 111 s. Batches that overflow the atlas, table rebuilds and the cost of activating blocks are not modelled.
+| Workload | $\mu$ at 16×16 | Projected cell-updates/s | vs bit-plane brute force ($3.0 \cdot 10^{11}$) |
+|---|---|---|---|
+| [ROM][lotr1.ANSI-1M.rle] after its first period | 0 | $8.4 \cdot 10^{12}$ (measured, Table XVI) | 28× |
+| [Segmented ROM], movies, component sheet | 0.07–0.16 % | $5.8\text{–}6.7 \cdot 10^{12}$ | 19–22× |
+| Counter array, non-repeating | 1.7 % | $1.8 \cdot 10^{12}$ | 5.8× |
+| [`squares`]-like displays | 3.5 % | $9.6 \cdot 10^{11}$ | 3.2× |
+| [`chaotic`]-like | 25 % | $1.5 \cdot 10^{11}$, so brute force: $3.0 \cdot 10^{11}$ | 1× |
+| [ROM][lotr1.ANSI-1M.rle] during its first period | 96 % | $4 \cdot 10^{10}$, so plain cells | 0.13× as memo; 1× as plain cells |
+
+The projections assume a universe of $10^{10}$ cells; Golly was not run at that size, so the table compares with GHL's own fallback rather than with Golly. They hold when a sweep contains enough tiles to hide dispatch latency, roughly $10^{5}$ tiles or $2.6 \cdot 10^{7}$ cells. Below that a sweep with misses costs about 53 µs per 8 generations, 6.6 µs per generation against 3.5 µs for one dispatch of the plain kernel, which is why Algorithm 1 does not memoize small universes. A shared tile on the atlas would take a wave from about 53 µs to about 37 µs; that was not run. On the GPU, learning one ROM period would take 0.1–0.5 s instead of the CPU's 81–86 s, and the replicator's 262,144 generations would take 0.4 s of probes plus 5–15 s of wave latency. Batches that overflow the atlas, table rebuilds and the cost of activating blocks are not modelled.
 
 ### B. Where the margin is thin
 
-The closest case is a small universe with constant novelty. On the single counter Golly does $2.2 \cdot 10^{10}$ cell-updates/s ($5.8 \cdot 10^{5}$ gens/s), the CPU engine $2.4 \cdot 10^{10}$ ($6.5 \cdot 10^{5}$), the plain GPU kernel $1.0 \cdot 10^{10}$ ($2.7 \cdot 10^{5}$) and the shared-tile kernel $2.9 \cdot 10^{10}$ ($7.8 \cdot 10^{5}$): a 1.35× lead that rests on one machine. Below about $10^{6}$ active cells every GPU engine waits for the dispatch, and the host recursion stays in Algorithm 1 for that reason.
+The closest case is a small universe with constant novelty. On the single counter over $2^{20}$ generations Golly does $2.4 \cdot 10^{10}$ cell-updates/s (648,717 gens/s), the recursion on one CPU thread $2.2 \cdot 10^{10}$ (592,048) and the shared-tile kernel $3.0 \cdot 10^{10}$ (801,737): a 1.2× lead that rests on one machine and on the length of the run. Four times longer, Golly is ahead, and at $2^{24}$ generations the best GHL engine is the recursion, at 0.89× Golly's speed. Below about $10^{6}$ active cells every GPU engine waits for the dispatch, and the host recursion stays in Algorithm 1 for that reason.
 
 ### C. Limitations
 
 * **Not one program.** The GPU results for memoized stepping are hit-path measurements on tables learned by the CPU, on periodic patterns replicated with phase offsets. They establish steady-state rates and correctness, not learning speed on the GPU. The fixed-capacity wave was measured empty; overflow and replay are designed, not built. The racing of executors, table rebuild and cycle detection are specified only.
+* **Workloads favour the hit path.** Copies in the composed universes sit at whole-tile offsets; Table XVII shows that table size and learning grow with every additional alignment class. The sparse universe's active-block list is fixed, so block activation was not exercised.
 * **Section VI-G is simulation.** Floors, engines and depth are costed from the reference engine's operation counts; the plain-cells mode is costed, not executed as cells, and the controller was tuned on the same composite it is reported on.
-* **One machine, two rules.** All constants come from one RTX 5060 Ti under wgpu on Windows. Pass, submit and read-back costs varied by 2–20× between runs of the same benchmark; chained-dispatch and fixed-capacity figures were stable to 10 %. GPU throughput is sensitive to other load: a run of the kernel comparison taken during a build showed the byte-LUT kernel up to 48 % low, and the tables report repeats on an idle machine. On an 8 GB card of the same bus the brute and out-of-cache probe rates should be similar and memo capacity halves; this was not measured.
+* **One machine, two rules.** All constants come from one RTX 5060 Ti under wgpu on Windows. Pass, submit and read-back costs varied by up to 5× between runs on different days. Within a set of five runs most figures varied by a few percent; the largest spread, 30 %, was one run of the byte-LUT kernel on 18.7 M cells. GPU timings include the CPU's recording of commands (1.0 µs of a 3.2 µs chained dispatch); GPU timestamp queries were not used. On an 8 GB card of the same bus the brute and out-of-cache probe rates should be similar and memo capacity halves; this was not measured.
 * **Miss rates are pattern statistics** measured on fourteen patterns over $10^{4}\text{–}10^{6}$ generations. A circuit whose state space is explored more slowly would keep missing longer.
-* **The circuit** exists for Hutton32b only and is not proven minimal. Hutton32 differs from it in 74,854 neighbourhoods; that edit has not been made, and Hutton32 patterns use the byte-LUT kernel. The bit-plane kernel was measured up to $1.07 \cdot 10^{9}$ cells; one binding holds 2 GiB, so a $10^{10}$-cell universe as plain cells (6.3 GB per buffer) would need a kernel spanning several bindings.
-* **Baselines.** Golly figures are `bgolly` without rendering at the best step size tried; interactive figures will be lower. The reference engine is unoptimized and never reclaims nodes.
+* **The circuit** exists for Hutton32b only and is not proven minimal. Hutton32 differs from it in 74,854 neighbourhoods, and that edit has not been made, so the bit-plane kernels compute Hutton32b. On the Hutton32 pattern [`squares`] they agree cell for cell with Hutton32 over the 65,536 generations checked, because it never reaches a neighbourhood in which the two rules differ; that does not hold for Hutton32 patterns in general. The bit-plane kernel was measured up to $1.07 \cdot 10^{9}$ cells; one binding holds 2 GiB, so a $10^{10}$-cell universe as plain cells (6.3 GB per buffer) would need a kernel spanning several bindings.
+* **Baselines.** Golly figures are `bgolly` without rendering at the best of one to seven step sizes, with the published `@TABLE` rule (an `@TREE` is up to 12 % faster) and an 8 GB memory limit on a 16 GB host, which the ROM exhausts; Golly's ROM rate covers the first minute of each run. Interactive figures will be lower. No multi-threaded HashLife was compared; the four-core CPU baseline is brute force. The reference engine is unoptimized and never reclaims nodes.
 * **Literature.** Sections II and VII rest on a survey run for this paper; sources marked † were read only as abstracts.
 
 ### D. Generality
 
-Nothing in GHL above the brute-force engine is specific to Hutton32. Any radius-1 rule with a kernel (a table, a rule tree or a circuit) fits below the floor; only the hand-written starting network of the circuit is rule-specific, and the optimiser works from any $2^{25}$-byte table. For a rule without a circuit the byte-LUT kernel is the fallback, at $1.86 \cdot 10^{11}$ on real content.
+Nothing in GHL above the brute-force engine is specific to Hutton32. Any radius-1 rule with a kernel (a table, a rule tree or a circuit) fits below the floor; only the hand-written starting network of the circuit is rule-specific, and the optimiser works from any $2^{25}$-byte table. For a rule without a circuit the byte-LUT kernel is the fallback, at $1.74 \cdot 10^{11}$ on real content.
 
 ## VIII. Conclusion
 
-HashLife's weakness on dense content is the grain of its memoization, not memoization. On a GPU a probe costs as much as about fifty cell-updates of brute force, so memoizing below 16×16-cell windows loses and memoizing above them wins by up to $V_L / \rho$. GHL combines a memo floor at that grain, a 367-gate bit-sliced engine below it, a level-synchronous recursion and a positional sweep above it, and a choice of engine and depth driven by novelty and active area. Its measured components beat Golly 5.1 on every workload measured on the GPU, from 1.3× on a small active counter to $6.4 \cdot 10^{5}$× on a recurring ROM, and its recursion matches Golly within a factor of two on the CPU with identical final states. The remaining step is to assemble the on-GPU miss path, whose primitives and cost are measured here.
+HashLife's weakness on dense content is the grain of its memoization, not memoization. On a GPU a probe costs as much as about 47 cell-updates of brute force, so memoizing below 16×16-cell windows loses and memoizing above them wins by up to $V_L / \rho$. GHL combines a memo floor at that grain, a 367-gate bit-sliced engine below it, a level-synchronous recursion and a positional sweep above it, and a choice of engine and depth driven by novelty and active area. Measured separately, its components beat Golly 5.1 where content is dense and either new or recurring at scale: the brute-force engine by $1.4 \cdot 10^{4}$× on a dense ROM (60× against four CPU cores) and by 1.2–18× on small universes over runs of up to $10^{6}$ generations, and the hit path by $5.9 \cdot 10^{5}$× on the ROM once its table is learned. Counted with the CPU's learning, the hit path's margins shrink to at least 4.4× on the ROM and to parity on a sparse universe; on small universes run long enough to repeat, the margin reverses, and HashLife on the CPU, which GHL's recursion runs at 0.29–1.07× Golly's speed, is the engine to use. The remaining steps are to assemble the on-GPU miss path, whose primitives and cost are measured here, and to measure learning on the GPU.
 
 ## Acknowledgment
 
@@ -638,7 +700,7 @@ HashLife's weakness on dense content is the grain of its memoization, not memoiz
 
 Sources marked † were read as abstract or secondary summary only. Text in square brackets describes a source whose exact title was not recorded; those entries must be checked against the source before submission.
 
-[1] R. W. Gosper, "Exploiting regularities in large cellular spaces," *Physica D*, vol. 10, 1984.  
+[1] R. W. Gosper, "Exploiting regularities in large cellular spaces," *Physica D*, vol. 10, no. 1–2, pp. 75–80, 1984, doi: 10.1016/0167-2789(84)90251-3.  
 [2] The Golly Gang, Golly 5.1, branch `master`, commit 53bdb74e48cd0792f87a2e3e6a5bb0c5d7d5af0e (2026-11-15); source files [`ghashbase.h`], [`ghashbase.cpp`], [`hlifealgo.cpp`], [`ruletable_algo.cpp`], [`jvnalgo.cpp`]. [Online]. Available: https://sourceforge.net/p/golly/code/ci/53bdb74e48cd0792f87a2e3e6a5bb0c5d7d5af0e/tree/  
 [3] T. Hutton, "Hutton32.table," Golly rule table repository. [Online]. Available: http://gollygang.github.io/ruletablerepository/downloads/Hutton32.table  
 [4] "Hutton32b.rule," Hutton32-Computer repository. [Online]. Available: https://github.com/FredericaBernkastel/Hutton32-Computer/blob/master/doc/Hutton32b.rule  
@@ -647,30 +709,30 @@ Sources marked † were read as abstract or secondary summary only. Text in squa
 [7] T. Rokicki, "Life algorithms," G4G13, 2018. [Online]. Available: https://www.gathering4gardner.org/g4g13gift/math/RokickiTomas-GiftExchange-LifeAlgorithms-G4G13.pdf  
 [8] C. E. LaForest, "HashLife on GPU," 2010. [Online]. Available: https://fpgacpu.ca/writings/HashLife-GPU.pdf  
 [9] das67333, "gol_engines," 2026. [Online]. Available: https://github.com/das67333/gol_engines  
-[10] T. Fujita, K. Nakano, and Y. Ito, [bit-sliced Life on the GPU], *Int. J. Found. Comput. Sci.*, vol. 27, 2016, doi: 10.1142/S0129054116500404.  
-[11] Dijkstra and Brouwer, [bit-packed Life in CUDA], 2023. [Online]. Available: https://binary-banter.github.io/game-of-life  
-[12] E. Frankling, "auto," [bit-plane and multi-state CA kernels in wgpu], 2026. [Online]. Available: https://erikfrankling.github.io/auto/  
-[13] J. Signorini, [29-state von Neumann CA on a SIMD machine], in *Proc. Supercomputing ’89*. [Online]. Available: https://dl.acm.org/doi/10.1145/76263.76282 †  
-[14] M. Awad *et al.*, "Better GPU hash tables," arXiv:2108.07232.  
-[15] D. Jünger *et al.*, "WarpCore," arXiv:2009.07914.  
-[16] McCoy and Pandey, "WarpSpeed," arXiv:2509.16407.  
-[17] Polak *et al.*, "Hive," arXiv:2510.15095.  
-[18] Z. Jia *et al.*, [GPU microarchitecture and TLB measurements], arXiv:1903.07486.  
-[19] Maczan, [WebGPU dispatch overhead measurements], 2026, arXiv:2604.02344.  
-[20] S. Rafler, [SmoothLife], arXiv:1111.1567.  
-[21] B. Chan, [Lenia], arXiv:1812.05433.  
-[22] [FFT versus direct convolution for Life, Julia benchmark], 2021. [Online]. Available: https://rivesunder.github.io/SortaSota/2021/09/27/faster_life_julia.html  
-[23] [Bit-packed CUDA versus PyTorch Life], 2025. [Online]. Available: https://www.boristhebrave.com/2025/09/11/accelerated-game-of-life-with-cuda-triton/  
+[10] T. Fujita, K. Nakano, and Y. Ito, "Fast simulation of Conway's Game of Life using bitwise parallel bulk computation on a GPU," *Int. J. Found. Comput. Sci.*, vol. 27, no. 8, pp. 981–1003, 2016, doi: 10.1142/S0129054116500404.  
+[11] J. Dijkstra and J. Brouwer, "Game of Life: How a nerdsnipe led to a fast implementation of game of life," Binary Banter, Jun. 29, 2023. [Online]. Available: https://binary-banter.github.io/game-of-life  
+[12] ErikFrankling, "auto: How fast can cellular automata go on one gaming GPU?" 2026. [Online]. Available: https://erikfrankling.github.io/auto/  
+[13] J. Signorini, "How a SIMD machine can implement a complex cellular automata? A case study: von Neumann's 29-state cellular automaton," in *Proc. 1989 ACM/IEEE Conf. Supercomputing (Supercomputing ’89)*, 1989, pp. 175–186, doi: 10.1145/76263.76282. †  
+[14] M. A. Awad, S. Ashkiani, S. D. Porumbescu, M. Farach-Colton, and J. D. Owens, "Better GPU hash tables," arXiv:2108.07232, 2021.  
+[15] D. Jünger, R. Kobus, A. Müller, C. Hundt, K. Xu, W. Liu, and B. Schmidt, "WarpCore: A library for fast hash tables on GPUs," in *Proc. IEEE 27th Int. Conf. High Performance Computing, Data, and Analytics (HiPC)*, 2020, pp. 11–20, doi: 10.1109/HiPC50609.2020.00015.  
+[16] H. McCoy and P. Pandey, "WarpSpeed: A high-performance library for concurrent GPU hash tables," arXiv:2509.16407, 2025.  
+[17] M. S. H. Polak, D. Troendle, and B. Jang, "Hive hash table: A warp-cooperative, dynamically resizable hash table for GPUs," arXiv:2510.15095, 2025.  
+[18] Z. Jia, M. Maggioni, J. Smith, and D. P. Scarpazza, "Dissecting the NVidia Turing T4 GPU via microbenchmarking," arXiv:1903.07486, 2019.  
+[19] J. Maczan, "Characterizing WebGPU dispatch overhead for LLM inference across four GPU vendors, three backends, and three browsers," arXiv:2604.02344, 2026.  
+[20] S. Rafler, "Generalization of Conway's 'Game of Life' to a continuous domain – SmoothLife," arXiv:1111.1567, 2011.  
+[21] B. W.-C. Chan, "Lenia: Biology of artificial life," *Complex Systems*, vol. 28, no. 3, pp. 251–286, 2019, doi: 10.25088/ComplexSystems.28.3.251.  
+[22] rivesunder, "Faster convolutions and cellular automata in Julia with NNlib: 2.7X faster than PyTorch," SortaSota, Sep. 27, 2021. [Online]. Available: https://rivesunder.github.io/SortaSota/2021/09/27/faster_life_julia.html  
+[23] Boris, "Accelerated Game of Life with CUDA / Triton," BorisTheBrave.Com, Sep. 11, 2025. [Online]. Available: https://www.boristhebrave.com/2025/09/11/accelerated-game-of-life-with-cuda-triton/  
 [24] A. D. Robison, "Fast computation of additive cellular automata," *Complex Systems*, vol. 1, 1987. [Online]. Available: https://content.wolfram.com/sites/13/2018/02/01-1-15.pdf  
-[25] C. Moore, "Predicting non-linear cellular automata quickly by decomposing them into linear ones," arXiv:patt-sol/9701008.  
+[25] C. Moore, "Predicting nonlinear cellular automata quickly by decomposing them into linear ones," *Physica D*, vol. 111, no. 1–4, pp. 27–41, 1998, doi: 10.1016/S0167-2789(97)80003-6.  
 [26] D. Griffeath and C. Moore, "Life without Death is P-complete," *Complex Systems*, vol. 10, 1996. [Online]. Available: https://content.wolfram.com/sites/13/2018/02/10-6-3.pdf  
-[27] N. Israeli and N. Goldenfeld, "Coarse-graining of cellular automata," arXiv:nlin/0508033.
+[27] N. Israeli and N. Goldenfeld, "Coarse-graining of cellular automata, emergence, and the predictability of complex systems," *Phys. Rev. E*, vol. 73, no. 2, Art. no. 026203, 2006, doi: 10.1103/PhysRevE.73.026203.
 
 ## Appendix A. Reproducing the Results
 
 Everything the tables need is in the repository: the harness in [`research/`], every pattern in [`patterns/`] (sources and rules in its README) and the two canonical tables in [`rules/`]. Each table is one command, run in bash (git-bash on Windows, WSL or Linux) from [`research/`]. [`reproduce.sh`] builds the harness first; run with no argument it lists the targets, and its source holds the exact harness commands behind each one. It needs Rust, Python 3 and a GPU with Vulkan or DX12. The Golly targets also need `bgolly`, which is taken from `$BGOLLY`, from Golly 5.1's Windows install path or from `PATH`, with [`rules/`] as its rule folder. GPU figures should be taken on an otherwise idle machine.
 
-**TABLE XXV.** One command per table
+**TABLE XXVII.** One command per table
 
 | Table or claim | Command | Needs |
 |---|---|---|
@@ -681,37 +743,43 @@ Everything the tables need is in the repository: the harness in [`research/`], e
 | Table V | `bash reproduce.sh cond-miss` | |
 | Table VII: forms A and C | `bash reproduce.sh forms` | network (numpy) |
 | Table VII, Section IV-C: the circuit against the table | `bash reproduce.sh circuit` | network (numpy) |
-| Section V-C, Table XXVI: reference engine against per-cell stepping; CPU rules against both tables; the two rules compared | `bash reproduce.sh correctness` | |
+| Section V-C, Table XXVIII: reference engine against per-cell stepping; CPU rules against both tables; the two rules compared | `bash reproduce.sh correctness` | |
 | Table X | `bash reproduce.sh golly` | Golly |
+| Table X: the ROM at step 1 past one period, until Golly's memory limit | `bash reproduce.sh golly-rom-long` | Golly |
+| Table X: Golly with Hutton32b as an `@TREE` rule | `bash reproduce.sh golly-tree` | Golly |
+| Table XII | `bash reproduce.sh runlength` | Golly |
 | Table X: the ROM on one CPU core and the byte-LUT kernel | `bash reproduce.sh rom-kernels` | |
-| Table XII: byte-LUT kernel | `bash reproduce.sh lut-kernel rom-kernels` | |
-| Table XII: bit-plane kernel | `bash reproduce.sh bitplane-sizes` | |
-| Table XII: shared tile | `bash reproduce.sh tile` | |
-| Table XIII | `bash reproduce.sh bitplane-content` | |
+| Table XIII: byte-LUT kernel | `bash reproduce.sh lut-kernel rom-kernels` | |
+| Table XIII: bit-plane kernel | `bash reproduce.sh bitplane-sizes` | |
+| Table XIII: shared tile | `bash reproduce.sh tile` | |
+| Table XIV | `bash reproduce.sh bitplane-content` | |
 | Section VI-C: the byte LUT at $8192^{2}$ | `bash reproduce.sh lut-content` | |
 | Section VI-C: identity circuit, chained evaluations | `bash reproduce.sh bitplane-limit` | |
-| Table XIV and the serial cost | `bash reproduce.sh window` | |
-| Table XV: 16×16 and 32×32 tiles | `bash reproduce.sh sweep` | |
-| Table XV: 64×64 to 256×256 tiles | `bash reproduce.sh sweep-tiles` | |
-| Table XVI | `bash reproduce.sh sweep-ops` | |
-| Table XVII | `bash reproduce.sh sparse` | Golly |
-| Table XVIII | `bash reproduce.sh head2head` | Golly |
+| Table XV and the serial cost | `bash reproduce.sh window` | |
+| Table XVI: 16×16 and 32×32 tiles | `bash reproduce.sh sweep` | |
+| Table XVI: 64×64 to 256×256 tiles | `bash reproduce.sh sweep-tiles` | |
+| Table XVII | `bash reproduce.sh unaligned` | |
+| Table XVIII | `bash reproduce.sh sweep-ops` | |
+| Table XIX | `bash reproduce.sh sparse` | Golly |
+| Table XX | `bash reproduce.sh head2head runlength` | Golly |
 | Section VI-F: batch statistics of the replicator | `bash reproduce.sh batches` | |
-| Table XIX | `bash reproduce.sh floors` | |
-| Table XX | `bash reproduce.sh engine-choice` | |
-| Table XXI | `bash reproduce.sh controller` | |
-| Table XXII: work per generation of the counter | `bash reproduce.sh counter-work` | |
-| Tables XX and XXII at the bit-plane rate | `bash reproduce.sh reprice` | |
-| Table XXIII | `bash reproduce.sh cpu-bench` | |
+| Table XXI | `bash reproduce.sh floors` | |
+| Table XXII | `bash reproduce.sh engine-choice` | |
+| Table XXIII | `bash reproduce.sh controller` | |
+| Table XXIV: work per generation of the counter | `bash reproduce.sh counter-work` | |
+| Tables XXII and XXIV at the bit-plane rate | `bash reproduce.sh reprice` | |
+| Table XXV: one thread | `bash reproduce.sh cpu-bench` | |
+| Table XXV: four threads; the CPU column of Table XI | `bash reproduce.sh cpu-parallel` | |
 | Appendix B: the committed tables are the published files | `bash reproduce.sh rules-upstream` | network |
+| Figs. 2–4 | `bash reproduce.sh figures` | |
 
-`sweep` and `sweep-tiles` learn the ROM's table on the CPU before each GPU run, about 90 s per period at 16×16 tiles. Tables II, III, VIII, IX, XI and XXIV derive from or restate the others; Table VI and Algorithms 1–3 come from the design and the code. The circuit is regenerated in [`bitslice/`] with [`rule_circuit.py`], [`optimize.py`] `25 1` (25 minutes), [`optimize_more.py`] `6.5 7` and [`emit.py`], which also need `pip install yowasp-yosys python-sat`; the optimiser runs on a wall-clock budget, so a rerun does not reproduce the netlist gate for gate, and [`circuit.netlist`] is the artifact. The mixed universe of Table XXI is the `--compose` string in [`composite_spec.txt`] (items `file@x,y[+pre-run gens][~perturbation seed]`). The three controllers that Section VI-G reports as failed were replaced in [`cmd_adapt.rs`] and cannot be rerun.
+`sweep`, `sweep-tiles` and `unaligned` learn the ROM's table on the CPU before each GPU run, 81–86 s per period and alignment class at 16×16 tiles. The raw output of every run behind the tables is in [`logs/`], one file per target, written by [`run_batch.sh`]. Tables II, III, VIII, IX, XI and XXVI derive from or restate the others; Table VI and Algorithms 1–3 come from the design and the code. The circuit is regenerated in [`bitslice/`] with [`rule_circuit.py`], [`optimize.py`] `25 1` (a 25-minute budget), [`optimize_more.py`] `6.5 7` and [`emit.py`], which also need `pip install yowasp-yosys python-sat`; the optimiser runs on a wall-clock budget, so a rerun does not reproduce the netlist gate for gate, and [`circuit.netlist`] is the artifact. The mixed universe of Table XXIII is the `--compose` string in [`composite_spec.txt`] (items `file@x,y[+pre-run gens][~perturbation seed]`). The three controllers that Section VI-G reports as failed were replaced in [`cmd_adapt.rs`] and cannot be rerun.
 
 ## Appendix B. The Rule Tables
 
-Each rule has one authoritative table (Table XXVI). The harness's CPU rule implementation and the circuit of Section IV-C equal these tables on all $2^{25}$ neighbourhoods; the circuit was built and checked against the Hutton32b table. The two rules differ in 74,854 neighbourhoods, all with an excited special transmission state, a confluent state or a crossing in the centre.
+Each rule has one authoritative table (Table XXVIII). The harness's CPU rule implementation and the circuit of Section IV-C equal these tables on all $2^{25}$ neighbourhoods; the circuit was built and checked against the Hutton32b table. The two rules differ in 74,854 neighbourhoods, all with an excited special transmission state, a confluent state or a crossing in the centre.
 
-**TABLE XXVI.** Canonical rule tables
+**TABLE XXVIII.** Canonical rule tables
 
 | Rule | Canonical table | Verified identical to it: 0 of $2^{25}$ neighbourhoods differ |
 |---|---|---|
@@ -735,9 +803,13 @@ Each rule has one authoritative table (Table XXVI). The harness's CPU rule imple
 | [`cmd_sparse.rs`] | sparse universe, active-block sweep, macrocell writer |
 | [`cmd_adapt.rs`] | per-region floors and engines on the position-aware recursion ([`hl.rs: result_at`]), cost model, controller, `--compose` universes |
 | [`cmd_bitslice.rs`] | the plain bit-plane kernel (`gpu-bitslice`), the shared-tile kernel (`gpu-tile`) and the one-thread-per-window kernel (`gpu-window`) |
-| [`bitslice/`] | the rule as a gate network: [`rule_circuit.py`], [`resub.py`], [`abc_flow.py`], [`xag.py`], [`optimize.py`], [`emit.py`]; artifacts [`circuit.netlist`], [`step_planes.wgsl`], [`step_planes.rs`]; [`verify.py`]; [`scalar.py`] and [`tables.py`] (forms A and C); [`bench/`] (CPU benchmark) |
+| [`bitslice/`] | the rule as a gate network: [`rule_circuit.py`], [`resub.py`], [`abc_flow.py`], [`xag.py`], [`optimize.py`], [`emit.py`]; artifacts [`circuit.netlist`], [`step_planes.wgsl`], [`step_planes.rs`]; [`verify.py`]; [`scalar.py`] and [`tables.py`] (forms A and C); [`bench/`] (CPU benchmark on one or more threads) |
 | [`bitslice_series.sh`] | every GPU measurement of the bit-plane, window and shared-tile kernels |
-| [`time_golly.py`], [`head2head.py`], [`engine_choice.sh`] | `bgolly` timing; head-to-head with a final-state check; engine-per-content table |
+| [`time_golly.py`] | `bgolly` timing: median of repeats per step size, peak working set, rate over the second half of the run |
+| [`head2head.py`] | `bgolly` against the CPU engine, both timed the same way and without output, final states compared in a separate run |
+| [`engine_choice.sh`] | engine-per-content table |
+| [`figures.py`], [`svgplot.py`] | Figs. 2–4 from the logged medians, as SVG without plotting libraries |
+| [`logs/`] | raw output of every target behind the tables; [`run_batch.sh`] runs targets one at a time into a dated folder |
 | [`patterns/`] | every pattern the paper uses, with its source, rule and the targets that use it |
 | [`rules/`] | [`Hutton32.table`] and [`Hutton32b.rule`][Hutton32b.rule], byte for byte as published; also `bgolly`'s rule folder |
 
@@ -797,6 +869,7 @@ Each rule has one authoritative table (Table XXVI). The harness's CPU rule imple
 [BCD converter]: research/patterns/misc/BIN2BCD.rle
 [component sheet]: research/patterns/component-basis.rle
 [replicator]: research/patterns/replicators/Hutton-replicator.rle
+[`logs/`]: research/logs/
 [`hl.rs`]: research/src/hl.rs
 [Hutton replicator]: research/patterns/replicators/Hutton-replicator.rle
 [lotr1.ANSI-1M.rle]: research/patterns/misc/extra/lotr1.ANSI-1M.rle
@@ -804,11 +877,11 @@ Each rule has one authoritative table (Table XXVI). The harness's CPU rule imple
 [counters]: research/patterns/advanced%20counter%20v2.rle
 [`serial display`]: research/patterns/misc/serial%20display%20%2832x32%29.mc
 [Segmented ROM (256k)]: research/patterns/misc/Segmented%20ROM%20%28256k%29.mc
-[serial display (32×32)]: research/patterns/misc/serial%20display%20%2832x32%29.mc
-[parallel display (16×16)]: research/patterns/misc/parallel%20display%20%2816x16%29.mc
 [16×16 movie]: research/patterns/16x16%20movie/16x16%20movie.mc
-[efficient demultiplexer]: research/patterns/misc/efficient_demultiplexer.mc
+[serial display (32×32)]: research/patterns/misc/serial%20display%20%2832x32%29.mc
 [BIN2BCD]: research/patterns/misc/BIN2BCD.rle
+[parallel display (16×16)]: research/patterns/misc/parallel%20display%20%2816x16%29.mc
+[efficient demultiplexer]: research/patterns/misc/efficient_demultiplexer.mc
 [advanced counter v2]: research/patterns/advanced%20counter%20v2.rle
 [chaotic]: research/patterns/misc/chaotic.rle
 [32×32 movie]: research/patterns/32x32%20movie/32x32%20movie.mc
@@ -826,6 +899,7 @@ Each rule has one authoritative table (Table XXVI). The harness's CPU rule imple
 [`patterns/`]: research/patterns/
 [`rules/`]: research/rules/
 [`reproduce.sh`]: research/reproduce.sh
+[`run_batch.sh`]: research/logs/run_batch.sh
 [`bitslice/`]: research/bitslice/
 [`rule_circuit.py`]: research/bitslice/rule_circuit.py
 [`optimize.py`]: research/bitslice/optimize.py
@@ -860,3 +934,5 @@ Each rule has one authoritative table (Table XXVI). The harness's CPU rule imple
 [`time_golly.py`]: research/tools/time_golly.py
 [`head2head.py`]: research/tools/head2head.py
 [`engine_choice.sh`]: research/tools/engine_choice.sh
+[`figures.py`]: research/tools/figures.py
+[`svgplot.py`]: research/tools/svgplot.py

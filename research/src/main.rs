@@ -66,6 +66,30 @@ pub fn flag(args: &[String], key: &str) -> bool {
   args.iter().any(|a| a == key)
 }
 
+/// `--repeats N` (default 1): time a measurement N times. With N > 1 it is run once more first,
+/// untimed, as a warm-up. `once` must reset its own input and return the measured seconds; the
+/// state it leaves behind is the last run's, so a verification after it checks the last run.
+pub fn repeat_timed(args: &[String], mut once: impl FnMut() -> f64) -> Vec<f64> {
+  let n: usize = opt_or(args, "--repeats", 1);
+  if n > 1 {
+    once();
+  }
+  (0..n.max(1)).map(|_| once()).collect()
+}
+
+/// Median of the run times, and a note on the spread of the rate `work / seconds` when there
+/// was more than one run.
+pub fn median_and_spread(secs: &[f64], work: f64, unit: &str) -> (f64, String) {
+  let mut v = secs.to_vec();
+  v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+  let n = v.len();
+  let med = if n % 2 == 1 { v[n / 2] } else { 0.5 * (v[n / 2 - 1] + v[n / 2]) };
+  if n == 1 {
+    return (med, String::new());
+  }
+  (med, format!(" | {n} runs after a warm-up, median of {unit}: min {:.4e}, max {:.4e}", work / v[n - 1], work / v[0]))
+}
+
 fn main() {
   let args: Vec<String> = std::env::args().skip(1).collect();
   let cmd = args.first().map(String::as_str).unwrap_or("help");

@@ -1,0 +1,25 @@
+=== latency           latency constants and the miss-path wave (gpu-latency)
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+  chained dispatch, one pass:                3.20 us each
+    of which recording on the CPU:           0.99 us each (GPU side 2.21 us)
+  one pass per dispatch, one submit:        53.96 us each
+  count pass + indirect dispatch pair:      42.06 us per pair
+  submit per dispatch (no readback):       492.38 us each
+  dispatch + 16-byte readback round trip:  105.25 us each
+-- indirect-dispatch validation on (wgpu default) --
+  count pass + pass with  1 indirect dispatches:   107.46 us
+  count pass + pass with  4 indirect dispatches:    76.51 us
+  count pass + pass with 16 indirect dispatches:   214.88 us
+  whole miss-path wave, 3 passes, 16 dispatches (14 indirect):   234.06 us
+  fixed dispatch of        4 workgroups (64 threads each), 256 invocations live:      3.17 us = 793.68 ns per idle workgroup
+  fixed dispatch of       64 workgroups (64 threads each), 256 invocations live:      3.09 us = 48.32 ns per idle workgroup
+  fixed dispatch of     1024 workgroups (64 threads each), 256 invocations live:      4.29 us = 4.19 ns per idle workgroup
+  fixed dispatch of    16384 workgroups (64 threads each), 256 invocations live:     27.34 us = 1.67 ns per idle workgroup
+  fixed dispatch of    65535 workgroups (64 threads each), 256 invocations live:     65.20 us = 0.99 ns per idle workgroup
+  fixed dispatch of  1048560 workgroups (64 threads each), 256 invocations live:    851.23 us = 0.81 ns per idle workgroup
+  whole miss-path wave, 1 pass, 16 fixed dispatches sized for 4096 misses:     50.47 us
+-- indirect-dispatch validation off --
+  count pass + pass with  1 indirect dispatches:    91.55 us
+  count pass + pass with  4 indirect dispatches:    40.93 us
+  count pass + pass with 16 indirect dispatches:    89.39 us
+  whole miss-path wave, 3 passes, 16 dispatches (14 indirect):   133.04 us

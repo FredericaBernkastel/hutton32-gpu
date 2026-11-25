@@ -317,8 +317,11 @@ pub fn run(args: &[String]) {
     let (ab, ba) = (mk(&u_ab, &buf_a, &buf_b), mk(&u_ba, &buf_b, &buf_a));
     let per_submit: u64 = opt_or(args, "--per-submit", if sparse { 256 } else { 8 });
     let n_rects = (reps * reps) as u32;
+    let all = crate::repeat_timed(args, || {
+    gpu.queue.write_buffer(&buf_a, 0, bytemuck::cast_slice(&big));
+    gpu.queue.write_buffer(&buf_m, 0, &[0u8; 16]);
     let mut done = 0u64;
-    let secs = gpu.timed(|| {
+    gpu.timed(|| {
       while done < cycles {
         let n = per_submit.min(cycles - done);
         let mut enc = gpu.device.create_command_encoder(&Default::default());
@@ -344,14 +347,16 @@ pub fn run(args: &[String]) {
         done += n;
         gpu.wait();
       }
+    })
     });
     let gens = cycles * s;
+    let (secs, spread) = crate::median_and_spread(&all, gens as f64, "gens/s");
     let misses = gpu.read_u32(&buf_m, 0, 1)[0];
     let out = gpu.read_u32(&buf_a, 0, (bw * bh) as u64);
     let want = fill(cycles);
     let bad = out.iter().zip(&want).filter(|(x, y)| x != y).count();
     println!(
-      "  {mode:<14}: {gens} gens in {secs:.3}s = {:.1} gens/s = {:.3e} cell-updates/s (universe area) | verify: {misses} misses, {bad} mismatching tiles of {}",
+      "  {mode:<14}: {gens} gens in {secs:.3}s = {:.1} gens/s = {:.3e} cell-updates/s (universe area) | verify: {misses} misses, {bad} mismatching tiles of {}{spread}",
       gens as f64 / secs,
       cells as f64 * gens as f64 / secs,
       bw * bh

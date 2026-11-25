@@ -1,0 +1,45 @@
+2026-11-25 05:29:15 start latency
+2026-11-25 05:29:23 done  latency (exit 0)
+2026-11-25 05:29:23 start lut-kernel
+2026-11-25 05:32:23 done  lut-kernel (exit 0)
+2026-11-25 05:32:23 start lut-content
+2026-11-25 05:33:52 done  lut-content (exit 0)
+2026-11-25 05:33:52 start rom-kernels
+2026-11-25 05:34:08 done  rom-kernels (exit 0)
+2026-11-25 05:34:08 start bitplane-content
+2026-11-25 05:41:47 done  bitplane-content (exit 0)
+2026-11-25 05:41:47 start bitplane-sizes
+2026-11-25 05:45:54 done  bitplane-sizes (exit 0)
+2026-11-25 05:45:54 start bitplane-limit
+2026-11-25 05:48:49 done  bitplane-limit (exit 0)
+2026-11-25 05:48:49 start window
+2026-11-25 05:50:51 done  window (exit 0)
+2026-11-25 05:50:51 start tile
+2026-11-25 05:54:13 done  tile (exit 0)
+2026-11-25 05:54:13 start probe
+2026-11-25 05:54:53 done  probe (exit 0)
+2026-11-25 05:54:53 start sweep
+2026-11-25 06:02:08 done  sweep (exit 0)
+2026-11-25 06:02:08 start unaligned
+2026-11-25 06:12:34 done  unaligned (exit 0)
+2026-11-25 06:12:34 start sparse
+2026-11-25 06:15:30 done  sparse (exit 0)
+2026-11-25 06:15:30 start sweep-tiles
+2026-11-25 06:20:50 done  sweep-tiles (exit 0)
+2026-11-25 06:21:22 start golly
+2026-11-25 06:40:54 start golly
+2026-11-25 06:53:16 batch restarted with shortened Golly targets
+2026-11-25 06:53:16 start golly
+2026-11-25 06:59:22 done  golly (exit 0)
+2026-11-25 06:59:22 start golly-tree
+2026-11-25 07:00:38 done  golly-tree (exit 0)
+2026-11-25 07:00:38 start runlength
+2026-11-25 07:02:17 done  runlength (exit 0)
+2026-11-25 07:02:17 start head2head
+2026-11-25 07:03:23 done  head2head (exit 0)
+2026-11-25 07:03:23 start cpu-parallel
+2026-11-25 07:04:38 done  cpu-parallel (exit 0)
+2026-11-25 07:04:38 start window
+2026-11-25 07:06:42 done  window (exit 0)
+2026-11-25 07:08:05 start head2head
+2026-11-25 07:09:19 done  head2head (exit 0)

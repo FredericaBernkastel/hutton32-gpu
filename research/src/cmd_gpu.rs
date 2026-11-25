@@ -247,26 +247,30 @@ pub fn brute(args: &[String]) {
   };
   let (ab, ba) = (mk(&a, &b), mk(&b, &a));
   let (dx, dy) = ((ww as u32 - 2).div_ceil(wgx), (h as u32 - 2).div_ceil(wgy));
-  let mut done = 0u64;
-  let secs = gpu.timed(|| {
-    while done < gens {
-      let n = per_submit.min(gens - done);
-      let mut enc = gpu.device.create_command_encoder(&Default::default());
-      {
-        let mut pass = enc.begin_compute_pass(&Default::default());
-        pass.set_pipeline(&pipeline);
-        for i in 0..n {
-          pass.set_bind_group(0, if i % 2 == 0 { &ab } else { &ba }, &[]);
-          pass.dispatch_workgroups(dx, dy, 1);
+  let all = crate::repeat_timed(args, || {
+    gpu.queue.write_buffer(&a, 0, bytemuck::cast_slice(&words));
+    let mut done = 0u64;
+    gpu.timed(|| {
+      while done < gens {
+        let n = per_submit.min(gens - done);
+        let mut enc = gpu.device.create_command_encoder(&Default::default());
+        {
+          let mut pass = enc.begin_compute_pass(&Default::default());
+          pass.set_pipeline(&pipeline);
+          for i in 0..n {
+            pass.set_bind_group(0, if i % 2 == 0 { &ab } else { &ba }, &[]);
+            pass.dispatch_workgroups(dx, dy, 1);
+          }
         }
+        gpu.queue.submit(Some(enc.finish()));
+        done += n;
+        gpu.wait();
       }
-      gpu.queue.submit(Some(enc.finish()));
-      done += n;
-      gpu.wait();
-    }
+    })
   });
+  let (secs, spread) = crate::median_and_spread(&all, gens as f64, "gens/s");
   println!(
-    "  {gens} gens in {secs:.3}s = {:.1} gens/s = {:.3e} cell-updates/s",
+    "  {gens} gens in {secs:.3}s = {:.1} gens/s = {:.3e} cell-updates/s{spread}",
     gens as f64 / secs,
     (g.w * g.h) as f64 * gens as f64 / secs
   );
@@ -385,42 +389,71 @@ pub fn sweep(args: &[String]) {
   let s = 1u64 << lt;
 
   // ---- learn one period on the CPU ----
+  // `--alignments K` (default 1): learn the pattern at K different cell offsets inside a tile, so
+  // that copies at arbitrary positions can be simulated; copy (cx, cy) uses class (cx + cy * reps) % K.
+  let n_align: usize = opt_or(args, "--alignments", 1);
   let t0 = Instant::now();
   let mut e = Engine::new(&lut, a, (lt - 1).max(a));
-  let mut f = match &loaded {
-    Loaded::Dense(g) => Flat::from_grid(&mut e, g, lt, 2),
-    Loaded::Mc(m) => {
-      let (root, level) = e.from_mc(m);
-      let (root, level, _) = e.popzeros(root, level);
-      let ids = e.ids_at_level(root, level, lt);
-      Flat::from_ids(&mut e, &ids, 1 << (level - lt), lt, 2)
+  let (mut nx, mut ny, mut period_cycles) = (0usize, 0usize, 0u64);
+  let mut classes: Vec<Vec<Vec<u32>>> = Vec::with_capacity(n_align);
+  let mut offsets: Vec<(usize, usize)> = Vec::with_capacity(n_align);
+  for k in 0..n_align {
+    let mut f = match &loaded {
+      Loaded::Dense(g) if n_align == 1 => Flat::from_grid(&mut e, g, lt, 2),
+      Loaded::Dense(g) => {
+        let su = s as usize;
+        let (ox, oy) = if k == 0 { (0, 0) } else { ((k * 2654435761usize >> 5) % su, (k * 40503 + 7 * k * k) % su) };
+        offsets.push((ox, oy));
+        let mut c = crate::pattern::Grid::new(g.w + su, g.h + su);
+        c.blit(g, ox, oy);
+        Flat::from_grid(&mut e, &c, lt, 2)
+      }
+      Loaded::Mc(m) => {
+        assert_eq!(n_align, 1, "--alignments needs a dense pattern");
+        let (root, level) = e.from_mc(m);
+        let (root, level, _) = e.popzeros(root, level);
+        let ids = e.ids_at_level(root, level, lt);
+        Flat::from_ids(&mut e, &ids, 1 << (level - lt), lt, 2)
+      }
+    };
+    if k == 0 {
+      (nx, ny) = (f.nx, f.ny);
     }
-  };
-  let (nx, ny) = (f.nx, f.ny);
-  let mut seen: rustc_hash::FxHashMap<Vec<u32>, u64> = Default::default();
-  let mut period_cycles = 0u64;
-  seen.insert(f.a_ids.clone(), 0);
-  let mut cyc = 0u64;
-  while cyc * s < max_learn {
-    f.sweep(&mut e);
-    f.sweep(&mut e);
-    cyc += 1;
-    if let Some(&prev) = seen.get(&f.a_ids) {
-      period_cycles = cyc - prev;
-      break;
+    assert_eq!((f.nx, f.ny), (nx, ny), "alignment classes must have the same tile grid");
+    let mut seen: rustc_hash::FxHashMap<Vec<u32>, u64> = Default::default();
+    let mut pc = 0u64;
+    seen.insert(f.a_ids.clone(), 0);
+    let mut cyc = 0u64;
+    while cyc * s < max_learn {
+      f.sweep(&mut e);
+      f.sweep(&mut e);
+      cyc += 1;
+      if let Some(&prev) = seen.get(&f.a_ids) {
+        pc = cyc - prev;
+        break;
+      }
+      seen.insert(f.a_ids.clone(), cyc);
     }
-    seen.insert(f.a_ids.clone(), cyc);
+    assert!(pc > 0, "pattern did not become periodic within --max-learn-gens");
+    drop(seen);
+    if k == 0 {
+      period_cycles = pc;
+    }
+    assert_eq!(pc, period_cycles, "alignment classes must have the same period");
+    // record the cycle: a_phase[i] = A grid after i cycles from here (f is on the cycle now)
+    let mut a_phase: Vec<Vec<u32>> = Vec::with_capacity(pc as usize);
+    for _ in 0..pc {
+      a_phase.push(f.a_ids.clone());
+      f.sweep(&mut e);
+      f.sweep(&mut e);
+    }
+    assert_eq!(f.a_ids, a_phase[0], "cycle did not close");
+    classes.push(a_phase);
   }
-  assert!(period_cycles > 0, "pattern did not become periodic within --max-learn-gens");
-  drop(seen);
-  // record the cycle: a_phase[i] = A grid after i cycles from here (f is on the cycle now)
-  let mut a_phase: Vec<Vec<u32>> = Vec::with_capacity(period_cycles as usize);
-  for _ in 0..period_cycles {
-    a_phase.push(f.a_ids.clone());
-    f.sweep(&mut e);
-    f.sweep(&mut e);
+  if n_align > 1 {
+    println!("alignment classes: {n_align}, cell offsets {offsets:?}");
   }
-  assert_eq!(f.a_ids, a_phase[0], "cycle did not close");
+  let class_of = |cx: usize, cy: usize| -> usize { (cx + cy * opt_or::<usize>(args, "--reps", 8)) % n_align };
   let top = &e.levels[lt + 1];
   let n_entries = top.res.iter().filter(|&&r| r != crate::hl::NONE).count();
   println!(
@@ -450,7 +483,7 @@ pub fn sweep(args: &[String]) {
   let phase_of = |cx: usize, cy: usize| -> u64 { ((cx as u64 * 2654435761 + cy as u64 * 40503 + 12345) >> 3) % period_cycles };
   for cy in 0..reps {
     for cx in 0..reps {
-      let src = &a_phase[phase_of(cx, cy) as usize];
+      let src = &classes[class_of(cx, cy)][phase_of(cx, cy) as usize];
       for y in 0..ny {
         big[(cy * ny + y) * bw + cx * nx..(cy * ny + y) * bw + cx * nx + nx].copy_from_slice(&src[y * nx..(y + 1) * nx]);
       }
@@ -490,30 +523,35 @@ pub fn sweep(args: &[String]) {
   };
   let (ab, ba) = (mk(&u_ab, &buf_a, &buf_b), mk(&u_ba, &buf_b, &buf_a));
   let per_submit: u64 = opt_or(args, "--per-submit", 8);
-  let mut done = 0u64;
-  let secs = gpu.timed(|| {
-    while done < cycles {
-      let n = per_submit.min(cycles - done);
-      let mut enc = gpu.device.create_command_encoder(&Default::default());
-      {
-        let mut pass = enc.begin_compute_pass(&Default::default());
-        pass.set_pipeline(&pipeline);
-        for _ in 0..n {
-          pass.set_bind_group(0, &ab, &[]);
-          pass.dispatch_workgroups((bw as u32 + 1).div_ceil(wgx), (bh as u32 + 1).div_ceil(wgy), 1);
-          pass.set_bind_group(0, &ba, &[]);
-          pass.dispatch_workgroups((bw as u32).div_ceil(wgx), (bh as u32).div_ceil(wgy), 1);
+  let all = crate::repeat_timed(args, || {
+    gpu.queue.write_buffer(&buf_a, 0, bytemuck::cast_slice(&big));
+    gpu.queue.write_buffer(&buf_m, 0, &[0u8; 16]);
+    let mut done = 0u64;
+    gpu.timed(|| {
+      while done < cycles {
+        let n = per_submit.min(cycles - done);
+        let mut enc = gpu.device.create_command_encoder(&Default::default());
+        {
+          let mut pass = enc.begin_compute_pass(&Default::default());
+          pass.set_pipeline(&pipeline);
+          for _ in 0..n {
+            pass.set_bind_group(0, &ab, &[]);
+            pass.dispatch_workgroups((bw as u32 + 1).div_ceil(wgx), (bh as u32 + 1).div_ceil(wgy), 1);
+            pass.set_bind_group(0, &ba, &[]);
+            pass.dispatch_workgroups((bw as u32).div_ceil(wgx), (bh as u32).div_ceil(wgy), 1);
+          }
         }
+        gpu.queue.submit(Some(enc.finish()));
+        done += n;
+        gpu.wait();
       }
-      gpu.queue.submit(Some(enc.finish()));
-      done += n;
-      gpu.wait();
-    }
+    })
   });
   let gens = cycles * s;
+  let (secs, spread) = crate::median_and_spread(&all, gens as f64, "gens/s");
   let probes = cycles as f64 * ((bw + 1) * (bh + 1) + bw * bh) as f64;
   println!(
-    "  {gens} gens ({} sweeps) in {secs:.3}s = {:.1} gens/s = {:.3e} cell-updates/s | {:.3e} table probes/s",
+    "  {gens} gens ({} sweeps) in {secs:.3}s = {:.1} gens/s = {:.3e} cell-updates/s | {:.3e} table probes/s{spread}",
     cycles * 2,
     gens as f64 / secs,
     cells as f64 * gens as f64 / secs,
@@ -525,7 +563,7 @@ pub fn sweep(args: &[String]) {
   let mut bad = 0usize;
   for cy in 0..reps {
     for cx in 0..reps {
-      let want = &a_phase[((phase_of(cx, cy) + cycles) % period_cycles) as usize];
+      let want = &classes[class_of(cx, cy)][((phase_of(cx, cy) + cycles) % period_cycles) as usize];
       for y in 0..ny {
         let row = &out[(cy * ny + y) * bw + cx * nx..(cy * ny + y) * bw + cx * nx + nx];
         bad += row.iter().zip(&want[y * nx..(y + 1) * nx]).filter(|(a, b)| a != b).count();
@@ -906,7 +944,30 @@ pub fn latency(args: &[String]) {
     gpu.queue.submit(Some(enc.finish()));
   });
   println!("  chained dispatch, one pass:            {:>8.2} us each", t * 1e6 / n as f64);
-  // (2) one pass per dispatch (as the archived app does), one submit
+  // (1b) the same commands recorded and finished on the CPU but never submitted: the host-side
+  // share of (1); the GPU-side share is the difference
+  let t_rec = {
+    let t0 = Instant::now();
+    let mut enc = gpu.device.create_command_encoder(&Default::default());
+    {
+      let mut pass = enc.begin_compute_pass(&Default::default());
+      pass.set_pipeline(&main);
+      for _ in 0..n {
+        pass.set_bind_group(0, &bg_main, &[]);
+        pass.dispatch_workgroups(4, 1, 1);
+      }
+    }
+    let cb = enc.finish();
+    let dt = t0.elapsed().as_secs_f64();
+    drop(cb);
+    dt
+  };
+  println!(
+    "    of which recording on the CPU:       {:>8.2} us each (GPU side {:.2} us)",
+    t_rec * 1e6 / n as f64,
+    (t - t_rec) * 1e6 / n as f64
+  );
+  // (2) one pass per dispatch, one submit
   let t = gpu.timed(|| {
     let mut enc = gpu.device.create_command_encoder(&Default::default());
     for _ in 0..n {

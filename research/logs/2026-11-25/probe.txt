@@ -1,0 +1,23 @@
+=== probe             probe and insert rates R_P, R_I (gpu-probe, gpu-insert; R_B is lut-kernel)
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+  slots(log2)  table      lookups/dispatch   lookups/s      GB/s(32B)   check
+           10       0 MiB          33554432    5.355e10      1713.7   ok
+           14       0 MiB          33554432    3.443e10      1101.8   ok
+           16       2 MiB          33554432    3.463e10      1108.3   ok
+           18       8 MiB          33554432    3.488e10      1116.1   ok
+           19      16 MiB          33554432    3.492e10      1117.5   ok
+           20      32 MiB          33554432    1.328e10       425.0   ok
+           21      64 MiB          33554432     4.615e9       147.7   ok
+           22     128 MiB          33554432     4.056e9       129.8   ok
+           24     512 MiB          33554432     3.797e9       121.5   ok
+           25    1024 MiB          33554432     3.760e9       120.3   ok
+           26    2048 MiB          33554432     3.730e9       119.4   ok
+           27    4096 MiB          33554432     3.698e9       118.3   ok
+           28    8192 MiB          33554432     3.726e9       119.2   ok
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+table 2^25 slots (claim 128 MiB + keys 512 MiB); batch = 16777216 requests drawn from 4194304 keys
+  A: all keys new          : 4.857e8 find-or-insert/s (insert 29.1 ms + commit 5.5 ms) | 4118757 distinct in batch, 4118757 new | unresolved 0, wrong key 0, duplicate ids 0, uncommitted 0
+  B: all keys new          : 1.048e9 find-or-insert/s (insert 10.7 ms + commit 5.3 ms) | 4118757 distinct in batch, 4118757 new | unresolved 0, wrong key 0, duplicate ids 0, uncommitted 0
+  C: all keys already there: 1.338e9 find-or-insert/s (insert 8.8 ms + commit 3.8 ms) | 4118757 distinct in batch, 0 new | unresolved 0, wrong key 0, duplicate ids 0, uncommitted 0
+  D: half new, half old    : 1.256e9 find-or-insert/s (insert 9.1 ms + commit 4.2 ms) | 4118757 distinct in batch, 1048210 new | unresolved 0, wrong key 0, duplicate ids 0, uncommitted 0
+  slots used 9285724, distinct keys overall 9285724 -> consistent

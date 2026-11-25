@@ -1,0 +1,45 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='640' height='400' viewBox='0 0 640 400' font-family='Helvetica, Arial, sans-serif' font-size='13'>
+<rect width='640' height='400' fill='white'/>
+<line x1='72.0' y1='20' x2='72.0' y2='348' stroke='#e4e4e4'/>
+<text x='72.0' y='366' text-anchor='middle'>10<tspan baseline-shift='super' font-size='70%'>1</tspan></text>
+<line x1='261.0' y1='20' x2='261.0' y2='348' stroke='#e4e4e4'/>
+<text x='261.0' y='366' text-anchor='middle'>10<tspan baseline-shift='super' font-size='70%'>2</tspan></text>
+<line x1='450.0' y1='20' x2='450.0' y2='348' stroke='#e4e4e4'/>
+<text x='450.0' y='366' text-anchor='middle'>10<tspan baseline-shift='super' font-size='70%'>3</tspan></text>
+<line x1='72' y1='348.0' x2='450' y2='348.0' stroke='#e4e4e4'/>
+<text x='64' y='352.0' text-anchor='end'>10<tspan baseline-shift='super' font-size='70%'>2</tspan></text>
+<line x1='72' y1='282.4' x2='450' y2='282.4' stroke='#e4e4e4'/>
+<text x='64' y='286.4' text-anchor='end'>10<tspan baseline-shift='super' font-size='70%'>3</tspan></text>
+<line x1='72' y1='216.8' x2='450' y2='216.8' stroke='#e4e4e4'/>
+<text x='64' y='220.8' text-anchor='end'>10<tspan baseline-shift='super' font-size='70%'>4</tspan></text>
+<line x1='72' y1='151.2' x2='450' y2='151.2' stroke='#e4e4e4'/>
+<text x='64' y='155.2' text-anchor='end'>10<tspan baseline-shift='super' font-size='70%'>5</tspan></text>
+<line x1='72' y1='85.6' x2='450' y2='85.6' stroke='#e4e4e4'/>
+<text x='64' y='89.6' text-anchor='end'>10<tspan baseline-shift='super' font-size='70%'>6</tspan></text>
+<line x1='72' y1='20.0' x2='450' y2='20.0' stroke='#e4e4e4'/>
+<text x='64' y='24.0' text-anchor='end'>10<tspan baseline-shift='super' font-size='70%'>7</tspan></text>
+<rect x='72' y='20' width='378' height='328' fill='none' stroke='#555'/>
+<text x='261.0' y='390' text-anchor='middle'>tile side (cells)</text>
+<text transform='translate(18,184.0) rotate(-90)' text-anchor='middle'>generations/s</text>
+<polyline points='110.6,287.9 167.5,196.1 224.4,133.0 281.3,78.0 338.2,29.4' fill='none' stroke='#0072B2' stroke-width='2'/>
+<circle cx='110.6' cy='287.9' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
+<circle cx='167.5' cy='196.1' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
+<circle cx='224.4' cy='133.0' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
+<circle cx='281.3' cy='78.0' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
+<circle cx='338.2' cy='29.4' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
+<line x1='464' y1='34' x2='488' y2='34' stroke='#0072B2' stroke-width='2'/>
+<circle cx='476.0' cy='34.0' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
+<text x='494' y='38'>hit path, 1.02·10¹⁰ cells</text>
+<polyline points='110.6,107.0 167.5,71.3' fill='none' stroke='#D55E00' stroke-width='2'/>
+<rect x='106.6' y='103.0' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<rect x='163.5' y='67.3' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<line x1='464' y1='56' x2='488' y2='56' stroke='#D55E00' stroke-width='2'/>
+<rect x='472.0' y='52.0' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<text x='494' y='60'>hit path, one ROM</text>
+<polyline points='110.6,176.4 167.5,176.4' fill='none' stroke='#009E73' stroke-width='2'/>
+<polygon points='110.6,171.4 105.6,180.4 115.6,180.4' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
+<polygon points='167.5,171.4 162.5,180.4 172.5,180.4' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
+<line x1='464' y1='78' x2='488' y2='78' stroke='#009E73' stroke-width='2'/>
+<polygon points='476.0,73.0 471.0,82.0 481.0,82.0' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
+<text x='494' y='82'>bit-plane brute force, one ROM</text>
+</svg>

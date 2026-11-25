@@ -1,0 +1,17 @@
+=== head2head         CPU engine vs Golly, final states compared (needs Golly)
+engine base tile: 8x8 cells; median of runs adding up to 1 s (at most 5)
+pattern                               golly s runs   engine s runs  golly gens/s  engine gens/s  same-state
+Segmented ROM (256k).mc                1.8213    1     1.6959    1       9211595        9892810  yes
+16x16 movie.mc                         3.4269    1     3.8543    1       4895677        4352857  yes
+serial display (32x32).mc              0.1546    5     0.4272    3     108492576       39272509  yes
+BIN2BCD.rle                            0.0426    5     0.0631    5     393476678      265882979  yes
+parallel display (16x16).mc            0.0063    5     0.0145    5    2667241567     1157049379  yes
+efficient_demultiplexer.mc             0.0202    5     0.0352    5     831856567      476625455  yes
+cpu.mc                                 0.0136    5     0.0230    5    1237321687      729444174  yes
+engine base tile: 8x8 cells; median of runs adding up to 1 s (at most 5)
+pattern                               golly s runs   engine s runs  golly gens/s  engine gens/s  same-state
+32x32 movie.mc                         6.6656    1     7.2780    1          9832           9005  yes
+squares.rle                            2.1000    1     4.0609    1         31208          16138  yes
+engine base tile: 8x8 cells; median of runs adding up to 1 s (at most 5)
+pattern                               golly s runs   engine s runs  golly gens/s  engine gens/s  same-state
+Hutton-replicator.rle                  2.7097    1     9.2253    1         24186           7104  yes

@@ -1,0 +1,16 @@
+=== lut-content       content: full and class-compressed LUT (gpu-brute2)
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule Hutton32b | content: chaotic.rle tiled 51x58 | 8109x8120 = 65845080 cells | ping-pong
+neighbour classes per position (w,s,e,n): [15, 15, 15, 15]
+  full LUT (32 MiB):           64 gens in 0.023s = 1.804e11 cell-updates/s | verify: 0 mismatching cells | 5 runs after a warm-up, median of cell-updates/s: min 1.7588e11, max 1.8078e11
+  class-compressed LUT (2 MiB): 64 gens in 0.034s = 1.258e11 cell-updates/s | verify: 0 mismatching cells | 5 runs after a warm-up, median of cell-updates/s: min 1.2398e11, max 1.2619e11
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule Hutton32b | content: uniform random soup | 8192x8192 = 67108864 cells | ping-pong
+neighbour classes per position (w,s,e,n): [15, 15, 15, 15]
+  full LUT (32 MiB):           64 gens in 0.114s = 3.778e10 cell-updates/s | verify: 0 mismatching cells | 5 runs after a warm-up, median of cell-updates/s: min 3.7382e10, max 3.8073e10
+  class-compressed LUT (2 MiB): 64 gens in 0.041s = 1.053e11 cell-updates/s | verify: 0 mismatching cells | 5 runs after a warm-up, median of cell-updates/s: min 8.5496e10, max 1.0707e11
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+rule Hutton32b | content: uniform random soup | 8192x8192 = 67108864 cells | same source every generation (content never decays)
+neighbour classes per position (w,s,e,n): [15, 15, 15, 15]
+  full LUT (32 MiB):           64 gens in 0.276s = 1.554e10 cell-updates/s | verify: 0 mismatching cells | 5 runs after a warm-up, median of cell-updates/s: min 1.5415e10, max 1.5715e10
+  class-compressed LUT (2 MiB): 64 gens in 0.102s = 4.204e10 cell-updates/s | verify: 0 mismatching cells | 5 runs after a warm-up, median of cell-updates/s: min 4.1947e10, max 4.2220e10

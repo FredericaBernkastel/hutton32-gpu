@@ -14,13 +14,17 @@ TARGETS='
 correctness       reference engine vs per-cell stepping; CPU rules vs both tables; the two rules compared
 lut-kernel       the byte-LUT kernel, workgroup shapes, DX12 (gpu-brute)
 lut-content       content: full and class-compressed LUT (gpu-brute2)
-golly             Golly HashLife per pattern (needs Golly)
+golly             Golly HashLife per pattern and step size, peak memory (needs Golly; about 7 minutes)
+golly-rom-long    Golly on the ROM at step 1 past one period, until its 8 GB limit (needs Golly; about 7 minutes)
+golly-tree        Golly with Hutton32b as an @TREE rule instead of @TABLE (needs Golly)
+runlength         counter and chaotic: Golly and the CPU engine as the run grows (needs Golly)
 rom-kernels       lotr1.ANSI-1M: byte-LUT kernel and one CPU core
 probe             probe and insert rates R_P, R_I (gpu-probe, gpu-insert; R_B is lut-kernel)
 miss-rates        miss rates of the flat tile automaton (flat)
 batches           batch statistics of the level-synchronous schedule, Hutton replicator (root)
 latency           latency constants and the miss-path wave (gpu-latency)
 sweep             memo hit path on phase-shifted ROMs (gpu-sweep; learns ~90 s per period first)
+unaligned         copies at arbitrary cell offsets: table size and hit path against alignment classes (gpu-sweep)
 sparse            sparse 100k x 100k universe: GPU, Golly, CPU engine (needs Golly)
 head2head         CPU engine vs Golly, final states compared (needs Golly)
 rules-upstream    the committed tables are the published files (needs the network)
@@ -39,7 +43,9 @@ bitplane-limit    where the limit is: identity circuit, k chained evaluations
 window            one thread per window vs chained dispatches; serial cost (gpu-window)
 tile              shared tile, k generations per dispatch (gpu-tile)
 cpu-bench         CPU engines, default and target-cpu=native builds (bitslice/bench)
+cpu-parallel      bit-sliced CPU forms on 4 threads: random states and the ROM (bitslice/bench)
 reprice           engine-choice and counter-work re-priced at the rate of the bit-plane kernel
+figures           Figs. 2-4 as SVG in figures/, from the medians in logs/2026-11-25 (tools/figures.py)
 '
 
 R=./target/release/ca-research
@@ -84,7 +90,7 @@ bgolly() {
   "$b" "$@"
 }
 
-series() { bash tools/bitslice_series.sh $R "$1"; } # sections of the bit-plane kernel series
+series() { REPEATS=5 bash tools/bitslice_series.sh $R "$1"; } # sections of the bit-plane kernel series, 5 runs each
 
 run() {
   case "$1" in
@@ -94,32 +100,40 @@ run() {
     $R rulediff --a hutton32b --b table:rules/Hutton32b.rule      # 0
     $R rulediff --a table:rules/Hutton32.table --b table:rules/Hutton32b.rule ;; # the two rules differ in 74 854
   lut-kernel)
-    $R gpu-brute --pattern $NEW --gens 65536 --per-submit 1024 --verify
-    $R gpu-brute --pattern $SQ --gens 65536 --per-submit 1024 --verify
-    $R gpu-brute --pattern $OLD --reps 8 --gens 2048 --per-submit 64 --verify
-    $R gpu-brute --pattern $OLD --reps 24 --gens 512 --per-submit 32
+    $R gpu-brute --pattern "$CTR" --gens 65536 --per-submit 1024 --verify --repeats 5
+    $R gpu-brute --pattern $NEW --gens 65536 --per-submit 1024 --verify --repeats 5
+    $R gpu-brute --pattern $SQ --gens 65536 --per-submit 1024 --verify --repeats 5
+    $R gpu-brute --pattern $OLD --reps 8 --gens 2048 --per-submit 64 --verify --repeats 5
+    $R gpu-brute --pattern $OLD --reps 24 --gens 512 --per-submit 32 --repeats 5
     for s in "8 8" "16 16" "32 8" "64 4"; do
       set -- $s; $R gpu-brute --pattern $OLD --reps 24 --gens 512 --per-submit 32 --wgx $1 --wgy $2
     done
     $R gpu-brute --pattern $OLD --reps 24 --gens 512 --per-submit 32 --backend dx12 ;;
   lut-content)
-    $R gpu-brute2 --side 8192 --gens 64 --pattern $CHA --verify
-    $R gpu-brute2 --side 8192 --gens 64 --verify
-    $R gpu-brute2 --side 8192 --gens 64 --same-src --verify ;;
+    $R gpu-brute2 --side 8192 --gens 64 --pattern $CHA --verify --repeats 5
+    $R gpu-brute2 --side 8192 --gens 64 --verify --repeats 5
+    $R gpu-brute2 --side 8192 --gens 64 --same-src --verify --repeats 5 ;;
   golly)
-    py tools/time_golly.py "$CTR" 1048576 1 8 64 512 4096 32768 262144 --cells 37627
-    py tools/time_golly.py $SQ 65536 8 64 1024 --algo JvN --cells 274950
-    py tools/time_golly.py $CHA 16384 8 64 1024 --cells 19932
-    py tools/time_golly.py $ROM 65536 64 4096 --cells 9467605 --timeout 180
-    py tools/time_golly.py $P/replicators/Hutton-replicator.rle 1048576 1024 16384 262144 --algo JvN --timeout 300
-    for spec in "misc/Segmented ROM (256k).mc|RuleLoader|538740" "misc/serial display (32x32).mc|RuleLoader|1710912" \
-                "32x32 movie/32x32 movie.mc|RuleLoader|1404064" "misc/parallel display (16x16).mc|JvN|612717" \
-                "16x16 movie/16x16 movie.mc|JvN|5716840" "misc/efficient_demultiplexer.mc|JvN|578280"; do
-      IFS='|' read -r f algo cells <<< "$spec"
-      py tools/time_golly.py "$P/$f" 65536 64 1024 --algo $algo --cells $cells --timeout 120
+    py tools/time_golly.py "$CTR" 1048576 1 8 64 512 4096 32768 262144 --cells 37627 --repeats 3
+    py tools/time_golly.py $SQ 65536 8 64 1024 16384 --algo JvN --cells 274950 --repeats 3
+    py tools/time_golly.py $CHA 16384 8 64 1024 --cells 19932 --repeats 3 --gc
+    # the ROM: the rate over the first minute at each step size (a period needs about four)
+    py tools/time_golly.py $ROM 1056 1 8 16 64 --cells 9467605 --timeout 60 ;;
+  golly-rom-long) # about 7 minutes: step 1 until Golly stops at its 8 GB limit, past one period
+    py tools/time_golly.py $ROM 1056 1 --cells 9467605 --timeout 600 ;;
+  golly-tree)
+    mkdir -p out/tree
+    $R ruletree --rule hutton32b --name Hutton32b --out out/tree/Hutton32b.rule
+    py tools/time_golly.py "$CTR" 1048576 1024 262144 --cells 37627 --repeats 3 --rules out/tree/
+    py tools/time_golly.py $CHA 16384 64 1024 --cells 19932 --repeats 3 --rules out/tree/
+    py tools/time_golly.py $ROM 1056 8 --cells 9467605 --timeout 60 --rules out/tree/ ;;
+  runlength) # Golly and the CPU engine (8x8 base tiles) at step 1024 as the run grows; the GPU
+             # shared-tile kernel's rate does not depend on the run length (tile target)
+    for g in 16384 65536 262144 1048576 4194304 16777216; do
+      py tools/head2head.py $g 10 --a 3 --timeout 300 "$CTR" $CHA
     done ;;
   rom-kernels)
-    $R gpu-brute --pattern $ROM --gens 528 --per-submit 264 --verify ;; # --verify also prints the one-core CPU rate
+    $R gpu-brute --pattern $ROM --gens 528 --per-submit 264 --verify --repeats 5 ;; # --verify also prints the one-core CPU rate
   probe)
     $R gpu-probe --log2-slots 10,14,16,18,19,20,21,22,24,25,26,27,28 # the 8 GiB table needs that much free VRAM
     $R gpu-insert ;;
@@ -140,35 +154,40 @@ run() {
   latency)
     $R gpu-latency ;;
   sweep)
-    $R gpu-sweep --pattern $ROM --lt 4 --reps 1  --cycles 6600 --per-submit 512
-    $R gpu-sweep --pattern $ROM --lt 5 --reps 1  --cycles 6600 --per-submit 512
-    $R gpu-sweep --pattern $ROM --lt 4 --reps 8  --cycles 66
-    $R gpu-sweep --pattern $ROM --lt 4 --reps 32 --cycles 33 --per-submit 4
-    $R gpu-sweep --pattern $ROM --lt 5 --reps 32 --cycles 33 --per-submit 4 ;;
+    $R gpu-sweep --pattern $ROM --lt 4 --reps 1  --cycles 6600 --per-submit 512 --repeats 5
+    $R gpu-sweep --pattern $ROM --lt 5 --reps 1  --cycles 6600 --per-submit 512 --repeats 5
+    $R gpu-sweep --pattern $ROM --lt 4 --reps 8  --cycles 66 --repeats 5
+    $R gpu-sweep --pattern $ROM --lt 4 --reps 32 --cycles 33 --per-submit 4 --repeats 5
+    $R gpu-sweep --pattern $ROM --lt 5 --reps 32 --cycles 33 --per-submit 4 --repeats 5 ;;
+  unaligned) # 8x8 copies; class k is the ROM shifted by a pseudo-random cell offset inside a tile
+    for k in 1 2 4; do
+      $R gpu-sweep --pattern $ROM --lt 4 --reps 8 --cycles 66 --alignments $k --repeats 5
+    done ;;
   sparse)
     mkdir -p out/golly
-    $R gpu-sparse --pattern "$CTR" --lt 4 --reps 48 --pitch 8 --cycles 1024 --export-mc out/golly/sparse100k.mc
-    py tools/time_golly.py out/golly/sparse100k.mc 16384 16 1024 16384 --timeout 600
-    py tools/time_golly.py out/golly/sparse100k.mc 1048576 1024 65536 --timeout 900
+    $R gpu-sparse --pattern "$CTR" --lt 4 --reps 48 --pitch 8 --cycles 1024 --export-mc out/golly/sparse100k.mc --repeats 5
+    py tools/time_golly.py out/golly/sparse100k.mc 16384 16 1024 16384 --timeout 600 --repeats 3
+    py tools/time_golly.py out/golly/sparse100k.mc 1048576 1024 65536 --timeout 900 --repeats 3
     bgolly -q -q -a RuleLoader -s rules/ -M 8000 -m 16384 -i 1024 -o out/golly/sparse100k_out.mc out/golly/sparse100k.mc
     $R fingerprint --pattern out/golly/sparse100k_out.mc     # Golly's final state
     $R root --pattern out/golly/sparse100k.mc --k 10 --gens 16384 --a 2 ;; # the CPU engine's
-  head2head) # the last column compares the final states
-    py tools/head2head.py 16777216 10 --a 2 --timeout 400 "$P/misc/Segmented ROM (256k).mc" "$P/misc/serial display (32x32).mc" \
-      "$P/misc/parallel display (16x16).mc" "$P/16x16 movie/16x16 movie.mc" $P/misc/efficient_demultiplexer.mc \
-      "$P/misc/weird designs/cpu.mc" $P/misc/BIN2BCD.rle "$CTR" $CHA "$P/32x32 movie/32x32 movie.mc"
-    py tools/head2head.py 1048576 10 --a 2 --timeout 600 $SQ
-    py tools/head2head.py 262144 14 --a 2 --timeout 900 $P/replicators/Hutton-replicator.rle ;;
+  head2head) # 8x8 base tiles, as GHL; the last column compares the final states. The counter and
+             # chaotic at 2^24 generations are in the runlength target
+    py tools/head2head.py 16777216 10 --a 3 --timeout 300 "$P/misc/Segmented ROM (256k).mc" "$P/16x16 movie/16x16 movie.mc" \
+      "$P/misc/serial display (32x32).mc" $P/misc/BIN2BCD.rle "$P/misc/parallel display (16x16).mc" \
+      $P/misc/efficient_demultiplexer.mc "$P/misc/weird designs/cpu.mc"
+    py tools/head2head.py 65536 10 --a 3 --timeout 300 "$P/32x32 movie/32x32 movie.mc" $SQ
+    py tools/head2head.py 65536 12 --a 3 --timeout 300 $P/replicators/Hutton-replicator.rle ;;
   rules-upstream)
     curl -sL --retry 3 https://gollygang.github.io/ruletablerepository/downloads/Hutton32.table \
       | cmp - rules/Hutton32.table && echo "rules/Hutton32.table: same as published"
     curl -sL --retry 3 https://raw.githubusercontent.com/FredericaBernkastel/Hutton32-Computer/master/doc/Hutton32b.rule \
       | cmp - rules/Hutton32b.rule && echo "rules/Hutton32b.rule: same as published" ;;
   sweep-tiles)
-    $R gpu-sweep --pattern $ROM --lt 4 --reps 32 --cycles 33 --per-submit 4
-    $R gpu-sweep --pattern $ROM --lt 5 --reps 32 --cycles 33 --per-submit 4
+    $R gpu-sweep --pattern $ROM --lt 4 --reps 32 --cycles 33 --per-submit 4 --repeats 5
+    $R gpu-sweep --pattern $ROM --lt 5 --reps 32 --cycles 33 --per-submit 4 --repeats 5
     for lt in 6 7 8; do
-      $R gpu-sweep --pattern $ROM --lt $lt --a 4 --reps 32 --cycles 264 --per-submit 66 --max-learn-gens 40000
+      $R gpu-sweep --pattern $ROM --lt $lt --a 4 --reps 32 --cycles 264 --per-submit 66 --max-learn-gens 40000 --repeats 5
     done ;;
   sweep-ops) # MODEL lines
     for spec in "advanced counter v2.rle|65536" "misc/chaotic.rle|16384" "misc/extra/lotr1.PPMd-244K.rle|528" \
@@ -212,9 +231,14 @@ run() {
     lutbin
     cargo run --release --manifest-path bitslice/bench/Cargo.toml
     RUSTFLAGS="-C target-cpu=native" cargo run --release --manifest-path bitslice/bench/Cargo.toml ;; # adds AVX2
+  cpu-parallel) # i5-6600K: 4 cores; the ROM fills one 4096^2 grid
+    lutbin
+    RUSTFLAGS="-C target-cpu=native" cargo run --release --manifest-path bitslice/bench/Cargo.toml -- \
+      --threads 4 --size 4096 --pattern $ROM ;;
   reprice)
     bash tools/engine_choice.sh $R 4096 --cell-rate 2.9e11
     $R adapt --pattern "$CTR" --gens 16384 --a 3 --cell-rate 2.9e11 ;;
+  figures) py tools/figures.py ;;
   *)
     echo "unknown target: $1" >&2; return 2 ;;
   esac

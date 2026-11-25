@@ -79,7 +79,7 @@ ghl/
   benches/              throughput targets of Section 5
 ```
 
-Feature flags: `gpu` (default) and `png`. Without `gpu` the library runs the host recursion only, which matches Golly within 0.51–1.9× (paper Table XVIII) and is the right engine for idle universes anyway.
+Feature flags: `gpu` (default) and `png`. Without `gpu` the library runs the host recursion only, which runs at 0.29–1.07× Golly's speed (paper Table XX); for idle universes and long runs of small ones that is the engine to use, so closing the gap to Golly is part of Stage 0.
 
 ## 4. Stages
 
@@ -91,7 +91,7 @@ Each stage ends in something a UI can use and in checks that already exist in `r
 * `rule`: load a Golly `@TABLE` `.rule` or bare `.table` into a $2^{25}$-byte table; embed the two canonical tables; expose the palette.
 * `io`: RLE read and write, macrocell read and write, palette PNG behind `png`.
 * `tile` and `cpu::hl`: port of `hl.rs` with 8×8 base tiles stored as bit-planes, the level-synchronous `solve`, root stepping and `result_at`; per-level statistics.
-* `cpu::leaf`: the circuit on `u64` bit-planes (`bitslice/step_planes.rs`) as the host's brute-force step, replacing per-cell table lookups. On the CPU it is 2.0–3.5× the table on real content (paper Table XXIII); with it the host floor moves to 16×16 windows as well (paper Section VI-H), which is to be confirmed by measurement here.
+* `cpu::leaf`: the circuit on `u64` bit-planes (`bitslice/step_planes.rs`) as the host's brute-force step, replacing per-cell table lookups. On the CPU it is 2.0–3.5× the table on real content (paper Table XXV); with it the host floor moves to 16×16 windows as well (paper Section VI-H), which is to be confirmed by measurement here.
 * Public API for a CPU-only `Universe` (Section 7).
 
 Done when:
@@ -99,7 +99,7 @@ Done when:
 * the rule implementation equals both tables on all $2^{25}$ neighbourhoods (`reproduce.sh correctness`);
 * the engine agrees with per-cell stepping on the 22 configurations of `ca-research selftest`;
 * final states match Golly's fingerprints for the ten patterns of `reproduce.sh head2head` at $2^{24}$ generations and for the replicator at 262,144. The fingerprints are recorded once with `bgolly` and committed as test fixtures, so the library's tests do not need Golly;
-* on one thread the host recursion is within the 0.51–1.9× of Golly that the reference engine reaches (paper Table XVIII).
+* on one thread the host recursion is at least at the 0.29–1.07× of Golly's speed that the reference engine reaches (paper Table XX), and closer to Golly on the idle displays, where the gap is widest.
 
 ### Stage 1: plain cells on the GPU
 
@@ -110,15 +110,16 @@ The first GPU engine steps a dense grid without memoization. It replaces the arc
 * Choice between shared tile and plain kernel: the crossover lies between $3 \cdot 10^{5}$ and $9.5 \cdot 10^{6}$ cells and was not located. Implement both and race them (Stage 4); until racing exists, use the shared tile below $3 \cdot 10^{5}$ cells.
 * Grid growth: re-allocate with a margin when live cells reach the ring.
 
-Targets (paper Table XII), cell-exact against the CPU after every benchmark:
+Targets (paper Table XIII), cell-exact against the CPU after every benchmark:
 
 | Workload | Target |
 |---|---|
 | Large grids, any content (Hutton32b) | $3.0 \cdot 10^{11}$ |
-| Counter, 37,627 cells | $2.9\text{–}3.0 \cdot 10^{10}$ (770,000–785,000 gens/s) |
-| `squares`, 274,950 cells | $1.5 \cdot 10^{11}$ (556,000–563,000 gens/s) |
-| ROM, $9.5 \cdot 10^{6}$ cells | $3.9 \cdot 10^{11}$ (40,999 gens/s) |
-| Hutton32, byte-LUT kernel, large grids | $1.86 \cdot 10^{11}$ |
+| Counter, 37,627 cells | $3.0 \cdot 10^{10}$ (801,737 gens/s, shared tile) |
+| `chaotic`, 19,932 cells | $1.8 \cdot 10^{10}$ (900,168 gens/s, shared tile) |
+| `squares`, 274,950 cells | $1.56 \cdot 10^{11}$ (569,161 gens/s, shared tile) |
+| ROM, $9.5 \cdot 10^{6}$ cells | $3.9 \cdot 10^{11}$ (41,321 gens/s) |
+| Hutton32, byte-LUT kernel, large grids | $1.74 \cdot 10^{11}$ |
 
 Checks: `reproduce.sh bitplane-content bitplane-sizes tile`.
 
@@ -132,16 +133,17 @@ ID grids and memo tables move to VRAM; misses are still resolved by the host rec
 * Sweep tile: start at 16×16 and raise it while the hit rate stays above 40 % (paper equation (5)); every level shares the tables, so a change of level is a parallel re-key of the ID grid.
 * `cpu::reclaim` is needed from here on: the reference engine never reclaims and grew to 148 M nodes (about 7 GB) on the replicator. Mark what is reachable from the current grids, rebuild, re-key.
 
-Targets (paper Tables XV and XVII), tile-exact against the host's prediction:
+Targets (paper Tables XVI, XVII and XIX), tile-exact against the host's prediction:
 
 | Workload | Target |
 |---|---|
-| 32×32 phase-shifted ROMs, $1.02 \cdot 10^{10}$ cells, 16×16 tiles | $8.6 \cdot 10^{12}$ (858 gens/s) |
-| The same, 32×32 to 256×256 tiles | $2.1 \cdot 10^{14}$ to $6.8 \cdot 10^{16}$ (20,349 to 6,714,020 gens/s) |
-| One ROM, 32×32 tiles | $1.5 \cdot 10^{13}$ (1,607,022 gens/s) |
-| Sparse universe of 2304 counters, $1.03 \cdot 10^{10}$ cells, active blocks | $2.9 \cdot 10^{15}$ effective (278,648 gens/s); same final state as Golly |
+| 32×32 phase-shifted ROMs, $1.02 \cdot 10^{10}$ cells, 16×16 tiles | $8.4 \cdot 10^{12}$ (823 gens/s) |
+| The same, 32×32 to 256×256 tiles | $2.1 \cdot 10^{14}$ to $7.3 \cdot 10^{16}$ (20,686 to 7,190,399 gens/s) |
+| One ROM, 32×32 tiles | $1.6 \cdot 10^{13}$ (1,652,238 gens/s) |
+| Sparse universe of 2304 counters, $1.03 \cdot 10^{10}$ cells, active blocks | $2.0 \cdot 10^{15}$ effective (193,203 gens/s); same final state as Golly |
+| 8×8 ROMs in 4 alignment classes, 16×16 tiles | $6.0 \cdot 10^{12}$ (9,497 gens/s), 9.85 M entries |
 
-Checks: `reproduce.sh sweep sweep-tiles sparse`.
+Checks: `reproduce.sh sweep sweep-tiles unaligned sparse`.
 
 ### Stage 3: the miss path on the GPU
 
@@ -154,7 +156,7 @@ The host leaves the per-wave path. This is the stage the paper has not measured 
 * Dispatch sizing: no indirect dispatch. Every stage is dispatched for a fixed capacity taken from asynchronously read, possibly stale miss counters; invocations beyond the live count return at once; a wave that overflows a capacity leaves a sentinel and is replayed from the last snapshot with a larger one.
 * Atlas evaluation with the shared-tile kernel, since an atlas of missed windows is a small grid: about 12 µs instead of 29 µs for eight chained dispatches, which takes a wave from about 54 µs to about 37 µs (projected, not run).
 
-Targets (projections, paper Table XXIV and Section VII-A):
+Targets (projections, paper Table XXVI and Section VII-A):
 
 | Quantity | Target |
 |---|---|
@@ -168,12 +170,12 @@ Checks: cell-exact against the host after every run; the GPU's own counters (req
 
 ### Stage 4: adaptivity
 
-* Universe-wide floor from the active area (paper Table XXII): below $A_1 \approx 1.0 \cdot 10^{6}$ active cells no memo, plain cells; F32 up to $A_2 \approx 1.3 \cdot 10^{7}$; F16 above. Regions may only go coarser than the universe's floor.
+* Universe-wide floor from the active area (paper Table XXIV): below $A_1 \approx 1.0 \cdot 10^{6}$ active cells no memo, plain cells; F32 up to $A_2 \approx 1.3 \cdot 10^{7}$; F16 above. Regions may only go coarser than the universe's floor.
 * Per-region controller (paper Algorithm 3) on 256×256 regions: start at the floor; price coarser alternatives from the region's own statistics and switch when 15 % cheaper; price finer ones by subdividing one floor miss in sixteen; from plain cells, a two-step trial at most every 16 steps, the interval doubling up to 256 while trials fail. Plain-cells regions are stepped as cells under a region-level memo.
 * Racing in the latency-bound regime (paper Algorithm 1, line 4): host recursion, shared-tile kernel and plain kernel each time one epoch; keep the fastest; re-time the others with exponential back-off. Switching costs a read-back (0.1–2.4 ms), so it happens only at epoch boundaries.
 * Cycle detection: IDs are canonical, so a hash of the ID grid per epoch detects a globally periodic universe; from then on any generation is a lookup.
 
-Targets (paper Tables XX and XXI, model): on the mixed universe the controller is 7 % faster than uniform F16 (32.6 against 35.0 ms model time) with 43 % less memory; on the ROM alone it is 1.9× faster; on logic it never leaves F16.
+Targets (paper Tables XXII and XXIII, model): on the mixed universe the controller is 7 % faster than uniform F16 (32.6 against 35.0 ms model time) with 43 % less memory; on the ROM alone it is 1.9× faster; on logic it never leaves F16.
 
 Checks: every policy ends in the same state (property test: random policy switches give the same fingerprint); `reproduce.sh floors engine-choice controller` give the model numbers the live counters must approach.
 
@@ -183,7 +185,7 @@ Checks: every policy ends in the same state (property test: random policy switch
 * Tables beyond one binding at full rate (`gpu-probe` runs 8 × 1 GiB).
 * GPU table rebuild: mark entries reachable from the current grids, rebuild into a fresh table with the insert kernel, re-key the grids; all three are parallel passes. The memo is a cache: dropping it costs a relearning transient, never correctness.
 * A circuit for Hutton32: edit the hand-written starting network in the blocks for an excited-STS, confluent or crossing centre, where the two rules differ (74,854 entries), then run the optimiser in `research/bitslice`, which works from any $2^{25}$-byte table.
-* AVX2 for the host leaf: 6–8× the table on real content (paper Table XXIII).
+* AVX2 for the host leaf: 6–8× the table on real content (paper Table XXV).
 
 ## 5. Cross-cutting engineering
 
@@ -192,7 +194,7 @@ Checks: every policy ends in the same state (property test: random policy switch
 * Keep a whole epoch inside one compute pass. A pass costs 15–30× a dispatch and a read-back 30–700× (paper Table I).
 * No read-back in the per-wave path. The CPU reads counters without blocking and may act on values several waves old.
 * No indirect dispatch: 260–490 µs per wave in wgpu against 51–55 µs at fixed capacity.
-* Keep the width: one thread stepping a window alone is 21× slower than chained dispatches where latency matters (paper Table XIV). Generations per dispatch only through a shared tile.
+* Keep the width: one thread stepping a window alone is 22× slower than chained dispatches where latency matters (paper Table XV). Generations per dispatch only through a shared tile.
 * One binding holds less than 2 GiB on both backends; shard by the top hash bits.
 * A probe costs the same from 128 MiB to 8 GiB, so VRAM is memo capacity: insert while memory lasts. A policy that stops memoizing at high miss rates would never learn a ROM, which misses 96 % for one period and 0 % afterwards.
 * Exactness everywhere: keys compared in full, tiles by content, no probabilistic hashing.
@@ -219,7 +221,7 @@ Every threshold in the paper comes from one RTX 5060 Ti. The library measures th
 | Crossovers not located (shared tile against plain kernel; host against GPU for small batches) | wrong engine on mid-sized universes | racing (Stage 4) instead of fixed thresholds |
 | Controller tuned on one composite universe | poor choices on other content | F16 is the safe default (worst case 2.6× behind); controller can be disabled in `Config` |
 | Host memory growth during learning | out of memory on long novel runs | `cpu::reclaim` in Stage 2, before the host learns large universes |
-| Hutton32 has no circuit | Hutton32 runs at the byte-LUT rate ($1.86 \cdot 10^{11}$), content-dependent | Stage 5 circuit |
+| Hutton32 has no circuit | Hutton32 runs at the byte-LUT rate ($1.74 \cdot 10^{11}$), content-dependent | Stage 5 circuit |
 | Constants differ on other GPUs | thresholds off | calibration at start-up |
 
 ## 7. Interface for the UI project

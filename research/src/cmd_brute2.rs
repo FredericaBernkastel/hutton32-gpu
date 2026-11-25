@@ -127,12 +127,11 @@ pub fn run(args: &[String]) {
   let gens: u64 = opt_or(args, "--gens", 256) & !1;
   let (wgx, wgy): (u32, u32) = (opt_or(args, "--wgx", 8), opt_or(args, "--wgy", 8));
   let same_src = flag(args, "--same-src");
-  let spec = cmd_stats::variant_for(args, "hutton32b");
-  let lut = crate::load_lut(&spec);
-  assert_eq!(lut.len(), LUT_SIZE);
-  // content: uniformly random states, or a tiled pattern
+  // content: uniformly random states, or a tiled pattern (run under the pattern's own rule)
+  let mut file_rule = String::new();
   let (g, what) = if let Some(p) = opt(args, "--pattern") {
-    let (loaded, _) = cmd_stats::load_pattern(std::path::Path::new(&p));
+    let (loaded, fr) = cmd_stats::load_pattern(std::path::Path::new(&p));
+    file_rule = fr;
     let cmd_stats::Loaded::Dense(pat) = loaded else { panic!("dense pattern required") };
     let (cw, ch) = (pat.w + 8, pat.h + 8);
     let (rx, ry) = (side / cw, side / ch);
@@ -150,6 +149,9 @@ pub fn run(args: &[String]) {
     }
     (g, "uniform random soup".to_string())
   };
+  let spec = cmd_stats::variant_for(args, if file_rule.is_empty() { "hutton32b" } else { &file_rule });
+  let lut = crate::load_lut(&spec);
+  assert_eq!(lut.len(), LUT_SIZE);
   let gpu = Gpu::new(opt(args, "--backend").as_deref());
   println!("GPU: {}", gpu.describe());
   println!("rule {} | content: {what} | {}x{} = {} cells | {}", spec.name(), g.w, g.h, g.w * g.h, if same_src { "same source every generation (content never decays)" } else { "ping-pong" });
@@ -204,7 +206,11 @@ pub fn run(args: &[String]) {
         gpu.queue.submit(Some(enc.finish()));
       })
     };
-    let secs = run(gens);
+    let all = crate::repeat_timed(args, || {
+      gpu.queue.write_buffer(&a, 0, bytemuck::cast_slice(&words));
+      run(gens)
+    });
+    let (secs, spread) = crate::median_and_spread(&all, (g.w * g.h) as f64 * gens as f64, "cell-updates/s");
     // correctness: `gens` ping-pong generations (or one generation when same_src) vs the CPU
     let check = if flag(args, "--verify") {
       let out = gpu.read_u32(if same_src { &b } else { &a }, 0, words.len() as u64);
@@ -225,7 +231,7 @@ pub fn run(args: &[String]) {
       String::new()
     };
     println!(
-      "  {:<28} {gens} gens in {secs:.3}s = {:.3e} cell-updates/s{check}",
+      "  {:<28} {gens} gens in {secs:.3}s = {:.3e} cell-updates/s{check}{spread}",
       if compact { "class-compressed LUT (2 MiB):" } else { "full LUT (32 MiB):" },
       (g.w * g.h) as f64 * gens as f64 / secs
     );

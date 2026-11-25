@@ -4,6 +4,7 @@
 # usage (from research/): bash tools/bitslice_series.sh ./target/release/ca-research [sections] [quick]
 #   sections: letters to run, default ABCDEFGHST
 #   quick:    skip the CPU verification of the pattern runs (the random-soup runs are still verified)
+# REPEATS=N in the environment times every run N times after a warm-up and reports the median and range.
 R="$1"; SECTIONS="${2:-ABCDEFGHST}"; QUICK="$3"
 want() { case "$SECTIONS" in *"$1"*) return 0;; *) return 1;; esac; }
 P="$(dirname "$0")/../patterns"
@@ -27,7 +28,7 @@ done
 V="--verify"; [ "$QUICK" = quick ] && V=""
 run() { # label, command...
   local label="$1"; shift
-  "$@" 2>&1 | grep -E 'bit-plane kernel:|LUT|window kernel|tile kernel|circuit:' | grep -v 'wiring' | sed "s#^ *#[$label] #"
+  "$@" ${REPEATS:+--repeats $REPEATS} 2>&1 | grep -E 'bit-plane kernel:|LUT|window kernel|tile kernel|circuit:|note:' | grep -v 'wiring' | sed "s#^ *#[$label] #"
 }
 
 echo "=== circuit"; head -4 "$C"
@@ -52,6 +53,7 @@ if want C; then
 echo "=== C. small grids, bound by dispatch latency (three runs each)"
 run "counter, verified" "$R" gpu-bitslice --side 200 --gens 65536 --pattern "$P/advanced counter v2.rle" --verify
 for i in 1 2 3; do run "counter 224x205" "$R" gpu-bitslice --side 200 --gens 65536 --pattern "$P/advanced counter v2.rle"; done
+run "squares, verified" "$R" gpu-bitslice --side 672 --gens 65536 --pattern "$P/misc/squares.rle" --verify
 for i in 1 2 3; do run "squares 672x431" "$R" gpu-bitslice --side 672 --gens 65536 --pattern "$P/misc/squares.rle"; done
 fi
 
@@ -62,7 +64,7 @@ fi
 
 if want E; then
 echo "=== E. ceiling: the same harness with a circuit that returns the centre unchanged"
-for side in 1024 2048 4096 16384; do
+for side in 256 1024 2048 4096 16384; do
   g=512; [ $side = 16384 ] && g=64
   for i in 1 2; do
     run "side $side real    " "$R" gpu-bitslice --side $side --gens $g --same-src
@@ -92,7 +94,7 @@ fi
 
 if want S; then
 echo "=== S. size dependence, uniform random states held constant (two runs each)"
-for item in "8192 128" "11584 64" "16384 64" "23168 32" "32768 32" "32768 128"; do
+for item in "8192 128" "11584 64" "16384 64" "23168 256" "32768 512"; do
   set -- $item
   for i in 1 2; do run "side $1 gens $2" "$R" gpu-bitslice --side $1 --gens $2 --same-src; done
 done
@@ -106,8 +108,9 @@ run "chaotic k=4, 3x9 groups" "$R" gpu-tile --k 4 --tw 3 --th 9 --side 700 --gen
 echo "--- small grids (plain kernel: counter 273k, squares 172k gens/s; section C)"
 run "counter k=16, 7x16 groups" "$R" gpu-tile --k 16 --tw 7 --th 16 --side 200 --gens 65536 --pattern "$P/advanced counter v2.rle" --verify
 for i in 1 2 3; do run "counter k=16, 7x16 groups" "$R" gpu-tile --k 16 --tw 7 --th 16 --side 200 --gens 65536 --pattern "$P/advanced counter v2.rle"; done
-run "squares k=16, 6x48 groups" "$R" gpu-tile --k 16 --tw 6 --th 48 --side 672 --gens 16384 --pattern "$P/misc/squares.rle" --verify
+run "squares k=16, 6x48 groups, verified" "$R" gpu-tile --k 16 --tw 6 --th 48 --side 672 --gens 65536 --pattern "$P/misc/squares.rle" --verify
 for i in 1 2 3; do run "squares k=16, 6x48 groups" "$R" gpu-tile --k 16 --tw 6 --th 48 --side 672 --gens 65536 --pattern "$P/misc/squares.rle"; done
+for th in 16 32 48; do run "chaotic k=16, 5x$th groups, verified" "$R" gpu-tile --k 16 --tw 5 --th $th --side 160 --gens 65536 --pattern "$P/misc/chaotic.rle" --verify; done
 for th in 16 32; do for i in 1 2; do run "squares k=16, 6x$th groups" "$R" gpu-tile --k 16 --tw 6 --th $th --side 672 --gens 65536 --pattern "$P/misc/squares.rle"; done; done
 echo "--- one ROM, one period (plain kernel: 41k gens/s; section B)"
 for cfg in "2 6 28" "4 6 24" "8 6 24"; do

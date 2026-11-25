@@ -1,0 +1,27 @@
+=== golly             Golly HashLife per pattern and step size, peak memory (needs Golly; about 7 minutes)
+pattern patterns/advanced counter v2.rle
+load-only 0.016s (algo RuleLoader, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
+step        1:   19.030s net,        55100.5 gens/s, 2.073e+09 cell-updates/s (median of 3; 52726.0-55297.9 gens/s), peak 1848 MiB
+step        8:    2.926s net,       358423.7 gens/s, 1.349e+10 cell-updates/s (median of 3; 355561.0-364850.4 gens/s), peak 235 MiB
+step       64:    1.799s net,       582880.9 gens/s, 2.193e+10 cell-updates/s (median of 3; 577382.3-582891.1 gens/s), peak 119 MiB, second half 659765.3 gens/s
+step      512:    1.662s net,       630979.7 gens/s, 2.374e+10 cell-updates/s (median of 3; 618861.8-635176.3 gens/s), peak 119 MiB, second half 731065.1 gens/s
+step     4096:    1.625s net,       645174.4 gens/s, 2.428e+10 cell-updates/s (median of 3; 644435.3-647058.6 gens/s), peak 119 MiB, second half 739851.9 gens/s
+step    32768:    1.644s net,       637896.5 gens/s, 2.400e+10 cell-updates/s (median of 3; 601239.1-644502.2 gens/s), peak 119 MiB, second half 735383.8 gens/s
+step   262144:    1.641s net,       638845.6 gens/s, 2.404e+10 cell-updates/s (median of 3; 637843.1-639910.2 gens/s), peak 119 MiB, second half 735664.8 gens/s
+pattern patterns/misc/squares.rle
+load-only 0.019s (algo JvN, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
+step        8:    2.564s net,        25560.8 gens/s, 7.028e+09 cell-updates/s (median of 3; 25129.7-25720.7 gens/s), peak 235 MiB, second half 21036.4 gens/s
+step       64:    2.125s net,        30836.8 gens/s, 8.479e+09 cell-updates/s (median of 3; 30753.2-30851.8 gens/s), peak 235 MiB, second half 24184.7 gens/s
+step     1024:    2.099s net,        31220.2 gens/s, 8.584e+09 cell-updates/s (median of 3; 31159.1-31513.3 gens/s), peak 235 MiB, second half 24547.6 gens/s
+step    16384:    2.096s net,        31271.8 gens/s, 8.598e+09 cell-updates/s (median of 3; 31089.0-31602.4 gens/s), peak 235 MiB, second half 24470.6 gens/s
+pattern patterns/misc/chaotic.rle
+load-only 0.012s (algo RuleLoader, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
+step        8:    0.479s net,        34179.3 gens/s, 6.813e+08 cell-updates/s (median of 3; 31303.7-34479.0 gens/s), 22 GCs, peak 41 MiB, second half 27557.5 gens/s
+step       64:    0.343s net,        47791.5 gens/s, 9.526e+08 cell-updates/s (median of 3; 47695.4-48415.7 gens/s), 22 GCs, peak 36 MiB, second half 37794.1 gens/s
+step     1024:    0.322s net,        50914.9 gens/s, 1.015e+09 cell-updates/s (median of 3; 50332.4-51652.8 gens/s), 22 GCs, peak 36 MiB, second half 41905.7 gens/s
+pattern patterns/misc/extra/lotr1.ANSI-1M.rle
+load-only 1.502s (algo RuleLoader, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
+step        1: TIMEOUT after 60s at gen 82,          1.4 gens/s, 1.327e+07 cell-updates/s, peak 3717 MiB
+step        8: TIMEOUT after 60s at gen 168,          2.9 gens/s, 2.719e+07 cell-updates/s, peak 3717 MiB
+step       16: TIMEOUT after 60s at gen 160,          2.7 gens/s, 2.590e+07 cell-updates/s, peak 3717 MiB
+step       64: TIMEOUT after 60s at gen 128,          2.2 gens/s, 2.072e+07 cell-updates/s, peak 3713 MiB

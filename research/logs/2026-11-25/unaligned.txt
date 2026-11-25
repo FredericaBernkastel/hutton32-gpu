@@ -1,0 +1,21 @@
+=== unaligned         copies at arbitrary cell offsets: table size and hit path against alignment classes (gpu-sweep)
+pattern lotr1.ANSI-1M.rle rule Hutton32b: tile 16x16, grid 198x196 tiles, period 528 gens (33 cycles), learned in 82.0s
+memo: 2462688 entries -> table 8388608 slots (256 MiB), avg insert probes 1.21; dictionary 9741572 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 8x8 copies = 1584x1568 tiles = 25344x25088 cells (6.358e8); id buffers 9 MiB each
+  1056 gens (132 sweeps) in 0.098s = 10745.8 gens/s = 6.833e12 cell-updates/s | 3.338e9 table probes/s | 5 runs after a warm-up, median of gens/s: min 1.0563e4, max 1.0761e4
+  verify: 0 table misses, 0 mismatching tiles of 2483712
+alignment classes: 2, cell offsets [(0, 0), (13, 14)]
+pattern lotr1.ANSI-1M.rle rule Hutton32b: tile 16x16, grid 199x197 tiles, period 528 gens (33 cycles), learned in 211.8s
+memo: 4925643 entries -> table 16777216 slots (512 MiB), avg insert probes 1.21; dictionary 19475889 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 8x8 copies = 1592x1576 tiles = 25472x25216 cells (6.423e8); id buffers 9 MiB each
+  1056 gens (132 sweeps) in 0.104s = 10132.1 gens/s = 6.508e12 cell-updates/s | 3.180e9 table probes/s | 5 runs after a warm-up, median of gens/s: min 1.0069e4, max 1.0145e4
+  verify: 0 table misses, 0 mismatching tiles of 2508992
+alignment classes: 4, cell offsets [(0, 0), (13, 14), (11, 10), (8, 4)]
+pattern lotr1.ANSI-1M.rle rule Hutton32b: tile 16x16, grid 199x197 tiles, period 528 gens (33 cycles), learned in 311.7s
+memo: 9851385 entries -> table 33554432 slots (1024 MiB), avg insert probes 1.21; dictionary 38948504 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 8x8 copies = 1592x1576 tiles = 25472x25216 cells (6.423e8); id buffers 9 MiB each
+  1056 gens (132 sweeps) in 0.111s = 9496.7 gens/s = 6.100e12 cell-updates/s | 2.980e9 table probes/s | 5 runs after a warm-up, median of gens/s: min 7.7450e3, max 9.9022e3
+  verify: 0 table misses, 0 mismatching tiles of 2508992

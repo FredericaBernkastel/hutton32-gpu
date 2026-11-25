@@ -1,0 +1,31 @@
+=== sweep-tiles       sweep tiles 16x16 to 256x256 on 32x32 ROMs (gpu-sweep; long)
+pattern lotr1.ANSI-1M.rle rule Hutton32b: tile 16x16, grid 198x196 tiles, period 528 gens (33 cycles), learned in 85.3s
+memo: 2462688 entries -> table 8388608 slots (256 MiB), avg insert probes 1.21; dictionary 9741572 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 32x32 copies = 6336x6272 tiles = 101376x100352 cells (1.017e10); id buffers 151 MiB each
+  528 gens (66 sweeps) in 0.642s = 822.5 gens/s = 8.368e12 cell-updates/s | 4.086e9 table probes/s | 5 runs after a warm-up, median of gens/s: min 8.1160e2, max 8.2351e2
+  verify: 0 table misses, 0 mismatching tiles of 39739392
+pattern lotr1.ANSI-1M.rle rule Hutton32b: tile 32x32, grid 101x100 tiles, period 1056 gens (33 cycles), learned in 82.3s
+memo: 628903 entries -> table 2097152 slots (64 MiB), avg insert probes 1.22; dictionary 2462688 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 32x32 copies = 3232x3200 tiles = 103424x102400 cells (1.059e10); id buffers 39 MiB each
+  1056 gens (66 sweeps) in 0.051s = 20621.9 gens/s = 2.184e14 cell-updates/s | 1.333e10 table probes/s | 5 runs after a warm-up, median of gens/s: min 2.0460e4, max 2.0684e4
+  verify: 0 table misses, 0 mismatching tiles of 10342400
+pattern lotr1.ANSI-1M.rle rule Hutton32b: tile 64x64, grid 53x52 tiles, period 2112 gens (33 cycles), learned in 46.3s
+memo: 162691 entries -> table 524288 slots (16 MiB), avg insert probes 1.22; dictionary 628903 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 32x32 copies = 1696x1664 tiles = 108544x106496 cells (1.156e10); id buffers 10 MiB each
+  16896 gens (528 sweeps) in 0.089s = 189512.9 gens/s = 2.191e15 cell-updates/s | 1.672e10 table probes/s | 5 runs after a warm-up, median of gens/s: min 1.8701e5, max 1.9087e5
+  verify: 0 table misses, 0 mismatching tiles of 2822144
+pattern lotr1.ANSI-1M.rle rule Hutton32b: tile 128x128, grid 29x28 tiles, period 4224 gens (33 cycles), learned in 45.0s
+memo: 43759 entries -> table 131072 slots (4 MiB), avg insert probes 1.25; dictionary 162691 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 32x32 copies = 928x896 tiles = 118784x114688 cells (1.362e10); id buffers 3 MiB each
+  33792 gens (528 sweeps) in 0.026s = 1305890.3 gens/s = 1.779e16 cell-updates/s | 1.698e10 table probes/s | 5 runs after a warm-up, median of gens/s: min 1.2877e6, max 1.3185e6
+  verify: 0 table misses, 0 mismatching tiles of 831488
+pattern lotr1.ANSI-1M.rle rule Hutton32b: tile 256x256, grid 17x16 tiles, period 8448 gens (33 cycles), learned in 45.3s
+memo: 12475 entries -> table 32768 slots (1 MiB), avg insert probes 1.30; dictionary 43759 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 32x32 copies = 544x512 tiles = 139264x131072 cells (1.825e10); id buffers 1 MiB each
+  67584 gens (528 sweeps) in 0.009s = 7190399.2 gens/s = 1.313e17 cell-updates/s | 1.568e10 table probes/s | 5 runs after a warm-up, median of gens/s: min 7.0897e6, max 7.2007e6
+  verify: 0 table misses, 0 mismatching tiles of 278528

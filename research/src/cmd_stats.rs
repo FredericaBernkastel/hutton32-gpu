@@ -372,7 +372,7 @@ pub fn root(args: &[String]) {
       let finds: u64 = e.levels.iter().map(|l| l.stats.finds).sum();
       let misses: u64 = e.levels.iter().map(|l| l.stats.misses).sum();
       println!(
-        "  gen {:>10}: level {:>2}, nodes {:>9}, finds {:>11}, misses {:>10}, brute {:>9}, cpu {:>7.2}s",
+        "  gen {:>10}: level {:>2}, nodes {:>9}, finds {:>11}, misses {:>10}, brute {:>9}, cpu {:>9.4}s",
         i << k,
         level,
         e.total_nodes(),

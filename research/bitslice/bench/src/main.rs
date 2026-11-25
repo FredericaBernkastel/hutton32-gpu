@@ -159,6 +159,91 @@ fn scalar_grid_step(src: &ByteGrid, dst: &mut ByteGrid) {
   }
 }
 
+/// Output planes as raw pointers, so that threads can write disjoint row bands of one grid.
+#[derive(Clone, Copy)]
+struct OutPlanes([*mut u64; 5]);
+// SAFETY: every thread writes only the rows of its own band (see `plane_step_par`)
+unsafe impl Send for OutPlanes {}
+unsafe impl Sync for OutPlanes {}
+
+/// Bit-sliced step on u64 words for rows y0..y1 (1-based, padding excluded).
+/// SAFETY: `out` must point at planes of the same shape as `src`.
+unsafe fn plane_rows(src: &PlaneGrid, out: OutPlanes, y0: usize, y1: usize) {
+  let ww = src.ww;
+  for y in y0..y1 {
+    let base = y * ww;
+    for i in 1..ww - 1 {
+      let c: [u64; 5] = std::array::from_fn(|k| src.planes[k][base + i]);
+      let n: [u64; 5] = std::array::from_fn(|k| src.planes[k][base - ww + i]);
+      let s: [u64; 5] = std::array::from_fn(|k| src.planes[k][base + ww + i]);
+      let e: [u64; 5] = std::array::from_fn(|k| (c[k] >> 1) | (src.planes[k][base + i + 1] << 63));
+      let w: [u64; 5] = std::array::from_fn(|k| (c[k] << 1) | (src.planes[k][base + i - 1] >> 63));
+      let o = step_planes(c, n, e, s, w);
+      for k in 0..5 {
+        *out.0[k].add(base + i) = o[k];
+      }
+    }
+  }
+}
+
+/// Bit-sliced step on 256-bit words for rows y0..y1.
+/// SAFETY: as `plane_rows`; the row length must be a multiple of 256 cells.
+#[cfg(target_feature = "avx2")]
+unsafe fn plane_rows_wide(src: &PlaneGrid, out: OutPlanes, y0: usize, y1: usize) {
+  use std::arch::x86_64::*;
+  use wide::W;
+  let ww = src.ww;
+  for y in y0..y1 {
+    let base = y * ww;
+    let mut i = 1;
+    while i + 4 <= ww - 1 {
+      let ld = |k: usize, at: usize| _mm256_loadu_si256(src.planes[k].as_ptr().add(at) as *const __m256i);
+      let c: [W; 5] = std::array::from_fn(|k| wide::u64(ld(k, base + i)));
+      let n: [W; 5] = std::array::from_fn(|k| wide::u64(ld(k, base - ww + i)));
+      let s: [W; 5] = std::array::from_fn(|k| wide::u64(ld(k, base + ww + i)));
+      let e: [W; 5] =
+        std::array::from_fn(|k| wide::u64(_mm256_or_si256(_mm256_srli_epi64(c[k].0, 1), _mm256_slli_epi64(ld(k, base + i + 1), 63))));
+      let w: [W; 5] =
+        std::array::from_fn(|k| wide::u64(_mm256_or_si256(_mm256_slli_epi64(c[k].0, 1), _mm256_srli_epi64(ld(k, base + i - 1), 63))));
+      let o = wide::step_planes(c, n, e, s, w);
+      for k in 0..5 {
+        _mm256_storeu_si256(out.0[k].add(base + i) as *mut __m256i, o[k].0);
+      }
+      i += 4;
+    }
+  }
+}
+
+/// The bit-sliced step on `threads` threads, one band of rows each; `wide` selects the AVX2 form.
+#[inline(never)]
+fn plane_step_par(src: &PlaneGrid, dst: &mut PlaneGrid, threads: usize, wide: bool) {
+  let (h, ww) = (src.h, src.ww);
+  assert!(dst.h == h && dst.ww == ww);
+  #[cfg(not(target_feature = "avx2"))]
+  assert!(!wide, "the 256-bit form needs AVX2");
+  let out = OutPlanes(std::array::from_fn(|k| dst.planes[k].as_mut_ptr()));
+  let band = h.div_ceil(threads);
+  std::thread::scope(|sc| {
+    for t in 0..threads {
+      let (y0, y1) = (1 + t * band, (1 + (t + 1) * band).min(h + 1));
+      if y0 >= y1 {
+        continue;
+      }
+      sc.spawn(move || {
+        // SAFETY: bands are disjoint, `out` has the shape of `src`
+        unsafe {
+          #[cfg(target_feature = "avx2")]
+          if wide {
+            plane_rows_wide(src, out, y0, y1);
+            return;
+          }
+          plane_rows(src, out, y0, y1);
+        }
+      });
+    }
+  });
+}
+
 /// Bit-sliced step on 256-bit words: one call of the gate network per 256 cells.
 #[cfg(target_feature = "avx2")]
 #[inline(never)]
@@ -406,6 +491,8 @@ struct Row {
   scalar_rate: f64,
   bits_rate: f64,
   wide_rate: Option<f64>,
+  bits_mt_rate: Option<f64>,
+  wide_mt_rate: Option<f64>,
 }
 
 /// Time `gens` steps of a byte-grid engine.
@@ -436,8 +523,10 @@ fn bench_content(
   evolve: bool,
   gens: usize,
   repeats: usize,
+  threads: usize,
 ) -> Row {
   let cells = start.w * start.h;
+  let wide_ok = cfg!(target_feature = "avx2") && start.w % 256 == 0;
   // ---- verification: all engines side by side ----
   let check_gens = if evolve { gens.min(64) } else { 16 };
   let mut a = start.clone();
@@ -457,6 +546,16 @@ fn bench_content(
       let mut pw = PlaneGrid::new(start.w, start.h);
       plane_step_wide(&pa, &mut pw);
       total_diff += count_diff(&b, &pw.to_bytes());
+    }
+    if threads > 1 {
+      let mut pm = PlaneGrid::new(start.w, start.h);
+      plane_step_par(&pa, &mut pm, threads, false);
+      total_diff += count_diff(&b, &pm.to_bytes());
+      if wide_ok {
+        let mut pm = PlaneGrid::new(start.w, start.h);
+        plane_step_par(&pa, &mut pm, threads, true);
+        total_diff += count_diff(&b, &pm.to_bytes());
+      }
     }
     plane_step(&pa, &mut pb);
     total_diff += count_diff(&b, &pb.to_bytes()) + count_diff(&b, &sb);
@@ -498,6 +597,8 @@ fn bench_content(
   let wide_time = if start.w % 256 == 0 { Some(time_planes(&|a, b| plane_step_wide(a, b))) } else { None };
   #[cfg(not(target_feature = "avx2"))]
   let wide_time: Option<f64> = None;
+  let bits_mt_time = (threads > 1).then(|| time_planes(&|a, b| plane_step_par(a, b, threads, false)));
+  let wide_mt_time = (threads > 1 && wide_ok).then(|| time_planes(&|a, b| plane_step_par(a, b, threads, true)));
   let rate = |t: f64| cells as f64 * gens as f64 / t;
   Row {
     content: name.to_string(),
@@ -507,6 +608,8 @@ fn bench_content(
     scalar_rate: cells as f64 * scalar_gens as f64 / scalar_time,
     bits_rate: rate(bits_time),
     wide_rate: wide_time.map(rate),
+    bits_mt_rate: bits_mt_time.map(rate),
+    wide_mt_rate: wide_mt_time.map(rate),
   }
 }
 
@@ -520,6 +623,7 @@ fn main() {
     .map(|s| s.split(',').map(|t| t.parse().expect("bad --size")).collect())
     .unwrap_or(vec![512, 4096]);
   let repeats: usize = opt(&args, "--repeats").map(|s| s.parse().unwrap()).unwrap_or(5);
+  let threads: usize = opt(&args, "--threads").map(|s| s.parse().unwrap()).unwrap_or(1);
 
   let lut_vec = std::fs::read(&lut_path).unwrap_or_else(|e| panic!("cannot read {}: {e}", lut_path.display()));
   assert_eq!(lut_vec.len(), LUT_SIZE, "LUT must have 2^25 bytes");
@@ -532,7 +636,7 @@ fn main() {
   } else {
     "baseline x86-64 (sse2)"
   };
-  println!("target features: {simd}; single thread");
+  println!("target features: {simd}; single thread{}", if threads > 1 { format!(", plus the bit-sliced forms on {threads} threads") } else { String::new() });
 
   let t = Instant::now();
   let bad = exhaustive_check(lut);
@@ -574,11 +678,11 @@ fn main() {
     let gens: usize = opt(&args, "--gens").map(|s| s.parse().unwrap()).unwrap_or((1usize << 28) / cells).max(4);
     println!("grid {size}x{size} = {cells} cells, {gens} generations per timed run, best of {repeats}");
     let rnd = random_grid(size, size, 0x9E37_79B9_7F4A_7C15 ^ size as u64);
-    rows.push(bench_content("uniform random states", lut, &small, &rnd, false, gens, repeats));
+    rows.push(bench_content("uniform random states", lut, &small, &rnd, false, gens, repeats, threads));
     let (g, copies) = tiled_pattern(pw, ph, &pat, size, 4);
     if copies > 0 {
       let name = format!("{} x{copies}", pat_path.file_stem().unwrap().to_string_lossy());
-      rows.push(bench_content(&name, lut, &small, &g, true, gens, repeats));
+      rows.push(bench_content(&name, lut, &small, &g, true, gens, repeats, threads));
     }
   }
   println!();
@@ -599,5 +703,14 @@ fn main() {
       r.bits_rate / r.lut_rate,
       r.wide_rate.map(|v| format!("{v:.3e}")).unwrap_or("-".into())
     );
+  }
+  if threads > 1 {
+    println!();
+    println!("bit-sliced forms on {threads} threads (row bands), cell-updates per second:");
+    println!("{:<30} {:>9} {:>14} {:>14}", "content", "cells", "u64", "256-bit");
+    for r in &rows {
+      let f = |v: Option<f64>| v.map(|v| format!("{v:.3e}")).unwrap_or("-".into());
+      println!("{:<30} {:>9} {:>14} {:>14}", r.content, r.cells, f(r.bits_mt_rate), f(r.wide_mt_rate));
+    }
   }
 }

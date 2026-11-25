@@ -1,0 +1,89 @@
+=== golly-rom-long   Golly on the ROM at step 1 past one period, until its 8 GB limit (needs Golly; about 7 minutes)
+# Run at 06:43 as part of the golly target (timeout 600 s), before time_golly.py reported failed runs as such:
+# bgolly printed generations up to 538 and then exited with an error after 431.4 s (load 1.5 s) at a peak
+# working set of 8005 MiB, its -M 8000 limit. The 'gens/s' figure on the step line below divides the requested
+# 1056 generations by that time and is wrong: 538 generations in 429.9 s is 1.25 gens/s. Raw output follows.
+pattern patterns/misc/extra/lotr1.ANSI-1M.rle
+load-only 1.541s (algo RuleLoader, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
+bgolly failed: 459
+460
+461
+462
+463
+464
+465
+466
+467
+468
+469
+470
+471
+472
+473
+474
+475
+476
+477
+478
+479
+480
+481
+482
+483
+484
+485
+486
+487
+488
+489
+490
+491
+492
+493
+494
+495
+496
+497
+498
+499
+500
+501
+502
+503
+504
+505
+506
+507
+508
+509
+510
+511
+512
+513
+514
+515
+516
+517
+518
+519
+520
+521
+522
+523
+524
+525
+526
+527
+528
+529
+530
+531
+532
+533
+534
+535
+536
+537
+538
+ b''
+step        1:  429.859s net,            2.5 gens/s, 2.326e+07 cell-updates/s, peak 8005 MiB

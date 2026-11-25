@@ -146,16 +146,16 @@ pub fn run(args: &[String]) {
   let gens: u64 = opt_or(args, "--gens", 256);
   let wg: (u32, u32) = (opt_or(args, "--wgx", 8), opt_or(args, "--wgy", 8));
   let same_src = flag(args, "--same-src");
-  let spec = cmd_stats::variant_for(args, "hutton32b");
-  let lut = crate::load_lut(&spec);
   let default_wgsl = crate::repo_root().join("research/bitslice/step_planes.wgsl");
   let wgsl_path: std::path::PathBuf = opt(args, "--wgsl").map(Into::into).unwrap_or(default_wgsl);
 
   // content: uniformly random states, or a tiled pattern; width is a multiple of 32 so that the
   // CPU reference sees exactly the cells the kernel updates
   let side = side.div_ceil(32) * 32;
+  let mut file_rule = String::new();
   let (g, what) = if let Some(p) = opt(args, "--pattern") {
-    let (loaded, _) = cmd_stats::load_pattern(std::path::Path::new(&p));
+    let (loaded, fr) = cmd_stats::load_pattern(std::path::Path::new(&p));
+    file_rule = fr;
     let cmd_stats::Loaded::Dense(pat) = loaded else { panic!("dense pattern required") };
     let (cw, ch) = (pat.w + 8, pat.h + 8);
     let (rx, ry) = ((side / cw).max(1), (side / ch).max(1));
@@ -173,6 +173,12 @@ pub fn run(args: &[String]) {
     }
     (g, "uniform random soup".to_string())
   };
+  // the reference is the pattern's own rule; the circuit implements Hutton32b only
+  let spec = cmd_stats::variant_for(args, if file_rule.is_empty() { "hutton32b" } else { &file_rule });
+  let lut = crate::load_lut(&spec);
+  if spec.name() != "Hutton32b" {
+    println!("note: the circuit implements Hutton32b; the CPU reference uses {}", spec.name());
+  }
   let gpu = Gpu::new(opt(args, "--backend").as_deref());
   println!("GPU: {}", gpu.describe());
   let (words, ww, h) = pack_planes(&g);
@@ -235,9 +241,15 @@ pub fn run(args: &[String]) {
     wg.1
   );
   let verify = flag(args, "--verify");
-  let (secs, out) = r.go(&step, &words, gens, same_src, verify);
+  let mut out = Vec::new();
+  let all = crate::repeat_timed(args, || {
+    let (s, o) = r.go(&step, &words, gens, same_src, verify);
+    out = o;
+    s
+  });
+  let (secs, spread) = crate::median_and_spread(&all, gens as f64, "gens/s");
   let mut line = format!(
-    "  bit-plane kernel: {gens} gens in {secs:.3}s = {:.1} gens/s = {:.3e} cell-updates/s ({:.0} MiB per buffer)",
+    "  bit-plane kernel: {gens} gens in {secs:.3}s = {:.1} gens/s = {:.3e} cell-updates/s ({:.0} MiB per buffer){spread}",
     gens as f64 / secs,
     (g.w * g.h) as f64 * gens as f64 / secs,
     (words.len() * 4) as f64 / 1048576.0
@@ -494,13 +506,13 @@ pub fn tile(args: &[String]) {
   let th: u32 = opt_or(args, "--th", 32 - 2 * k);
   let gens: u64 = opt_or::<u64>(args, "--gens", 256) / k as u64 * k as u64;
   let same_src = flag(args, "--same-src");
-  let spec = cmd_stats::variant_for(args, "hutton32b");
-  let lut = crate::load_lut(&spec);
   let default_wgsl = crate::repo_root().join("research/bitslice/step_planes.wgsl");
   let wgsl_path: std::path::PathBuf = opt(args, "--wgsl").map(Into::into).unwrap_or(default_wgsl);
   let side = side.div_ceil(32) * 32;
+  let mut file_rule = String::new();
   let (g, what) = if let Some(p) = opt(args, "--pattern") {
-    let (loaded, _) = cmd_stats::load_pattern(std::path::Path::new(&p));
+    let (loaded, fr) = cmd_stats::load_pattern(std::path::Path::new(&p));
+    file_rule = fr;
     let cmd_stats::Loaded::Dense(pat) = loaded else { panic!("dense pattern required") };
     let (cw, ch) = (pat.w + 8, pat.h + 8);
     let (rx, ry) = ((side / cw).max(1), (side / ch).max(1));
@@ -518,6 +530,12 @@ pub fn tile(args: &[String]) {
     }
     (g, "uniform random soup".to_string())
   };
+  // the reference is the pattern's own rule; the circuit implements Hutton32b only
+  let spec = cmd_stats::variant_for(args, if file_rule.is_empty() { "hutton32b" } else { &file_rule });
+  let lut = crate::load_lut(&spec);
+  if spec.name() != "Hutton32b" {
+    println!("note: the circuit implements Hutton32b; the CPU reference uses {}", spec.name());
+  }
   let gpu = Gpu::new(opt(args, "--backend").as_deref());
   let (ew, eh) = (tw + 2, th + 2 * k);
   let lim = &gpu.limits;
@@ -559,21 +577,25 @@ pub fn tile(args: &[String]) {
   let (ab, ba) = (mk(&a, &b), mk(&b, &a));
   let (dx, dy) = ((ww as u32 - 2).div_ceil(tw), (h as u32 - 2).div_ceil(th));
   let passes = gens / k as u64;
-  let secs = gpu.timed(|| {
-    let mut enc = gpu.device.create_command_encoder(&Default::default());
-    {
-      let mut pass = enc.begin_compute_pass(&Default::default());
-      pass.set_pipeline(&pipeline);
-      for i in 0..passes {
-        pass.set_bind_group(0, if same_src || i % 2 == 0 { &ab } else { &ba }, &[]);
-        pass.dispatch_workgroups(dx, dy, 1);
+  let all = crate::repeat_timed(args, || {
+    gpu.queue.write_buffer(&a, 0, bytemuck::cast_slice(&words));
+    gpu.timed(|| {
+      let mut enc = gpu.device.create_command_encoder(&Default::default());
+      {
+        let mut pass = enc.begin_compute_pass(&Default::default());
+        pass.set_pipeline(&pipeline);
+        for i in 0..passes {
+          pass.set_bind_group(0, if same_src || i % 2 == 0 { &ab } else { &ba }, &[]);
+          pass.dispatch_workgroups(dx, dy, 1);
+        }
       }
-    }
-    gpu.queue.submit(Some(enc.finish()));
+      gpu.queue.submit(Some(enc.finish()));
+    })
   });
+  let (secs, spread) = crate::median_and_spread(&all, gens as f64, "gens/s");
   let evals: f64 = (1..=k).map(|g| (ew * (eh - 2 * g)) as f64).sum();
   let mut line = format!(
-    "tile kernel k={k}, tile {}x{} cells ({tw} word groups x {th} rows), {:.2} circuit evaluations per cell-update | {what} {}x{} | {gens} gens in {secs:.3}s = {:.1} gens/s = {:.3e} cell-updates/s | {:.2} us per dispatch",
+    "tile kernel k={k}, tile {}x{} cells ({tw} word groups x {th} rows), {:.2} circuit evaluations per cell-update | {what} {}x{} | {gens} gens in {secs:.3}s = {:.1} gens/s = {:.3e} cell-updates/s | {:.2} us per dispatch{spread}",
     tw * 32,
     th,
     evals / (tw * th * k) as f64,

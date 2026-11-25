@@ -1,0 +1,35 @@
+=== lut-kernel       the byte-LUT kernel, workgroup shapes, DX12 (gpu-brute)
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+brute (byte cells, 8x8 workgroups): advanced counter v2.rle x1 -> 199x205 = 40795 cells
+  65536 gens in 0.234s = 280510.2 gens/s = 1.144e10 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 2.7122e5, max 2.8295e5
+  verify vs CPU: 0 mismatching cells (CPU reference: 3.765e8 cell-updates/s single thread)
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+brute (byte cells, 8x8 workgroups): hutton32b_8bit_counter.rle x1 -> 199x205 = 40795 cells
+  65536 gens in 0.235s = 279192.5 gens/s = 1.139e10 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 2.7764e5, max 2.8472e5
+  verify vs CPU: 0 mismatching cells (CPU reference: 3.716e8 cell-updates/s single thread)
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+brute (byte cells, 8x8 workgroups): squares.rle x1 -> 658x431 = 283598 cells
+  65536 gens in 0.369s = 177772.8 gens/s = 5.042e10 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 1.7656e5, max 1.7798e5
+  verify vs CPU: 0 mismatching cells (CPU reference: 3.964e8 cell-updates/s single thread)
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+brute (byte cells, 8x8 workgroups): hutton32_8bit_counter_old.rle x8 -> 5128x3656 = 18747968 cells
+  2048 gens in 0.229s = 8949.4 gens/s = 1.678e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 6.2302e3, max 9.1263e3
+  verify vs CPU: 0 mismatching cells (CPU reference: 4.132e8 cell-updates/s single thread)
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+brute (byte cells, 8x8 workgroups): hutton32_8bit_counter_old.rle x24 -> 15384x10968 = 168731712 cells
+  512 gens in 0.496s = 1032.5 gens/s = 1.742e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 1.0200e3, max 1.0345e3
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+brute (byte cells, 8x8 workgroups): hutton32_8bit_counter_old.rle x24 -> 15384x10968 = 168731712 cells
+  512 gens in 0.497s = 1029.9 gens/s = 1.738e11 cell-updates/s
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+brute (byte cells, 16x16 workgroups): hutton32_8bit_counter_old.rle x24 -> 15384x10968 = 168731712 cells
+  512 gens in 0.500s = 1025.0 gens/s = 1.729e11 cell-updates/s
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+brute (byte cells, 32x8 workgroups): hutton32_8bit_counter_old.rle x24 -> 15384x10968 = 168731712 cells
+  512 gens in 0.495s = 1033.7 gens/s = 1.744e11 cell-updates/s
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+brute (byte cells, 64x4 workgroups): hutton32_8bit_counter_old.rle x24 -> 15384x10968 = 168731712 cells
+  512 gens in 0.494s = 1037.2 gens/s = 1.750e11 cell-updates/s
+GPU: NVIDIA GeForce RTX 5060 Ti [Dx12, driver ] max_buffer=2047 MiB max_storage_binding=2047 MiB
+brute (byte cells, 8x8 workgroups): hutton32_8bit_counter_old.rle x24 -> 15384x10968 = 168731712 cells
+  512 gens in 0.519s = 986.6 gens/s = 1.665e11 cell-updates/s

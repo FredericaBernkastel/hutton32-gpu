@@ -1,0 +1,25 @@
+=== runlength         counter and chaotic: Golly and the CPU engine as the run grows (needs Golly)
+engine base tile: 8x8 cells; median of runs adding up to 1 s (at most 5)
+pattern                               golly s runs   engine s runs  golly gens/s  engine gens/s  same-state
+advanced counter v2.rle                0.0616    5     0.1214    5        265899         134959  yes
+chaotic.rle                            0.3214    4     0.5736    2         50982          28561  yes
+engine base tile: 8x8 cells; median of runs adding up to 1 s (at most 5)
+pattern                               golly s runs   engine s runs  golly gens/s  engine gens/s  same-state
+advanced counter v2.rle                0.1802    5     0.3266    4        363749         200692  yes
+chaotic.rle                            2.1364    1     2.9796    1         30675          21995  yes
+engine base tile: 8x8 cells; median of runs adding up to 1 s (at most 5)
+pattern                               golly s runs   engine s runs  golly gens/s  engine gens/s  same-state
+advanced counter v2.rle                0.5433    2     1.0025    2        482473         261503  yes
+chaotic.rle                            2.8166    1     4.7355    1         93072          55357  yes
+engine base tile: 8x8 cells; median of runs adding up to 1 s (at most 5)
+pattern                               golly s runs   engine s runs  golly gens/s  engine gens/s  same-state
+advanced counter v2.rle                1.6164    1     1.7711    1        648717         592048  yes
+chaotic.rle                            3.2007    1     5.6617    1        327611         185205  yes
+engine base tile: 8x8 cells; median of runs adding up to 1 s (at most 5)
+pattern                               golly s runs   engine s runs  golly gens/s  engine gens/s  same-state
+advanced counter v2.rle                1.6702    1     1.7991    1       2511205        2331335  yes
+chaotic.rle                            3.7411    1     6.9355    1       1121131         604759  yes
+engine base tile: 8x8 cells; median of runs adding up to 1 s (at most 5)
+pattern                               golly s runs   engine s runs  golly gens/s  engine gens/s  same-state
+advanced counter v2.rle                1.6663    1     1.8759    1      10068380        8943556  yes
+chaotic.rle                            5.3193    1     8.2602    1       3154029        2031091  yes
