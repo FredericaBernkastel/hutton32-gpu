@@ -70,6 +70,12 @@ pub struct Engine<'a> {
   /// window is stepped for every generation (no pyramid shrinking), as a GPU atlas would
   pub brute_win: Vec<u64>,
   pub brute_win_evals: Vec<u64>,
+  /// When set, `solve` records every wave as `[level, distinct requests, misses, parent]`, where
+  /// `parent` is the index of the wave whose misses asked for this one (`NONE` at the top), and
+  /// the misses of every floor wave as node ids in `floor_misses` (for `overview`).
+  pub wave_log: Option<Vec<[u32; 4]>>,
+  pub floor_misses: Vec<Vec<u32>>,
+  wave_parent: u32,
   buf: Vec<u8>,
   tmp: Vec<u8>,
 }
@@ -113,6 +119,9 @@ impl<'a> Engine<'a> {
       expand_tiles: 0,
       brute_win: Vec::new(),
       brute_win_evals: Vec::new(),
+      wave_log: None,
+      floor_misses: Vec::new(),
+      wave_parent: NONE,
       buf: vec![0; 4 * tile_side * tile_side],
       tmp: vec![0; 4 * tile_side * tile_side],
     };
@@ -233,15 +242,25 @@ impl<'a> Engine<'a> {
         st.waves_with_miss += 1;
       }
     }
+    let parent = self.wave_parent;
+    if let Some(log) = self.wave_log.as_mut() {
+      log.push([l as u32, q.len() as u32, miss.len() as u32, parent]);
+      self.wave_parent = log.len() as u32 - 1;
+    }
     if miss.is_empty() {
+      self.wave_parent = parent;
       return;
     }
     let a = self.a;
     if l == a + 1 {
+      if self.wave_log.is_some() {
+        self.floor_misses.push(miss.clone());
+      }
       for &m in &miss {
         let r = self.brute(m);
         self.levels[l].res[m as usize] = r;
       }
+      self.wave_parent = parent;
       return;
     }
     let full = l - 2 <= self.step_log2;
@@ -329,6 +348,7 @@ impl<'a> Engine<'a> {
         self.levels[l].res[m as usize] = id;
       }
     }
+    self.wave_parent = parent;
   }
 
   // ---- construction ----------------------------------------------------------------------

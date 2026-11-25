@@ -491,6 +491,40 @@ impl Policy {
   pub fn region_costs(&self) -> FxHashMap<(i64, i64), f64> {
     self.regions.iter().map(|(k, r)| (*k, r.cost_hash + r.cost_brute)).collect()
   }
+  /// Per region with work, sorted by position: what the controller did there.
+  pub fn region_report(&self) -> Vec<RegionReport> {
+    let mut v: Vec<RegionReport> = self
+      .regions
+      .iter()
+      .filter(|(_, r)| r.time_in.iter().any(|&c| c > 0))
+      .map(|(k, r)| RegionReport {
+        x: k.0,
+        y: k.1,
+        steps: r
+          .time_in
+          .iter()
+          .enumerate()
+          .filter(|(_, &c)| c > 0)
+          .map(|(i, &c)| (if i == BRUTE_SLOT { 0 } else { 1u32 << (i + 1) }, c))
+          .collect(),
+        hash_ns: r.cost_hash,
+        cells_ns: r.cost_brute,
+      })
+      .collect();
+    v.sort_by_key(|r| (r.y, r.x));
+    v
+  }
+}
+
+/// One region of the controller's grid: its position in regions, the macro-steps with work it
+/// spent in each mode as `(side of the brute-forced window, steps)` with side 0 for plain cells,
+/// and its model cost.
+pub struct RegionReport {
+  pub x: i64,
+  pub y: i64,
+  pub steps: Vec<(u32, u32)>,
+  pub hash_ns: f64,
+  pub cells_ns: f64,
 }
 
 impl FloorPolicy for Policy {
@@ -634,6 +668,7 @@ struct RunResult {
   hist: Vec<(String, f64)>,
   fp: hl::Fingerprint,
   region_costs: FxHashMap<(i64, i64), f64>,
+  regions: Vec<RegionReport>,
   cpu_s: f64,
 }
 
@@ -701,8 +736,28 @@ fn run_policy(label: &str, kind: Kind, init: Mode, g: &Grid, lut: &crate::ca::Ru
     hist: pol.mode_histogram(),
     fp,
     region_costs: pol.region_costs(),
+    regions: pol.region_report(),
     cpu_s: t0.elapsed().as_secs_f64(),
   }
+}
+
+/// What `overview` shows of the controller: the adaptive policy (Algorithm 3 of the paper) on the
+/// universe `g`, as `controller` runs it.
+pub struct ControllerMap {
+  pub regions: Vec<RegionReport>,
+  /// model time of the adaptive policy and of plain cells over the non-empty regions, in ms
+  pub adaptive_ms: f64,
+  pub plain_ms: f64,
+  /// share of worked region-steps per mode, as the `adapt` table prints it
+  pub hist: Vec<(String, f64)>,
+  pub note: String,
+}
+
+pub fn controller_map(g: &Grid, lut: &crate::ca::Rule, a: usize, k: usize, rl: usize, gens: u64) -> ControllerMap {
+  let maxf = 4usize.clamp(a, rl - 1);
+  let mut plain_ns = 0.0;
+  let r = run_policy("adaptive", Kind::Adaptive, Mode::Floor(a.clamp(a, maxf)), g, lut, a, k, rl, gens >> k, Model::default(), maxf, &mut plain_ns);
+  ControllerMap { adaptive_ms: r.hash_ms + r.brute_ms, plain_ms: plain_ns / 1e6, hist: r.hist, note: r.note.trim().to_string(), regions: r.regions }
 }
 
 pub fn run(args: &[String]) {

@@ -45,7 +45,7 @@ tile              shared tile, k generations per dispatch (gpu-tile)
 cpu-bench         CPU engines, default and target-cpu=native builds (bitslice/bench)
 cpu-parallel      bit-sliced CPU forms on 4 threads: random states and the ROM (bitslice/bench)
 reprice           engine-choice and counter-work re-priced at the rate of the bit-plane kernel
-figures           Figs. 2-4 as SVG in figures/, from the medians in logs/2026-11-25 (tools/figures.py)
+figures           the overview diagram and Figs. 2-4 as SVG in figures/ (overview, about a minute on the CPU; tools/ghl_diagram.py, tools/figures.py)
 life-kernels      Life: bit-sliced Moore kernel by grid size, shared tile on small grids (gpu-life)
 life-golly        Life: Golly HashLife and QuickLife on a soup and the Unit Life Cell; the soup on the GPU (needs Golly)
 life-h2h          Life: the CPU engine vs Golly HashLife, final states compared (needs Golly)
@@ -245,7 +245,8 @@ run() {
   reprice)
     bash tools/engine_choice.sh $R 4096 --cell-rate 2.9e11
     $R adapt --pattern "$CTR" --gens 16384 --a 3 --cell-rate 2.9e11 ;;
-  figures) py tools/figures.py ;;
+  figures) # the diagram draws out/overview.json (the reference engine on the patterns), the logs and the two gate networks
+    $R overview && py tools/ghl_diagram.py && py tools/figures.py ;;
   life-kernels) # random soups fill the grid; widths are multiples of 32
     $R gpu-life --side 512 --gens 1024 --verify
     $R gpu-life --side 512 --gens 1024 --k 16 --tw 6 --th 32 --verify

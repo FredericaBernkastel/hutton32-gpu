@@ -2,3 +2,5 @@
 /peer-review.md
 # metadata and web pages fetched to verify the references (third-party content)
 /sources/
+# local secrets, e.g. OPENROUTER_API_KEY for the schematic generator
+/.env

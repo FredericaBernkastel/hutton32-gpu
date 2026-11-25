@@ -9,6 +9,7 @@ mod cmd_gpu;
 mod cmd_life;
 mod cmd_insert;
 mod cmd_lut;
+mod cmd_overview;
 mod cmd_sparse;
 mod cmd_stats;
 mod flat;
@@ -106,6 +107,7 @@ fn main() {
     "ruletree" => cmd_stats::ruletree(rest),
     "rulediff" => cmd_stats::rulediff(rest),
     "adapt" => cmd_adapt::run(rest),
+    "overview" => cmd_overview::run(rest),
     "gpu-baseline" => cmd_gpu::baseline(rest),
     "gpu-brute" => cmd_gpu::brute(rest),
     "gpu-sweep" => cmd_gpu::sweep(rest),
@@ -134,6 +136,7 @@ fn main() {
           "  export --pattern P --out F [--as RULE]       write RLE",
           "  ruletree --rule R --name N [--out F]         write a Golly @TREE rule from a LUT",
           "  adapt --pattern P | --compose SPEC [--gens N --k K --rl R --a A]  adaptive subdivision / engine choice",
+          "  overview [--out F]                           the data of the overview diagram (tools/ghl_diagram.py), as JSON",
           "GPU (all results are checked against the CPU):",
           "  gpu-baseline [--pattern P --reps N --gens G] archived kernel, verbatim structure",
           "  gpu-brute [--pattern P --reps N --gens G]    per-cell LUT kernel done properly",

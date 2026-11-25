@@ -1,3 +1,4 @@
 /target
 /out
 /bitslice/**/target*/
+__pycache__/
