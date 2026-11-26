@@ -10,6 +10,14 @@ pollster = "0.4"
 bytemuck = { version = "1", features = ["derive"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 rustc-hash = "2"
+# The CubeCL port of `gpu-life` (`cubecl-life`), off by default: `cargo build --release --features cubecl`.
+# Pinned exactly: the 0.12 line is a pre-release and its API changes between pre-releases.
+cubecl = { version = "=0.12.0-pre.2", features = ["wgpu", "wgpu-spirv"], optional = true }
+# for the `Runtime` trait only, which `cubecl` does not re-export: naming a compiler needs it
+cubecl-runtime = { version = "=0.12.0-pre.2", optional = true }
+
+[features]
+cubecl = ["dep:cubecl", "dep:cubecl-runtime"]
 
 [profile.release]
 opt-level = 3

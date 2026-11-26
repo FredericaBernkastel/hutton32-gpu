@@ -1,0 +1,164 @@
+=== gpu-life --side 256 --gens 65536 --repeats 5
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+  life kernel: 65536 gens in 0.1456s = 450121.0 gens/s = 2.950e10 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 3.9884e5, max 4.6051e5
+=== cubecl-life --side 256 --gens 65536 --repeats 5 --compiler spirv
+GPU: wgpu<spirv> (spirv)
+  life kernel: 65536 gens in 0.4359s = 150346.6 gens/s = 9.853e9 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 1.4626e5, max 1.7040e5
+=== cubecl-life --side 256 --gens 65536 --repeats 5 --compiler wgsl
+GPU: wgpu<spirv> (wgsl)
+  life kernel: 65536 gens in 0.5670s = 115592.8 gens/s = 7.575e9 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 6.5982e4, max 1.1870e5
+=== gpu-life --side 1024 --gens 8192 --repeats 5
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+  life kernel: 8192 gens in 0.0237s = 346190.1 gens/s = 3.630e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 3.3471e5, max 3.5766e5
+=== cubecl-life --side 1024 --gens 8192 --repeats 5 --compiler spirv
+GPU: wgpu<spirv> (spirv)
+  life kernel: 8192 gens in 0.0467s = 175530.3 gens/s = 1.841e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 1.6437e5, max 1.8274e5
+=== cubecl-life --side 1024 --gens 8192 --repeats 5 --compiler wgsl
+GPU: wgpu<spirv> (wgsl)
+  life kernel: 8192 gens in 0.0760s = 107743.8 gens/s = 1.130e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.6989e4, max 1.2688e5
+=== gpu-life --side 4096 --gens 2048 --repeats 5
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+  life kernel: 2048 gens in 0.0244s = 84070.5 gens/s = 1.410e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.3399e4, max 8.5046e4
+=== cubecl-life --side 4096 --gens 2048 --repeats 5 --compiler spirv
+GPU: wgpu<spirv> (spirv)
+  life kernel: 2048 gens in 0.0222s = 92410.8 gens/s = 1.550e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 9.1774e4, max 9.3468e4
+=== cubecl-life --side 4096 --gens 2048 --repeats 5 --compiler wgsl
+GPU: wgpu<spirv> (wgsl)
+  life kernel: 2048 gens in 0.0225s = 91204.6 gens/s = 1.530e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 7.1789e4, max 9.2068e4
+=== gpu-life --side 16384 --gens 256 --repeats 5
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+  life kernel: 256 gens in 0.0488s = 5246.5 gens/s = 1.408e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 5.2221e3, max 5.2765e3
+=== cubecl-life --side 16384 --gens 256 --repeats 5 --compiler spirv
+GPU: wgpu<spirv> (spirv)
+  life kernel: 256 gens in 0.0488s = 5243.0 gens/s = 1.407e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 5.0075e3, max 5.2611e3
+=== cubecl-life --side 16384 --gens 256 --repeats 5 --compiler wgsl
+GPU: wgpu<spirv> (wgsl)
+  life kernel: 256 gens in 0.0494s = 5183.2 gens/s = 1.391e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 5.1252e3, max 5.1861e3
+=== gpu-life --side 32768 --gens 64 --repeats 5
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+  life kernel: 64 gens in 0.0730s = 877.2 gens/s = 9.419e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.4934e2, max 9.1024e2
+=== cubecl-life --side 32768 --gens 64 --repeats 5 --compiler spirv
+GPU: wgpu<spirv> (spirv)
+  life kernel: 64 gens in 0.0473s = 1351.7 gens/s = 1.451e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 1.2754e3, max 1.3539e3
+=== cubecl-life --side 32768 --gens 64 --repeats 5 --compiler wgsl
+GPU: wgpu<spirv> (wgsl)
+  life kernel: 64 gens in 0.0483s = 1324.6 gens/s = 1.422e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.7078e2, max 1.3353e3
+=== gpu-life --side 256 --gens 65536 --k 16 --tw 6 --th 32 --repeats 5
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+  life kernel: 65536 gens in 0.0319s = 2052978.5 gens/s = 1.345e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 1.9682e6, max 2.0853e6
+=== cubecl-life --side 256 --gens 65536 --k 16 --tw 6 --th 32 --repeats 5 --compiler spirv
+GPU: wgpu<spirv> (spirv)
+  life kernel: 65536 gens in 0.0272s = 2407376.1 gens/s = 1.578e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 1.3968e6, max 2.4231e6
+=== cubecl-life --side 256 --gens 65536 --k 16 --tw 6 --th 32 --repeats 5 --compiler wgsl
+GPU: wgpu<spirv> (wgsl)
+  life kernel: 65536 gens in 0.0339s = 1932554.1 gens/s = 1.267e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 1.8028e6, max 2.0440e6
+=== gpu-life --side 1024 --gens 8192 --k 16 --tw 6 --th 32 --repeats 5
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+  life kernel: 8192 gens in 0.0116s = 704161.2 gens/s = 7.384e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 6.8630e5, max 7.1182e5
+=== cubecl-life --side 1024 --gens 8192 --k 16 --tw 6 --th 32 --repeats 5 --compiler spirv
+GPU: wgpu<spirv> (spirv)
+  life kernel: 8192 gens in 0.0089s = 921858.1 gens/s = 9.666e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.9796e5, max 9.2486e5
+=== cubecl-life --side 1024 --gens 8192 --k 16 --tw 6 --th 32 --repeats 5 --compiler wgsl
+GPU: wgpu<spirv> (wgsl)
+  life kernel: 8192 gens in 0.0103s = 797150.8 gens/s = 8.359e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 7.8999e5, max 8.0359e5
+=== cubecl-life --side 4096 --gens 2048 --repeats 5 --compiler spirv --checked
+GPU: wgpu<spirv> (spirv)
+  life kernel: 2048 gens in 0.0220s = 92941.8 gens/s = 1.559e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.7814e4, max 9.3433e4
+=== cubecl-life --side 1024 --gens 8192 --k 16 --tw 6 --th 32 --repeats 5 --compiler spirv --checked
+GPU: wgpu<spirv> (spirv)
+  life kernel: 8192 gens in 0.0090s = 912615.3 gens/s = 9.569e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.9142e5, max 9.1994e5
+=== gpu-life --side 512 --gens 1024 --k 16 --tw 6 --th 32 --verify
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+  life kernel: 1024 gens in 0.0012s = 842521.0 gens/s = 2.209e11 cell-updates/s
+  final state after 1024 gens: population 11279 bbox 512x512 hash a75cb93ec982babd
+  verify vs the table on the CPU: 0 mismatching cells
+=== cubecl-life --side 512 --gens 1024 --verify --compiler spirv
+GPU: wgpu<spirv> (spirv)
+  life kernel: 1024 gens in 0.0406s = 25206.6 gens/s = 6.608e9 cell-updates/s
+  final state after 1024 gens: population 11279 bbox 512x512 hash a75cb93ec982babd
+  verify vs the table on the CPU: 0 mismatching cells
+=== cubecl-life --side 512 --gens 1024 --k 16 --tw 6 --th 32 --verify --compiler spirv
+GPU: wgpu<spirv> (spirv)
+  life kernel: 1024 gens in 0.3744s = 2734.9 gens/s = 7.169e8 cell-updates/s
+  final state after 1024 gens: population 11279 bbox 512x512 hash a75cb93ec982babd
+  verify vs the table on the CPU: 0 mismatching cells
+=== cubecl-life --side 512 --gens 1024 --k 16 --tw 6 --th 32 --verify --compiler spirv --checked
+GPU: wgpu<spirv> (spirv)
+  life kernel: 1024 gens in 0.4381s = 2337.6 gens/s = 6.128e8 cell-updates/s
+  final state after 1024 gens: population 11279 bbox 512x512 hash a75cb93ec982babd
+  verify vs the table on the CPU: 0 mismatching cells
+=== cubecl-life --side 512 --gens 1024 --verify --compiler wgsl
+GPU: wgpu<spirv> (wgsl)
+  life kernel: 1024 gens in 0.0347s = 29528.4 gens/s = 7.741e9 cell-updates/s
+  final state after 1024 gens: population 11279 bbox 512x512 hash a75cb93ec982babd
+  verify vs the table on the CPU: 0 mismatching cells
+=== cubecl-life --side 512 --gens 1024 --k 16 --tw 6 --th 32 --verify --compiler wgsl
+GPU: wgpu<spirv> (wgsl)
+  life kernel: 1024 gens in 0.0799s = 12814.0 gens/s = 3.359e9 cell-updates/s
+  final state after 1024 gens: population 11279 bbox 512x512 hash a75cb93ec982babd
+  verify vs the table on the CPU: 0 mismatching cells
+=== cubecl-life --side 512 --gens 1024 --k 16 --tw 6 --th 32 --verify --compiler wgsl --checked
+GPU: wgpu<spirv> (wgsl)
+  life kernel: 1024 gens in 0.2630s = 3893.6 gens/s = 1.021e9 cell-updates/s
+  final state after 1024 gens: population 11279 bbox 512x512 hash a75cb93ec982babd
+  verify vs the table on the CPU: 0 mismatching cells
+
+real	1m21.331s
+user	0m0.580s
+sys	0m0.705s
+
+# hand-written WGSL without naga's runtime checks (--trusted), the sizes where CubeCL led
+=== gpu-life --side 4096 --gens 2048 --repeats 5
+  life kernel: 2048 gens in 0.0241s = 85009.6 gens/s = 1.426e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.3191e4, max 8.5195e4
+=== gpu-life --side 32768 --gens 64 --repeats 5
+  life kernel: 64 gens in 0.0758s = 844.7 gens/s = 9.070e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 7.6104e2, max 8.8115e2
+=== gpu-life --side 256 --gens 65536 --k 16 --tw 6 --th 32 --repeats 5
+  life kernel: 65536 gens in 0.0318s = 2058259.1 gens/s = 1.349e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 2.0258e6, max 2.0619e6
+=== gpu-life --side 1024 --gens 8192 --k 16 --tw 6 --th 32 --repeats 5
+  life kernel: 8192 gens in 0.0115s = 714983.9 gens/s = 7.497e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 6.8914e5, max 7.1978e5
+=== gpu-life --side 4096 --gens 2048 --repeats 5 --trusted
+  life kernel: 2048 gens in 0.0247s = 82933.8 gens/s = 1.391e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.2133e4, max 8.4837e4
+=== gpu-life --side 32768 --gens 64 --repeats 5 --trusted
+  life kernel: 64 gens in 0.0713s = 897.6 gens/s = 9.638e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 6.5091e2, max 9.0493e2
+=== gpu-life --side 256 --gens 65536 --k 16 --tw 6 --th 32 --repeats 5 --trusted
+  life kernel: 65536 gens in 0.0319s = 2054471.6 gens/s = 1.346e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 2.0271e6, max 2.0856e6
+=== gpu-life --side 1024 --gens 8192 --k 16 --tw 6 --th 32 --repeats 5 --trusted
+  life kernel: 8192 gens in 0.0097s = 841863.0 gens/s = 8.828e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.0852e5, max 8.5627e5
+=== gpu-life --side 512 --gens 1024 --k 16 --tw 6 --th 32 --verify --trusted
+  life kernel: 1024 gens in 0.0009s = 1082452.4 gens/s = 2.838e11 cell-updates/s
+  final state after 1024 gens: population 11279 bbox 512x512 hash a75cb93ec982babd
+  verify vs the table on the CPU: 0 mismatching cells
+=== gpu-life --side 512 --gens 1024 --verify --trusted
+  life kernel: 1024 gens in 0.0057s = 179557.8 gens/s = 4.707e10 cell-updates/s
+  final state after 1024 gens: population 11279 bbox 512x512 hash a75cb93ec982babd
+  verify vs the table on the CPU: 0 mismatching cells
+
+# gpu-life with the input upload submitted before the clock starts (it ran inside the timed submit before)
+=== gpu-life --side 4096 --gens 2048 --repeats 5
+  life kernel: 2048 gens in 0.0239s = 85681.4 gens/s = 1.437e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.1496e4, max 8.6102e4
+=== cubecl-life --side 4096 --gens 2048 --repeats 5 --compiler spirv
+  life kernel: 2048 gens in 0.0220s = 92881.1 gens/s = 1.558e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 8.2843e4, max 9.3036e4
+=== gpu-life --side 16384 --gens 256 --repeats 5
+  life kernel: 256 gens in 0.0483s = 5297.7 gens/s = 1.422e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 5.1012e3, max 5.3137e3
+=== cubecl-life --side 16384 --gens 256 --repeats 5 --compiler spirv
+  life kernel: 256 gens in 0.0489s = 5232.0 gens/s = 1.404e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 5.1574e3, max 5.2526e3
+=== gpu-life --side 32768 --gens 64 --repeats 5
+  life kernel: 64 gens in 0.0472s = 1357.3 gens/s = 1.457e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 1.3425e3, max 1.3649e3
+=== cubecl-life --side 32768 --gens 64 --repeats 5 --compiler spirv
+  life kernel: 64 gens in 0.0488s = 1311.6 gens/s = 1.408e12 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 1.2014e3, max 1.3505e3
+=== gpu-life --side 1024 --gens 8192 --k 16 --tw 6 --th 32 --repeats 5 --trusted
+  life kernel: 8192 gens in 0.0099s = 828437.1 gens/s = 8.687e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 7.6772e5, max 8.3876e5
+=== cubecl-life --side 1024 --gens 8192 --k 16 --tw 6 --th 32 --repeats 5 --compiler spirv
+  life kernel: 8192 gens in 0.0089s = 915634.6 gens/s = 9.601e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 7.9337e5, max 9.2203e5
+=== gpu-life --side 512 --gens 1024 --verify
+  life kernel: 1024 gens in 0.0048s = 214011.0 gens/s = 5.610e10 cell-updates/s
+  final state after 1024 gens: population 11279 bbox 512x512 hash a75cb93ec982babd
+  verify vs the table on the CPU: 0 mismatching cells
+
+# small grids: CubeCL's batching (CUBECL_WGPU_MAX_TASKS) against the dispatch-bound regime
+## CUBECL_WGPU_MAX_TASKS=32
+=== cubecl-life --side 256 --gens 65536 --repeats 5 --compiler spirv
+  life kernel: 65536 gens in 0.4331s = 151306.8 gens/s = 9.916e9 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 5.4754e4, max 1.6761e5
+## CUBECL_WGPU_MAX_TASKS=4096
+=== cubecl-life --side 256 --gens 65536 --repeats 5 --compiler spirv
+  life kernel: 65536 gens in 1.3848s = 47324.8 gens/s = 3.101e9 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 3.9491e4, max 5.6041e4

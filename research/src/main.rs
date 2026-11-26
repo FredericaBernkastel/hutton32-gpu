@@ -7,6 +7,8 @@ mod cmd_bitslice;
 mod cmd_brute2;
 mod cmd_gpu;
 mod cmd_life;
+#[cfg(feature = "cubecl")]
+mod cmd_life_cubecl;
 mod cmd_insert;
 mod cmd_lut;
 mod cmd_overview;
@@ -121,6 +123,8 @@ fn main() {
     "gpu-sparse" => cmd_sparse::run(rest),
     "gpu-life" => cmd_life::run(rest),
     "life-soup" => cmd_life::soup_cmd(rest),
+    #[cfg(feature = "cubecl")]
+    "cubecl-life" => cmd_life_cubecl::run(rest),
     _ => {
       eprintln!(
         "{}",
@@ -152,6 +156,8 @@ fn main() {
           "  gpu-life [--side N | --pattern P [--tiled | --margin M]] [--k K --tw W --th H] [--verify --fingerprint]",
           "                                               Life-like rules: bit-sliced Moore kernel, plain or shared tile",
           "  life-soup --side S [--density D --seed N] --out F   random square soup as RLE",
+          "  cubecl-life [the flags of gpu-life] [--compiler wgsl|spirv --checked]",
+          "                                               gpu-life ported to CubeCL (build with --features cubecl)",
           "rules (--rule, --a, --b, --against): hutton32 | hutton32b (canonical; the WGSL files in archive/src/kernel/rules),",
           "  hutton32-v1 | hutton32b-v1 (those files as archived in commit 256ef91), table:<Golly .rule or .table file>",
           "  (the canonical tables: table:rules/Hutton32.table, table:rules/Hutton32b.rule),",

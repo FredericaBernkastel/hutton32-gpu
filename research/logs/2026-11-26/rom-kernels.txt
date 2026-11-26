@@ -1,0 +1,5 @@
+=== rom-kernels       lotr1.ANSI-1M: byte-LUT kernel and one CPU core
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+brute (byte cells, 8x8 workgroups): lotr1.ANSI-1M.rle x1 -> 3103x3067 = 9516901 cells
+  528 gens in 0.027s = 19312.9 gens/s = 1.838e11 cell-updates/s | 5 runs after a warm-up, median of gens/s: min 1.9169e4, max 1.9620e4
+  verify vs CPU: 0 mismatching cells (CPU reference: 2.616e8 cell-updates/s single thread)

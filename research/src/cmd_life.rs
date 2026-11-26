@@ -187,14 +187,20 @@ pub fn soup_cmd(args: &[String]) {
   println!("wrote {out}: {side}x{side} soup, density {density}, seed {seed}, population {}", g.population());
 }
 
-pub fn run(args: &[String]) {
-  let side: usize = opt_or(args, "--side", 4096);
-  let k: u32 = opt_or(args, "--k", 1);
-  let gens: u64 = opt_or::<u64>(args, "--gens", 256) / k as u64 * k as u64;
-  let (wgx, wgy): (u32, u32) = (opt_or(args, "--wgx", 8), opt_or(args, "--wgy", 8));
-  let tw: u32 = opt_or(args, "--tw", 6);
-  let th: u32 = opt_or(args, "--th", 32u32.saturating_sub(2 * k).max(2));
+/// What a Life run starts from: the grid, a description of it, and the rule. Shared by `gpu-life`
+/// and its CubeCL port `cubecl-life`, so that the two differ only on the GPU.
+pub struct Setup {
+  pub g: Grid,
+  pub what: String,
+  pub rule_name: String,
+  pub birth: u16,
+  pub survive: u16,
+  pub rule: ca::Rule,
+}
 
+/// `--side N | --pattern P [--tiled | --margin M]`, `--rule R`: the grid and the rule.
+pub fn setup(args: &[String]) -> Setup {
+  let side: usize = opt_or(args, "--side", 4096);
   // content: random soup filling the grid, a pattern tiled over it, or a pattern centred with a
   // margin (`--margin M`, for patterns that grow, e.g. soups that emit gliders)
   let mut file_rule = String::new();
@@ -239,10 +245,41 @@ pub fn run(args: &[String]) {
   let spec = cmd_stats::variant_for(args, if file_rule.is_empty() { "B3/S23" } else { &file_rule });
   let RuleSpec::LifeLike(birth, survive, Nbhd::Moore) = spec else { panic!("gpu-life runs Life-like rules on the Moore neighbourhood, not {}", spec.name()) };
   let rule = crate::load_lut(&spec);
+  Setup { g, what, rule_name: spec.name(), birth, survive, rule }
+}
+
+/// After the timed runs: the final state's fingerprint (`--fingerprint`) and, with `--verify`, its
+/// comparison with the table stepped on the CPU. `words` is the final buffer, laid out as `pack_bits`.
+pub fn report(args: &[String], s: &Setup, words: &[u32], ww: usize, gens: u64) {
+  let g = &s.g;
+  let got = unpack_bits(words, ww, g.w, g.h);
+  let fp = cmd_stats::grid_fingerprint(&got);
+  println!("  final state after {gens} gens: population {} bbox {}x{} hash {:016x}", fp.population, fp.w, fp.h, fp.hash);
+  if got.bbox().is_some_and(|(x0, y0, x1, y1)| x0 == 0 || y0 == 0 || x1 == got.w || y1 == got.h) {
+    println!("  warning: live cells reached the edge of the grid; the result is the bounded grid's, not the plane's");
+  }
+  if flag(args, "--verify") {
+    let mut sim = Sim::new(g, &s.rule);
+    for _ in 0..gens {
+      sim.step();
+    }
+    let bad = got.cells.iter().zip(&sim.grid().cells).filter(|(a, b)| a != b).count();
+    println!("  verify vs the table on the CPU: {bad} mismatching cells");
+  }
+}
+
+pub fn run(args: &[String]) {
+  let k: u32 = opt_or(args, "--k", 1);
+  let gens: u64 = opt_or::<u64>(args, "--gens", 256) / k as u64 * k as u64;
+  let (wgx, wgy): (u32, u32) = (opt_or(args, "--wgx", 8), opt_or(args, "--wgy", 8));
+  let tw: u32 = opt_or(args, "--tw", 6);
+  let th: u32 = opt_or(args, "--th", 32u32.saturating_sub(2 * k).max(2));
+  let s = setup(args);
+  let (g, what, birth, survive) = (&s.g, &s.what, s.birth, s.survive);
 
   let gpu = Gpu::new(opt(args, "--backend").as_deref());
   println!("GPU: {}", gpu.describe());
-  let (words, ww, h) = pack_bits(&g);
+  let (words, ww, h) = pack_bits(g);
   let uni = gpu.device.create_buffer(&wgpu::BufferDescriptor {
     label: None,
     size: 16,
@@ -257,7 +294,8 @@ pub fn run(args: &[String]) {
     tile_kernel(tw, th, k)
   };
   let src = format!("{}\n{}", life_fn(birth, survive), body);
-  let pipeline = gpu.pipeline("life", &src, "main");
+  // `--trusted`: without naga's runtime checks, as CubeCL compiles its WGSL
+  let pipeline = gpu.pipeline_with("life", &src, "main", flag(args, "--trusted"));
   let a = gpu.storage_init("a", bytemuck::cast_slice(&words));
   let b = gpu.storage_init("b", bytemuck::cast_slice(&vec![0u32; words.len()]));
   let mk = |s: &wgpu::Buffer, d: &wgpu::Buffer| {
@@ -281,7 +319,7 @@ pub fn run(args: &[String]) {
   let per_submit: u64 = opt_or(args, "--per-submit", 4096);
   println!(
     "rule {} | content: {what} | {}x{} = {} cells | {} | {} MiB per buffer",
-    spec.name(),
+    s.rule_name,
     g.w,
     g.h,
     g.w * g.h,
@@ -316,19 +354,6 @@ pub fn run(args: &[String]) {
   );
   if flag(args, "--verify") || flag(args, "--fingerprint") {
     let out = gpu.read_u32(if dispatches % 2 == 1 { &b } else { &a }, 0, words.len() as u64);
-    let got = unpack_bits(&out, ww, g.w, g.h);
-    let fp = cmd_stats::grid_fingerprint(&got);
-    println!("  final state after {gens} gens: population {} bbox {}x{} hash {:016x}", fp.population, fp.w, fp.h, fp.hash);
-    if got.bbox().is_some_and(|(x0, y0, x1, y1)| x0 == 0 || y0 == 0 || x1 == got.w || y1 == got.h) {
-      println!("  warning: live cells reached the edge of the grid; the result is the bounded grid's, not the plane's");
-    }
-    if flag(args, "--verify") {
-      let mut sim = Sim::new(&g, &rule);
-      for _ in 0..gens {
-        sim.step();
-      }
-      let bad = got.cells.iter().zip(&sim.grid().cells).filter(|(a, b)| a != b).count();
-      println!("  verify vs the table on the CPU: {bad} mismatching cells");
-    }
+    report(args, &s, &out, ww, gens);
   }
 }

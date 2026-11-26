@@ -11,6 +11,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT = os.path.join(HERE, "..", "logs", "2026-11-25")
+# GPU timings re-measured later (the targets lut-kernel, tile, sweep, sweep-tiles, sparse, life-kernels,
+# life-sparse); the CPU and Golly runs of the same targets stay those of DEFAULT
+REMEASURED = os.path.join(HERE, "..", "logs", "2026-11-26")
 NUM = r"([0-9][0-9.]*(?:e[+-]?[0-9]+)?)"
 
 
@@ -90,13 +93,14 @@ H32, LIFE = "[[Hutton32]] and [[Hutton32b]], 32 states", "[[Life]], 2 states"
 WORDS = dict(enumerate("zero one two three four five six seven eight nine ten eleven twelve".split()))
 
 
-def collect(logs=None):
+def collect(logs=None, remeasured=None):
     """Every measured number the diagram shows, as one dictionary."""
     L = logs or Logs()
+    G = remeasured or Logs(REMEASURED)
     d = {}
 
     # ---- the four rates (paper Table I) ----
-    lk = L.lines("lut-kernel.txt")
+    lk = G.lines("lut-kernel.txt")
     i = next(i for i, l in enumerate(lk) if "x24 ->" in l and "8x8 workgroups" in l and "5 runs" in lk[i + 1])
     d["rb_lut"] = float(re.search(rf"= {NUM} cell-updates/s", lk[i + 1]).group(1))
     d["rb_planes"] = statistics.median(x[0] for x in L.all("bitplane-sizes.txt", rf"\[side 16384 gens 64\] bit-plane kernel: .* = {NUM} cell-updates/s"))
@@ -146,7 +150,7 @@ def collect(logs=None):
     j = next(j for j, l in enumerate(ls) if "universe: 1x1 copies" in l)
     d["ulc_hit_gens_s"] = float(re.search(rf"= {NUM} gens/s", ls[j + 1]).group(1))
     for key, name in (("sparse", "sparse.txt"), ("sparse_ulc", "life-sparse.txt")):
-        d[key + "_gpu"] = L.find(name, rf"active blocks : .* = {NUM} gens/s")[0]
+        d[key + "_gpu"] = G.find(name, rf"active blocks : .* = {NUM} gens/s")[0]
         d[key + "_learn_s"] = L.find(name, rf"learned in {NUM}s")[0]
         d[key + "_file"] = L.find(name, r"^pattern (.+?) rule \S+: tile ")[0]
         nx, ny, cells = L.find(name, rf"universe: (\d+)x(\d+) copies .* cells \({NUM}\)")

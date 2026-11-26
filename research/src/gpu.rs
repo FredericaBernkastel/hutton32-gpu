@@ -115,11 +115,20 @@ impl Gpu {
   }
 
   pub fn pipeline(&self, label: &str, wgsl: &str, entry: &str) -> wgpu::ComputePipeline {
+    self.pipeline_with(label, wgsl, entry, false)
+  }
+
+  /// `trusted`: compile without the checks naga adds to the shader (index clamping, loop bounding),
+  /// as CubeCL does for its WGSL. The driver's robust buffer access stays as wgpu enabled it.
+  pub fn pipeline_with(&self, label: &str, wgsl: &str, entry: &str, trusted: bool) -> wgpu::ComputePipeline {
     let scope = self.device.push_error_scope(wgpu::ErrorFilter::Validation);
-    let module = self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-      label: Some(label),
-      source: wgpu::ShaderSource::Wgsl(wgsl.into()),
-    });
+    let desc = wgpu::ShaderModuleDescriptor { label: Some(label), source: wgpu::ShaderSource::Wgsl(wgsl.into()) };
+    let module = if trusted {
+      // SAFETY: only for the harness's own kernels, whose indices are checked against the CPU
+      unsafe { self.device.create_shader_module_trusted(desc, wgpu::ShaderRuntimeChecks::unchecked()) }
+    } else {
+      self.device.create_shader_module(desc)
+    };
     let p = self.device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
       label: Some(label),
       layout: None,
@@ -148,7 +157,12 @@ impl Gpu {
   }
 
   /// Run `f` to record + submit work, wait for completion, return elapsed seconds.
+  ///
+  /// Writes queued before the call (`queue.write_buffer`, e.g. resetting the input of a run) are
+  /// executed by the next submit; they are submitted here, before the clock starts, so that an
+  /// upload is never timed as part of `f`'s work.
   pub fn timed(&self, f: impl FnOnce()) -> f64 {
+    self.queue.submit(None);
     self.wait();
     let t = Instant::now();
     f();

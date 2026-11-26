@@ -1,0 +1,33 @@
+=== unaligned         copies at arbitrary cell offsets: table size and hit path against alignment classes (gpu-sweep)
+pattern lotr1.ANSI-1M.rle rule Hutton32b: tile 16x16, grid 198x196 tiles, period 528 gens (33 cycles), learned in 86.3s
+memo: 2462688 entries -> table 8388608 slots (256 MiB), avg insert probes 1.21; dictionary 9741572 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 8x8 copies = 1584x1568 tiles = 25344x25088 cells (6.358e8); id buffers 9 MiB each
+  1056 gens (132 sweeps) in 0.098s = 10774.2 gens/s = 6.851e12 cell-updates/s | 3.347e9 table probes/s | 5 runs after a warm-up, median of gens/s: min 1.0716e4, max 1.0826e4
+  verify: 0 table misses, 0 mismatching tiles of 2483712
+alignment classes: 2, cell offsets [(0, 0), (13, 14)]
+pattern lotr1.ANSI-1M.rle rule Hutton32b: tile 16x16, grid 199x197 tiles, period 528 gens (33 cycles), learned in 260.7s
+memo: 4925643 entries -> table 16777216 slots (512 MiB), avg insert probes 1.21; dictionary 19475889 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 8x8 copies = 1592x1576 tiles = 25472x25216 cells (6.423e8); id buffers 9 MiB each
+  1056 gens (132 sweeps) in 0.107s = 9826.0 gens/s = 6.311e12 cell-updates/s | 3.084e9 table probes/s | 5 runs after a warm-up, median of gens/s: min 9.8090e3, max 9.8559e3
+  verify: 0 table misses, 0 mismatching tiles of 2508992
+alignment classes: 4, cell offsets [(0, 0), (13, 14), (11, 10), (8, 4)]
+pattern lotr1.ANSI-1M.rle rule Hutton32b: tile 16x16, grid 199x197 tiles, period 528 gens (33 cycles), learned in 346.6s
+memo: 9851385 entries -> table 33554432 slots (1024 MiB), avg insert probes 1.21; dictionary 38948504 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 8x8 copies = 1592x1576 tiles = 25472x25216 cells (6.423e8); id buffers 9 MiB each
+
+thread 'main' (16016) panicked at C:\Users\bernkastel\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\wgpu-30.0.2\src\backend\wgpu_core.rs:1619:18:
+wgpu error: Out of Memory
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+# the run with 4 alignment classes again, alone (wgpu reported Out of Memory above)
+alignment classes: 4, cell offsets [(0, 0), (13, 14), (11, 10), (8, 4)]
+pattern lotr1.ANSI-1M.rle rule Hutton32b: tile 16x16, grid 199x197 tiles, period 528 gens (33 cycles), learned in 296.9s
+memo: 9851385 entries -> table 33554432 slots (1024 MiB), avg insert probes 1.21; dictionary 38948504 tiles
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+universe: 8x8 copies = 1592x1576 tiles = 25472x25216 cells (6.423e8); id buffers 9 MiB each
+  1056 gens (132 sweeps) in 0.106s = 9949.0 gens/s = 6.390e12 cell-updates/s | 3.122e9 table probes/s | 5 runs after a warm-up, median of gens/s: min 9.8900e3, max 9.9952e3
+  verify: 0 table misses, 0 mismatching tiles of 2508992
+exit 0

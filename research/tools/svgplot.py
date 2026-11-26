@@ -40,7 +40,8 @@ def chart(path, xlabel, ylabel, series, width=640, height=400, xlog=True, ylog=T
     ys = [y for _, pts in series for _, y in pts]
     xt, yt = _ticks(min(xs), max(xs)), _ticks(min(ys), max(ys))
     x0, x1, y0, y1 = xt[0], xt[-1], yt[0], yt[-1]
-    ml, mr, mt, mb = 72, 190, 20 if not title else 40, 52
+    # the right margin holds the legend: wide enough for its longest name (13 px Helvetica, ~7 px a character)
+    ml, mr, mt, mb = 72, max(190, 44 + 7 * max(len(n) for n, _ in series) + 12), 20 if not title else 40, 52
     pw, ph = width - ml - mr, height - mt - mb
     X = lambda v: ml + pw * (math.log10(v) - math.log10(x0)) / (math.log10(x1) - math.log10(x0))
     Y = lambda v: mt + ph * (1 - (math.log10(v) - math.log10(y0)) / (math.log10(y1) - math.log10(y0)))
