@@ -1,0 +1,20 @@
+=== cpu-parallel      bit-sliced CPU forms on 4 threads: random states and the ROM (bitslice/bench)
+    Finished `release` profile [optimized] target(s) in 0.02s
+     Running `bitslice\bench\target\release\bitslice-bench.exe --threads 4 --size 4096 --pattern patterns/misc/extra/lotr1.ANSI-1M.rle`
+target features: avx2; single thread, plus the bit-sliced forms on 4 threads
+exhaustive check of step_planes (u64) against lut_table_Hutton32b.bin: 0 mismatches of 33554432 entries (0.08s)
+small tables (form C): 4 x 1024 u16 + 6779 final entries = 14971 bytes; check against the table: 0 mismatches (0.25s)
+exhaustive check of scalar_step (form A) against the table: 0 mismatches of 33554432 entries (0.33s)
+grid 4096x4096 = 16777216 cells, 16 generations per timed run, best of 5
+  [uniform random states] 16 generations, all engines, grids compared after every generation: 0 differing cells
+  [lotr1.ANSI-1M x1] 16 generations, all engines, grids compared after every generation: 0 differing cells
+
+cell-updates per second, single thread:
+content                            cells byte LUT 32MiB     scalar (A)   small tables bit-sliced u64   u64/LUT bit-sliced 256
+uniform random states           16777216        7.013e7        2.605e7        4.079e8        2.742e9     39.10        3.669e9
+lotr1.ANSI-1M x1                16777216        4.638e8        2.594e7        4.101e8        2.864e9      6.17        3.556e9
+
+bit-sliced forms on 4 threads (row bands), cell-updates per second:
+content                            cells            u64        256-bit
+uniform random states           16777216        6.717e9        6.334e9
+lotr1.ANSI-1M x1                16777216        6.249e9        6.118e9

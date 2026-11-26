@@ -1,28 +1,28 @@
 === life-sparse       Life: sparse universe of Unit Life Cells: GPU, Golly, CPU engine (needs Golly)
 pattern Unit-Life-Cell-512x512.rle rule B3/S23: tile 32x32, 20x20 tiles, period 5760 gens, learned in 0.7s; memo 13144 entries (1 MiB table)
 universe: 48x48 copies at pitch 8 = 7680x7680 tiles = 245760x245760 cells (6.040e10); 0.60% of tiles non-empty
-exported out/life/sparse_ulc.mc (18899 macrocell nodes, 1.5s): population 11047224 bbox 241151x241151
+exported out/life/sparse_ulc.mc (18899 macrocell nodes, 1.6s): population 11047224 bbox 241151x241151
 expected after 16384 gens: population 11045033 bbox 241151x241151 hash 6303834f3464e1b7
 GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
-  flat          : 16384 gens in 1.326s = 12358.2 gens/s = 7.464e14 cell-updates/s (universe area) | verify: 0 misses, 0 mismatching tiles of 58982400 | 5 runs after a warm-up, median of gens/s: min 1.1949e4, max 1.2373e4
-  active blocks : 16384 gens in 0.039s = 416123.8 gens/s = 2.513e16 cell-updates/s (universe area) | verify: 0 misses, 0 mismatching tiles of 58982400 | 5 runs after a warm-up, median of gens/s: min 4.1386e5, max 4.1982e5
+  flat          : 16384 gens in 1.308s = 12527.7 gens/s = 7.566e14 cell-updates/s (universe area) | verify: 0 misses, 0 mismatching tiles of 58982400 | 5 runs after a warm-up, median of gens/s: min 1.2523e4, max 1.2529e4
+  active blocks : 16384 gens in 0.039s = 418939.2 gens/s = 2.530e16 cell-updates/s (universe area) | verify: 0 misses, 0 mismatching tiles of 58982400 | 5 runs after a warm-up, median of gens/s: min 4.1683e5, max 4.1987e5
 pattern out/life/sparse_ulc.mc
 load-only 0.020s (algo HashLife, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
-step     1024:    0.045s net,       368005.3 gens/s (median of 3; 349345.7-375464.6 gens/s), peak 12 MiB, second half 8770878.4 gens/s
-step    16384:    0.040s net,       414159.9 gens/s (median of 3; 412414.7-416360.7 gens/s), peak 12 MiB
+step     1024:    0.041s net,       397331.4 gens/s (median of 3; 395468.0-404692.1 gens/s), peak 12 MiB, second half 8599621.8 gens/s
+step    16384:    0.040s net,       414457.4 gens/s (median of 3; 404284.7-419879.7 gens/s), peak 12 MiB
 pattern out/life/sparse_ulc.mc
-load-only 0.022s (algo HashLife, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
-step     1024:    0.046s net,     22932576.3 gens/s (median of 3; 22195748.7-23723975.7 gens/s), peak 12 MiB, second half 396977364.5 gens/s
-step    65536:    0.043s net,     24130046.6 gens/s (median of 3; 23519637.5-24422007.8 gens/s), peak 13 MiB, second half 577982557.3 gens/s
+load-only 0.020s (algo HashLife, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
+step     1024:    0.047s net,     22398817.4 gens/s (median of 3; 21849612.2-22919593.8 gens/s), peak 12 MiB, second half 399183801.1 gens/s
+step    65536:    0.044s net,     23575107.7 gens/s (median of 3; 22572982.8-23841188.5 gens/s), peak 13 MiB, second half 633963716.1 gens/s
 This is bgolly 5.1 Copyright 2005-2026 The Golly Gang.
 - C:\Program Files\golly-5.1-win-64bit\bgolly.exe -q -q -a HashLife -M 8000 -m 16384 -i 1024 -o out/life/sparse_ulc_out.mc out/life/sparse_ulc.mc
 (->out/life/sparse_ulc_out.mc)population 11045033 bbox 241151x241151 hash 6303834f3464e1b7
 pattern sparse_ulc.mc rule B3/S23 | a=3 step=2^10 | level 18 | population 11047224 bbox 241151x241151
-  gen       1024: level 18, nodes    104426, finds      564020, misses      92323, brute     37265, cpu    0.1591s
-  gen       2048: level 18, nodes    105886, finds      584919, misses      93815, brute     37265, cpu    0.1603s
-  gen       4096: level 18, nodes    108004, finds      610337, misses      95629, brute     37265, cpu    0.1612s
-  gen       8192: level 18, nodes    111833, finds      655671, misses      98864, brute     37265, cpu    0.1626s
-  gen      16384: level 18, nodes    118305, finds      736175, misses     104608, brute     37265, cpu    0.1654s
+  gen       1024: level 18, nodes    104426, finds      564020, misses      92323, brute     37265, cpu    0.1565s
+  gen       2048: level 18, nodes    105886, finds      584919, misses      93815, brute     37265, cpu    0.1573s
+  gen       4096: level 18, nodes    108004, finds      610337, misses      95629, brute     37265, cpu    0.1582s
+  gen       8192: level 18, nodes    111833, finds      655671, misses      98864, brute     37265, cpu    0.1595s
+  gen      16384: level 18, nodes    118305, finds      736175, misses     104608, brute     37265, cpu    0.1623s
   level  side      nodes      finds    inserts   requests     misses  waves  waves_miss  max_batch
       3     8      10640  (base tiles; brute calls 37265, cell evals 18781560)
       4    16      37265     210310      32797      83801      37265      8           8      17072

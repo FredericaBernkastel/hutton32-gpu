@@ -25,51 +25,51 @@
 <rect x='72' y='20' width='358' height='328' fill='none' stroke='#555'/>
 <text x='251.0' y='390' text-anchor='middle'>cells in the grid</text>
 <text transform='translate(18,184.0) rotate(-90)' text-anchor='middle'>cell-updates/s</text>
-<polyline points='106.3,345.2 157.9,272.6 249.6,209.7 267.2,211.6 324.3,209.5' fill='none' stroke='#0072B2' stroke-width='2'/>
+<polyline points='106.3,345.2 157.9,272.4 249.6,209.5 267.2,211.6 324.3,209.3' fill='none' stroke='#0072B2' stroke-width='2'/>
 <circle cx='106.3' cy='345.2' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
-<circle cx='157.9' cy='272.6' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
-<circle cx='249.6' cy='209.7' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
+<circle cx='157.9' cy='272.4' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
+<circle cx='249.6' cy='209.5' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
 <circle cx='267.2' cy='211.6' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
-<circle cx='324.3' cy='209.5' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
+<circle cx='324.3' cy='209.3' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
 <line x1='444' y1='34' x2='468' y2='34' stroke='#0072B2' stroke-width='2'/>
 <circle cx='456.0' cy='34.0' r='4' fill='#0072B2' stroke='#0072B2' stroke-width='1.5'/>
 <text x='474' y='38'>32 states, byte LUT</text>
-<polyline points='106.3,344.8 157.9,272.0 192.6,221.4 228.5,179.5 249.6,173.9 264.4,166.3 300.3,188.1 318.3,187.1 336.3,187.0 354.2,186.3 372.2,186.2' fill='none' stroke='#D55E00' stroke-width='2'/>
-<rect x='102.3' y='340.8' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
-<rect x='153.9' y='268.0' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
-<rect x='188.6' y='217.4' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
-<rect x='224.5' y='175.5' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
-<rect x='245.6' y='169.9' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
-<rect x='260.4' y='162.3' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
-<rect x='296.3' y='184.1' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
-<rect x='314.3' y='183.1' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
-<rect x='332.3' y='183.0' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
-<rect x='350.2' y='182.3' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
-<rect x='368.2' y='182.2' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<polyline points='106.3,344.3 157.9,271.6 192.6,220.4 228.5,180.0 249.6,174.4 264.4,166.7 300.3,187.1 318.3,186.7 336.3,186.0 354.2,185.7 372.2,185.6' fill='none' stroke='#D55E00' stroke-width='2'/>
+<rect x='102.3' y='340.3' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<rect x='153.9' y='267.6' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<rect x='188.6' y='216.4' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<rect x='224.5' y='176.0' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<rect x='245.6' y='170.4' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<rect x='260.4' y='162.7' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<rect x='296.3' y='183.1' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<rect x='314.3' y='182.7' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<rect x='332.3' y='182.0' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<rect x='350.2' y='181.7' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
+<rect x='368.2' y='181.6' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
 <line x1='444' y1='56' x2='468' y2='56' stroke='#D55E00' stroke-width='2'/>
 <rect x='452.0' y='52.0' width='8' height='8' fill='#D55E00' stroke='#D55E00' stroke-width='1.5'/>
 <text x='474' y='60'>32 states, bit-planes</text>
-<polyline points='89.9,320.4 106.3,295.5 157.9,217.6 249.6,201.0 336.3,196.1' fill='none' stroke='#009E73' stroke-width='2'/>
-<polygon points='89.9,315.4 84.9,324.4 94.9,324.4' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
-<polygon points='106.3,290.5 101.3,299.5 111.3,299.5' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
-<polygon points='157.9,212.6 152.9,221.6 162.9,221.6' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
-<polygon points='249.6,196.0 244.6,205.0 254.6,205.0' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
+<polyline points='89.9,320.6 106.3,295.4 157.9,217.2 249.6,200.8 336.3,196.1' fill='none' stroke='#009E73' stroke-width='2'/>
+<polygon points='89.9,315.6 84.9,324.6 94.9,324.6' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
+<polygon points='106.3,290.4 101.3,299.4 111.3,299.4' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
+<polygon points='157.9,212.2 152.9,221.2 162.9,221.2' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
+<polygon points='249.6,195.8 244.6,204.8 254.6,204.8' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
 <polygon points='336.3,191.1 331.3,200.1 341.3,200.1' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
 <line x1='444' y1='78' x2='468' y2='78' stroke='#009E73' stroke-width='2'/>
 <polygon points='456.0,73.0 451.0,82.0 461.0,82.0' fill='#009E73' stroke='#009E73' stroke-width='1.5'/>
 <text x='474' y='82'>32 states, shared tile</text>
-<polyline points='120.7,295.4 192.6,176.4 264.4,112.7 336.3,113.0 372.2,111.4' fill='none' stroke='#CC79A7' stroke-width='2'/>
-<polygon points='120.7,290.4 125.7,295.4 120.7,300.4 115.7,295.4' fill='#CC79A7' stroke='#CC79A7' stroke-width='1.5'/>
-<polygon points='192.6,171.4 197.6,176.4 192.6,181.4 187.6,176.4' fill='#CC79A7' stroke='#CC79A7' stroke-width='1.5'/>
-<polygon points='264.4,107.7 269.4,112.7 264.4,117.7 259.4,112.7' fill='#CC79A7' stroke='#CC79A7' stroke-width='1.5'/>
-<polygon points='336.3,108.0 341.3,113.0 336.3,118.0 331.3,113.0' fill='#CC79A7' stroke='#CC79A7' stroke-width='1.5'/>
+<polyline points='120.7,295.0 192.6,175.5 264.4,112.3 336.3,112.7 372.2,111.4' fill='none' stroke='#CC79A7' stroke-width='2'/>
+<polygon points='120.7,290.0 125.7,295.0 120.7,300.0 115.7,295.0' fill='#CC79A7' stroke='#CC79A7' stroke-width='1.5'/>
+<polygon points='192.6,170.5 197.6,175.5 192.6,180.5 187.6,175.5' fill='#CC79A7' stroke='#CC79A7' stroke-width='1.5'/>
+<polygon points='264.4,107.3 269.4,112.3 264.4,117.3 259.4,112.3' fill='#CC79A7' stroke='#CC79A7' stroke-width='1.5'/>
+<polygon points='336.3,107.7 341.3,112.7 336.3,117.7 331.3,112.7' fill='#CC79A7' stroke='#CC79A7' stroke-width='1.5'/>
 <polygon points='372.2,106.4 377.2,111.4 372.2,116.4 367.2,111.4' fill='#CC79A7' stroke='#CC79A7' stroke-width='1.5'/>
 <line x1='444' y1='100' x2='468' y2='100' stroke='#CC79A7' stroke-width='2'/>
 <polygon points='456.0,95.0 461.0,100.0 456.0,105.0 451.0,100.0' fill='#CC79A7' stroke='#CC79A7' stroke-width='1.5'/>
 <text x='474' y='104'>Life, plain</text>
-<polyline points='120.7,223.7 192.6,143.1' fill='none' stroke='#E69F00' stroke-width='2'/>
+<polyline points='120.7,223.7 192.6,142.6' fill='none' stroke='#E69F00' stroke-width='2'/>
 <circle cx='120.7' cy='223.7' r='4' fill='white' stroke='#E69F00' stroke-width='1.5'/>
-<circle cx='192.6' cy='143.1' r='4' fill='white' stroke='#E69F00' stroke-width='1.5'/>
+<circle cx='192.6' cy='142.6' r='4' fill='white' stroke='#E69F00' stroke-width='1.5'/>
 <line x1='444' y1='122' x2='468' y2='122' stroke='#E69F00' stroke-width='2'/>
 <circle cx='456.0' cy='122.0' r='4' fill='white' stroke='#E69F00' stroke-width='1.5'/>
 <text x='474' y='126'>Life, shared tile</text>

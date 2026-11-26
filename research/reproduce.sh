@@ -34,6 +34,8 @@ floors            fixed floors and plain cells (adapt)
 cond-miss         conditional miss rate per window size (root)
 engine-choice     engine per content (tools/engine_choice.sh)
 controller        the controller (adapt)
+region-size       the controller region, 64x64 to 1024x1024 (tools/region_sweep.sh; about 15 minutes)
+region-size-life  the same for Life (tools/region_sweep_life.sh; about 7 minutes)
 counter-work      work per generation of the counter, which sets the thresholds (adapt)
 forms             forms A and C, checked on all 2^25 neighbourhoods (pip installs numpy)
 circuit           the circuit vs the table on all 2^25 neighbourhoods (pip installs numpy)
@@ -221,6 +223,10 @@ run() {
     $R adapt --pattern $PPMD --gens 2112 --a 3 --k 4 --init-floor 3 --policies "16x16,adaptive"
     $R adapt --pattern "$CTR" --gens 16384 --a 3 --k 4 --init-floor 3 --policies "16x16,adaptive"
     $R adapt --compose "$CH8" --gens 8192 --a 3 --k 4 --init-floor 3 --policies "16x16,adaptive" ;;
+  region-size)
+    bash tools/region_sweep.sh $R ;;
+  region-size-life)
+    bash tools/region_sweep_life.sh $R ;;
   counter-work)
     $R adapt --pattern "$CTR" --gens 16384 --a 3 ;;
   forms)

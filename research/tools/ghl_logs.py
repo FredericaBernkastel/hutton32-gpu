@@ -1,8 +1,9 @@
 """The measured numbers of the overview diagram, read from the raw logs in research/logs/<date>
-(the output of reproduce.sh, see paper.md, Appendix A). Nothing is typed in by hand: every figure
-is found by the line that reports it, and a missing line is an error.
+(the output of reproduce.sh, see paper.md, Appendix A): each target's log from the newest dated
+folder that holds it. Nothing is typed in by hand: every figure is found by the line that reports
+it, and a missing line is an error.
 
-    python tools/ghl_logs.py [logs dir]      print everything the diagram uses
+    python tools/ghl_logs.py [logs dir]      print everything the diagram uses (from one folder if given)
 """
 import os
 import re
@@ -10,21 +11,31 @@ import statistics
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT = os.path.join(HERE, "..", "logs", "2026-11-25")
-# GPU timings re-measured later (the targets lut-kernel, tile, sweep, sweep-tiles, sparse, life-kernels,
-# life-sparse); the CPU and Golly runs of the same targets stay those of DEFAULT
-REMEASURED = os.path.join(HERE, "..", "logs", "2026-11-26")
+LOGS = os.path.join(HERE, "..", "logs")
 NUM = r"([0-9][0-9.]*(?:e[+-]?[0-9]+)?)"
 
 
 class Logs:
-    def __init__(self, directory=DEFAULT):
+    """The log of each target, taken from the newest dated folder under research/logs that holds
+    it (paper.md, Appendix A), or from one given folder only."""
+
+    def __init__(self, directory=None):
         self.dir = directory
         self._cache = {}
 
+    def path(self, name):
+        if self.dir is not None:
+            return os.path.join(self.dir, name)
+        dated = sorted((d for d in os.listdir(LOGS) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", d)), reverse=True)
+        for d in dated:
+            p = os.path.join(LOGS, d, name)
+            if os.path.exists(p):
+                return p
+        raise FileNotFoundError(f"{name}: in no dated folder of {LOGS}")
+
     def lines(self, name):
         if name not in self._cache:
-            with open(os.path.join(self.dir, name), encoding="utf-8") as f:
+            with open(self.path(name), encoding="utf-8") as f:
                 self._cache[name] = f.read().splitlines()
         return self._cache[name]
 
@@ -93,14 +104,13 @@ H32, LIFE = "[[Hutton32]] and [[Hutton32b]], 32 states", "[[Life]], 2 states"
 WORDS = dict(enumerate("zero one two three four five six seven eight nine ten eleven twelve".split()))
 
 
-def collect(logs=None, remeasured=None):
+def collect(logs=None):
     """Every measured number the diagram shows, as one dictionary."""
     L = logs or Logs()
-    G = remeasured or Logs(REMEASURED)
     d = {}
 
     # ---- the four rates (paper Table I) ----
-    lk = G.lines("lut-kernel.txt")
+    lk = L.lines("lut-kernel.txt")
     i = next(i for i, l in enumerate(lk) if "x24 ->" in l and "8x8 workgroups" in l and "5 runs" in lk[i + 1])
     d["rb_lut"] = float(re.search(rf"= {NUM} cell-updates/s", lk[i + 1]).group(1))
     d["rb_planes"] = statistics.median(x[0] for x in L.all("bitplane-sizes.txt", rf"\[side 16384 gens 64\] bit-plane kernel: .* = {NUM} cell-updates/s"))
@@ -119,7 +129,8 @@ def collect(logs=None, remeasured=None):
     d["wave_us"] = L.find("latency.txt", rf"whole miss-path wave, 1 pass, 16 fixed dispatches.*:\s+{NUM} us")[0]
     d["cpu_lut"] = L.find("rom-kernels.txt", rf"CPU reference: {NUM} cell-updates/s single thread")[0]
     d["circuit_check"] = L.find("cpu-parallel.txt", r"exhaustive check of step_planes \(u64\) against lut_table_Hutton32b\.bin: (\d+) mismatches of (\d+) entries")
-    d["cpu4"] = L.find("cpu-parallel.txt", rf"^lotr1\.ANSI-1M x1\s+\d+\s+{NUM}\s+{NUM}\s*$", after="bit-sliced forms on 4 threads")[1]
+    # the faster of the two four-thread forms (u64, 256-bit), as the paper reports it
+    d["cpu4"] = max(L.find("cpu-parallel.txt", rf"^lotr1\.ANSI-1M x1\s+\d+\s+{NUM}\s+{NUM}\s*$", after="bit-sliced forms on 4 threads"))
 
     # ---- Golly ----
     g = L.golly("golly.txt")
@@ -150,7 +161,7 @@ def collect(logs=None, remeasured=None):
     j = next(j for j, l in enumerate(ls) if "universe: 1x1 copies" in l)
     d["ulc_hit_gens_s"] = float(re.search(rf"= {NUM} gens/s", ls[j + 1]).group(1))
     for key, name in (("sparse", "sparse.txt"), ("sparse_ulc", "life-sparse.txt")):
-        d[key + "_gpu"] = G.find(name, rf"active blocks : .* = {NUM} gens/s")[0]
+        d[key + "_gpu"] = L.find(name, rf"active blocks : .* = {NUM} gens/s")[0]
         d[key + "_learn_s"] = L.find(name, rf"learned in {NUM}s")[0]
         d[key + "_file"] = L.find(name, r"^pattern (.+?) rule \S+: tile ")[0]
         nx, ny, cells = L.find(name, rf"universe: (\d+)x(\d+) copies .* cells \({NUM}\)")

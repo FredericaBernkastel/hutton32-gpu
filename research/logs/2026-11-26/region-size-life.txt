@@ -1,0 +1,369 @@
+=== region-size-life  the same for Life (tools/region_sweep_life.sh; about 7 minutes)
+=== region 64x64 (--rl 6)
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 16 gens, region 64x64 | 1024 gens
+  [    3.5s cpu] fixed: brute at 32x32
+  [    6.3s cpu] adaptive
+all 2 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 0.33 ms model time (4.649e8 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           429530     184749     1.062e9     0.59      0.76      1.35    0.25x     18.9  32:100%
+adaptive                        190022      68630     1.580e9     0.23      0.37      0.61    0.55x      9.8  32:55% 64:1% cells:44%  [483 mode changes; 4 of 185 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.32 ms | adaptive 1.45 ms
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 16 gens, region 64x64 | 11520 gens
+  [    0.7s cpu] fixed: brute at 32x32
+  [    5.0s cpu] adaptive
+all 2 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 2.19 ms model time (3.050e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           793791     109550     2.018e8     0.35      0.15      0.49    4.47x      4.8  32:100%
+adaptive                        687439      88960     1.226e9     0.48      0.71      1.19    1.84x      3.8  32:77% cells:23%  [236 mode changes; 12 of 96 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.51 ms | adaptive 1.27 ms
+universe: metapixel-galaxy.mc, 30720x30720 cells, population 7408195 | base tile 16x16, macro-step 16 gens, region 64x64 | 4096 gens
+  [    4.2s cpu] fixed: brute at 32x32
+  [   11.1s cpu] adaptive
+all 2 policies end in the same state: population 7058413 hash fc73d4132e165098
+plain cells over non-empty regions, no halo: 1010.68 ms model time (1.405e12 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32          1789787     264320     5.367e8     0.84      0.39      1.22  825.49x     11.9  32:100%
+adaptive                       1621040     222529     1.883e9     0.80      0.63      1.44  703.96x      9.6  32:95% 64:1% cells:4%  [875 mode changes; 45 of 247 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.25 ms | adaptive 2.21 ms
+universe: catacryst.mc, 2555x1772 cells, population 58 | base tile 16x16, macro-step 16 gens, region 64x64 | 4096 gens
+  [    1.7s cpu] fixed: brute at 32x32
+  [    5.7s cpu] adaptive
+all 2 policies end in the same state: population 5472 hash 65406ea642e721f9
+plain cells over non-empty regions, no halo: 0.90 ms model time (1.257e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           957227     159791     4.665e8     0.51      0.34      0.85    1.07x      9.0  32:100%
+adaptive                        810605     115812     1.342e9     0.42      0.42      0.84    1.07x      6.3  32:91% 64:1% cells:8%  [310 mode changes; 24 of 113 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.86 ms | adaptive 1.44 ms
+universe: gotts-dots.mc, 187x39 cells, population 41 | base tile 16x16, macro-step 16 gens, region 64x64 | 4096 gens
+  [    0.9s cpu] fixed: brute at 32x32
+  [    3.8s cpu] adaptive
+all 2 policies end in the same state: population 7825 hash 42453fa495f0b4bc
+plain cells over non-empty regions, no halo: 0.97 ms model time (1.351e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           524219      93818     2.704e8     0.29      0.19      0.49    2.00x      5.3  32:100%
+adaptive                        428146      67056     9.195e8     0.25      0.29      0.54    1.80x      3.6  32:86% 64:3% cells:10%  [210 mode changes; 15 of 72 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.49 ms | adaptive 0.94 ms
+--- plain cells per region, 16-generation steps (C16)
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 16 gens, region 64x64 | 1024 gens
+  [    9.1s cpu] fixed: plain cells
+all 1 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 0.33 ms model time (4.649e8 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: plain cells              126526      49068     2.193e9     0.18      0.36      0.54    0.62x      8.2  cells:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  plain cells 1.88 ms
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 16 gens, region 64x64 | 11520 gens
+  [    7.9s cpu] fixed: plain cells
+all 1 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 2.19 ms model time (3.050e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: plain cells              632147      78645     1.910e9     0.53      0.90      1.43    1.53x      3.2  cells:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  plain cells 1.79 ms
+=== region 128x128 (--rl 7)
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 16 gens, region 128x128 | 1024 gens
+  [    3.4s cpu] fixed: brute at 32x32
+  [    6.6s cpu] adaptive
+all 2 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 0.48 ms model time (6.630e8 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           429530     184749     1.062e9     0.59      0.76      1.35    0.35x     18.9  32:100%
+adaptive                        213405      74720     1.474e9     0.26      0.40      0.66    0.72x     10.5  32:76% 64:1% cells:23%  [103 mode changes; 2 of 40 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.32 ms | adaptive 1.39 ms
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 16 gens, region 128x128 | 11520 gens
+  [    0.7s cpu] fixed: brute at 32x32
+  [   22.8s cpu] adaptive
+all 2 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 3.01 ms model time (4.184e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           793791     109550     2.018e8     0.35      0.15      0.49    6.13x      4.8  32:100%
+adaptive                        700329      86301     4.860e9     0.80      1.48      2.28    1.32x      3.8  32:87% cells:13%  [118 mode changes; 3 of 53 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.51 ms | adaptive 4.19 ms
+universe: metapixel-galaxy.mc, 30720x30720 cells, population 7408195 | base tile 16x16, macro-step 16 gens, region 128x128 | 4096 gens
+  [    4.4s cpu] fixed: brute at 32x32
+  [   17.0s cpu] adaptive
+all 2 policies end in the same state: population 7058413 hash fc73d4132e165098
+plain cells over non-empty regions, no halo: 1280.10 ms model time (1.779e12 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32          1789787     264320     5.367e8     0.84      0.39      1.22 1045.55x     11.9  32:100%
+adaptive                       1676806     233327     3.142e9     0.96      0.95      1.91  669.41x     10.4  32:97% 64:0% cells:2%  [322 mode changes; 32 of 97 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.25 ms | adaptive 3.26 ms
+universe: catacryst.mc, 2555x1772 cells, population 58 | base tile 16x16, macro-step 16 gens, region 128x128 | 4096 gens
+  [    1.6s cpu] fixed: brute at 32x32
+  [    7.1s cpu] adaptive
+all 2 policies end in the same state: population 5472 hash 65406ea642e721f9
+plain cells over non-empty regions, no halo: 2.10 ms model time (2.915e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           957227     159791     4.665e8     0.51      0.34      0.85    2.48x      9.0  32:100%
+adaptive                        828591     121286     1.558e9     0.46      0.49      0.96    2.19x      6.8  32:96% 64:1% cells:3%  [70 mode changes; 4 of 27 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.86 ms | adaptive 1.63 ms
+universe: gotts-dots.mc, 187x39 cells, population 41 | base tile 16x16, macro-step 16 gens, region 128x128 | 4096 gens
+  [    0.9s cpu] fixed: brute at 32x32
+  [    5.3s cpu] adaptive
+all 2 policies end in the same state: population 7825 hash 42453fa495f0b4bc
+plain cells over non-empty regions, no halo: 1.91 ms model time (2.652e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           524219      93818     2.704e8     0.29      0.19      0.49    3.92x      5.3  32:100%
+adaptive                        447731      71590     1.160e9     0.28      0.32      0.60    3.20x      4.0  32:94% 64:2% cells:4%  [50 mode changes; 2 of 18 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.49 ms | adaptive 1.15 ms
+--- plain cells per region, 16-generation steps (C16)
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 16 gens, region 128x128 | 1024 gens
+  [   16.1s cpu] fixed: plain cells
+all 1 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 0.48 ms model time (6.630e8 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: plain cells              107656      35602     3.439e9     0.23      0.50      0.73    0.66x      7.7  cells:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  plain cells 2.86 ms
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 16 gens, region 128x128 | 11520 gens
+  [   38.2s cpu] fixed: plain cells
+all 1 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 3.01 ms model time (4.184e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: plain cells              650135      69538     8.152e9     0.91      1.84      2.75    1.10x      2.9  cells:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  plain cells 6.79 ms
+=== region 256x256 (--rl 8)
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 16 gens, region 256x256 | 1024 gens
+  [    3.4s cpu] fixed: brute at 32x32
+  [    5.9s cpu] adaptive
+all 2 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 0.72 ms model time (1.006e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           429530     184749     1.062e9     0.59      0.76      1.35    0.53x     18.9  32:100%
+adaptive                        237188      82358     1.283e9     0.27      0.39      0.67    1.09x     11.0  32:89% cells:11%  [20 mode changes; 0 of 8 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.32 ms | adaptive 1.25 ms
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 16 gens, region 256x256 | 11520 gens
+  [    0.7s cpu] fixed: brute at 32x32
+  [   36.9s cpu] adaptive
+all 2 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 5.11 ms model time (7.102e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           793791     109550     2.018e8     0.35      0.15      0.49   10.40x      4.8  32:100%
+adaptive                        747034      84379     7.347e9     0.97      1.87      2.84    1.80x      3.8  32:95% cells:5%  [41 mode changes; 3 of 19 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.51 ms | adaptive 6.19 ms
+universe: metapixel-galaxy.mc, 30720x30720 cells, population 7408195 | base tile 16x16, macro-step 16 gens, region 256x256 | 4096 gens
+  [    3.2s cpu] fixed: brute at 32x32
+  [   20.5s cpu] adaptive
+all 2 policies end in the same state: population 7058413 hash fc73d4132e165098
+plain cells over non-empty regions, no halo: 1552.36 ms model time (2.158e12 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32          1789787     264320     5.367e8     0.84      0.39      1.22 1267.92x     11.9  32:100%
+adaptive                       1820600     259792     4.003e9     1.15      1.21      2.35  660.19x     11.7  32:98% 64:1% cells:1%  [111 mode changes; 11 of 25 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.25 ms | adaptive 4.03 ms
+universe: catacryst.mc, 2555x1772 cells, population 58 | base tile 16x16, macro-step 16 gens, region 256x256 | 4096 gens
+  [    1.6s cpu] fixed: brute at 32x32
+  [    2.5s cpu] adaptive
+all 2 policies end in the same state: population 5472 hash 65406ea642e721f9
+plain cells over non-empty regions, no halo: 5.20 ms model time (7.234e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           957227     159791     4.665e8     0.51      0.34      0.85    6.15x      9.0  32:100%
+adaptive                        945226     156293     6.618e8     0.51      0.37      0.88    5.91x      8.9  32:99% 64:1% cells:0%  [5 mode changes; 1 of 2 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.86 ms | adaptive 1.00 ms
+universe: gotts-dots.mc, 187x39 cells, population 41 | base tile 16x16, macro-step 16 gens, region 256x256 | 4096 gens
+  [    0.9s cpu] fixed: brute at 32x32
+  [    0.9s cpu] adaptive
+all 2 policies end in the same state: population 7825 hash 42453fa495f0b4bc
+plain cells over non-empty regions, no halo: 3.60 ms model time (5.007e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           522581      93842     2.704e8     0.29      0.19      0.49    7.42x      5.3  32:100%
+adaptive                        522581      93842     2.704e8     0.29      0.19      0.49    7.42x      5.3  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.49 ms | adaptive 0.49 ms
+--- plain cells per region, 16-generation steps (C16)
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 16 gens, region 256x256 | 1024 gens
+  [   30.5s cpu] fixed: plain cells
+all 1 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 0.72 ms model time (1.006e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: plain cells              141939      30685     6.094e9     0.33      0.75      1.07    0.67x      7.6  cells:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  plain cells 5.00 ms
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 16 gens, region 256x256 | 11520 gens
+  [  172.2s cpu] fixed: plain cells
+all 1 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 5.11 ms model time (7.102e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: plain cells             1072418      60093    3.459e10     1.40      3.10      4.50    1.14x      2.6  cells:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  plain cells 28.09 ms
+=== region 512x512 (--rl 9)
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 16 gens, region 512x512 | 1024 gens
+  [    3.4s cpu] fixed: brute at 32x32
+  [    6.0s cpu] adaptive
+all 2 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 1.55 ms model time (2.160e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           431921     185354     1.062e9     0.59      0.76      1.36    1.15x     19.0  32:100%
+adaptive                        238825      82673     1.283e9     0.27      0.39      0.67    2.33x     11.0  32:95% cells:5%  [5 mode changes; 0 of 2 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.32 ms | adaptive 1.25 ms
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 16 gens, region 512x512 | 11520 gens
+  [    0.7s cpu] fixed: brute at 32x32
+  [   47.7s cpu] adaptive
+all 2 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 12.69 ms model time (1.764e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           836949     109712     2.018e8     0.36      0.15      0.50   25.22x      4.8  32:100%
+adaptive                        865046      92592     9.412e9     1.02      1.88      2.90    4.38x      4.3  32:98% cells:2%  [14 mode changes; 2 of 7 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.52 ms | adaptive 7.90 ms
+universe: metapixel-galaxy.mc, 30720x30720 cells, population 7408195 | base tile 16x16, macro-step 16 gens, region 512x512 | 4096 gens
+  [    3.0s cpu] fixed: brute at 32x32
+  [    6.1s cpu] adaptive
+all 2 policies end in the same state: population 7058413 hash fc73d4132e165098
+plain cells over non-empty regions, no halo: 2242.01 ms model time (3.116e12 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32          1789787     264320     5.367e8     0.84      0.39      1.22 1831.21x     11.9  32:100%
+adaptive                       1799215     264082     1.140e9     0.88      0.50      1.38 1619.63x     11.9  32:100% 64:0% cells:0%  [5 mode changes; 0 of 1 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.25 ms | adaptive 1.73 ms
+universe: catacryst.mc, 2555x1772 cells, population 58 | base tile 16x16, macro-step 16 gens, region 512x512 | 4096 gens
+  [    1.5s cpu] fixed: brute at 32x32
+  [    1.5s cpu] adaptive
+all 2 policies end in the same state: population 5472 hash 65406ea642e721f9
+plain cells over non-empty regions, no halo: 11.76 ms model time (1.634e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           957227     159791     4.665e8     0.51      0.34      0.85   13.88x      9.0  32:100%
+adaptive                        957227     159791     4.665e8     0.51      0.34      0.85   13.88x      9.0  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.86 ms | adaptive 0.86 ms
+universe: gotts-dots.mc, 187x39 cells, population 41 | base tile 16x16, macro-step 16 gens, region 512x512 | 4096 gens
+  [    0.9s cpu] fixed: brute at 32x32
+  [    0.9s cpu] adaptive
+all 2 policies end in the same state: population 7825 hash 42453fa495f0b4bc
+plain cells over non-empty regions, no halo: 7.09 ms model time (9.852e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           526389      94210     2.704e8     0.29      0.19      0.49   14.57x      5.3  32:100%
+adaptive                        526389      94210     2.704e8     0.29      0.19      0.49   14.57x      5.3  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.49 ms | adaptive 0.49 ms
+=== region 1024x1024 (--rl 10)
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 16 gens, region 1024x1024 | 1024 gens
+  [    3.4s cpu] fixed: brute at 32x32
+  [    4.2s cpu] adaptive
+all 2 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 2.74 ms model time (3.808e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           439691     185851     1.062e9     0.59      0.76      1.36    2.02x     19.0  32:100%
+adaptive                        287735     111731     1.376e9     0.35      0.99      1.34    2.04x     12.0  32:95% 64:5%  [1 mode changes; 0 of 0 finer trials kept]
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.33 ms | adaptive 1.37 ms
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 16 gens, region 1024x1024 | 11520 gens
+  [    0.7s cpu] fixed: brute at 32x32
+  [    0.7s cpu] adaptive
+all 2 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 42.64 ms model time (5.927e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           854365     112316     2.018e8     0.36      0.15      0.51   83.90x      4.9  32:100%
+adaptive                        854365     112316     2.018e8     0.36      0.15      0.51   83.90x      4.9  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.53 ms | adaptive 0.53 ms
+universe: metapixel-galaxy.mc, 30720x30720 cells, population 7408195 | base tile 16x16, macro-step 16 gens, region 1024x1024 | 4096 gens
+  [    3.0s cpu] fixed: brute at 32x32
+  [    3.0s cpu] adaptive
+all 2 policies end in the same state: population 7058413 hash fc73d4132e165098
+plain cells over non-empty regions, no halo: 2812.96 ms model time (3.910e12 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32          1789787     264320     5.367e8     0.84      0.39      1.22 2297.54x     11.9  32:100%
+adaptive                       1789787     264320     5.367e8     0.84      0.39      1.22 2297.54x     11.9  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.25 ms | adaptive 1.25 ms
+universe: catacryst.mc, 2555x1772 cells, population 58 | base tile 16x16, macro-step 16 gens, region 1024x1024 | 4096 gens
+  [    1.5s cpu] fixed: brute at 32x32
+  [    1.5s cpu] adaptive
+all 2 policies end in the same state: population 5472 hash 65406ea642e721f9
+plain cells over non-empty regions, no halo: 26.13 ms model time (3.632e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           957227     159791     4.665e8     0.51      0.34      0.85   30.86x      9.0  32:100%
+adaptive                        957227     159791     4.665e8     0.51      0.34      0.85   30.86x      9.0  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.86 ms | adaptive 0.86 ms
+universe: gotts-dots.mc, 187x39 cells, population 41 | base tile 16x16, macro-step 16 gens, region 1024x1024 | 4096 gens
+  [    0.9s cpu] fixed: brute at 32x32
+  [    0.9s cpu] adaptive
+all 2 policies end in the same state: population 7825 hash 42453fa495f0b4bc
+plain cells over non-empty regions, no halo: 16.08 ms model time (2.235e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           538877      95090     2.704e8     0.30      0.19      0.49   32.80x      5.3  32:100%
+adaptive                        538877      95090     2.704e8     0.30      0.19      0.49   32.80x      5.3  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.49 ms | adaptive 0.49 ms

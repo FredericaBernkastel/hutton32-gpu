@@ -14,6 +14,7 @@ mod cmd_lut;
 mod cmd_overview;
 mod cmd_sparse;
 mod cmd_stats;
+mod cmd_symmetry;
 mod flat;
 mod gpu;
 mod hl;
@@ -103,6 +104,7 @@ fn main() {
     "lut" => cmd_lut::run(rest),
     "selftest" => cmd_stats::selftest(rest),
     "flat" => cmd_stats::flat(rest),
+    "symmetry" => cmd_symmetry::run(rest),
     "root" => cmd_stats::root(rest),
     "fingerprint" => cmd_stats::fingerprint(rest),
     "export" => cmd_stats::export(rest),
@@ -135,6 +137,7 @@ fn main() {
           "  rulediff --a R --b R                         compare two rules entry by entry",
           "  selftest [--pattern P]                       reference engine vs per-cell stepping",
           "  flat --pattern P [--lt L --a A --gens N]     miss-rate / learning curve of the flat tile CA",
+          "  symmetry --pattern P [--a A --lt L --gens N --check N]  memo entries shared up to rotation / mirroring",
           "  root --pattern P [--k K --a A --gens N]      level-synchronous HashLife with batch statistics",
           "  fingerprint --pattern P                      population / bounding box / content hash",
           "  export --pattern P --out F [--as RULE]       write RLE",

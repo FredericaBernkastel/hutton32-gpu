@@ -4,7 +4,8 @@ libraries. Everything it shows is data:
   * out/overview.json     patterns as cells, tile IDs, a memo table, one sweep, the waves of the
                           recursion, the controller (written by `ca-research overview`, which runs
                           the CPU reference engine);
-  * logs/2026-11-25/      the measured rates and the comparison with Golly (tools/ghl_logs.py);
+  * logs/<date>/         the measured rates and the comparison with Golly, each target from the
+                          newest dated folder that holds it (tools/ghl_logs.py);
   * bitslice/circuit.netlist, src/cmd_life.rs    the two gate networks (tools/ghl_netlist.py).
 
 While drawing, the script checks what it shows: the netlist against the harness's next generation
@@ -618,7 +619,8 @@ def panel_universes(svg, y, D):
 
 GROUPS = [("n", "north"), ("w", "west"), ("c", "centre"), ("e", "east"), ("s", "south")]
 # Active cells from which a floor of 32x32 and of 16x16 windows pays for its dispatches: the model of
-# paper.md, Table XXVII, at the bit-plane rate (the one figure pair here that no log file holds).
+# paper.md, the table of dispatch time per engine ({T:bounds}), at the bit-plane rate (the one figure
+# pair here that no log file holds).
 DEPTH_A1, DEPTH_A2 = 1.0e6, 1.3e7
 
 

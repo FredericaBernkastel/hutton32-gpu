@@ -42,3 +42,33 @@
 2026-11-26 08:56:04 start unaligned
 2026-11-26 09:07:56 done  unaligned (exit 0)
 2026-11-26 09:13:32 done  unaligned, 4 classes rerun alone
+2026-11-26 12:23:21 start region-size (rl 6..10)
+2026-11-26 14:02:03 stopped region-size at 1024x1024, engine table after 3 of 8 contents (each run steps 1024^2 regions as plain cells on the CPU; the rows cannot change the order of the sizes)
+2026-11-26 14:12:19 start region-size
+2026-11-26 14:35:04 done  region-size (exit 0)
+2026-11-26 17:00:46 rerun region-size from the beginning
+2026-11-26 17:00:47 start region-size
+2026-11-26 17:17:50 done  region-size (exit 0)
+2026-11-26 17:52:13 start region-size-life
+2026-11-26 18:01:45 done  region-size-life (exit 0)
+2026-11-26 21:31:41 same-day partners of the re-measured GPU targets (Golly and CPU sides of the ratios); background load ~1 core (Claude app, Explorer, qBittorrent), High performance plan, 3.5 GHz
+2026-11-26 21:31:42 start golly
+2026-11-26 21:38:03 done  golly (exit 0)
+2026-11-26 21:38:03 start bitplane-sizes
+2026-11-26 21:42:37 done  bitplane-sizes (exit 0)
+2026-11-26 21:42:37 start cpu-parallel
+2026-11-26 21:43:53 done  cpu-parallel (exit 0)
+2026-11-26 21:43:53 start head2head
+2026-11-26 21:45:09 done  head2head (exit 0)
+2026-11-26 21:45:09 start runlength
+2026-11-26 21:46:52 done  runlength (exit 0)
+2026-11-26 21:46:52 start rom-kernels
+2026-11-26 21:47:12 done  rom-kernels (exit 0)
+2026-11-26 21:47:12 start sparse
+2026-11-26 21:49:18 done  sparse (exit 0)
+2026-11-26 21:49:18 start life-golly
+2026-11-26 21:51:44 done  life-golly (exit 0)
+2026-11-26 21:51:44 start life-sparse
+2026-11-26 21:52:02 done  life-sparse (exit 0)
+2026-11-26 21:53:54 start golly-tree
+2026-11-26 21:55:11 done  golly-tree (exit 0)

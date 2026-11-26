@@ -1,0 +1,13 @@
+=== golly-tree        Golly with Hutton32b as an @TREE rule instead of @TABLE (needs Golly)
+wrote out/tree/Hutton32b.rule (6582 tree nodes)
+pattern patterns/advanced counter v2.rle
+load-only 0.030s (algo RuleLoader, maxmem 8000 MB, rules out/tree/)
+step     1024:    1.762s net,       595212.6 gens/s, 2.240e+10 cell-updates/s (median of 3; 573921.2-598509.4 gens/s), peak 120 MiB, second half 677437.3 gens/s
+step   262144:    1.739s net,       603123.1 gens/s, 2.269e+10 cell-updates/s (median of 3; 602401.6-606722.9 gens/s), peak 120 MiB, second half 690073.1 gens/s
+pattern patterns/misc/chaotic.rle
+load-only 0.029s (algo RuleLoader, maxmem 8000 MB, rules out/tree/)
+step       64:    0.338s net,        48496.7 gens/s, 9.666e+08 cell-updates/s (median of 3; 48284.4-48919.1 gens/s), peak 36 MiB, second half 39111.4 gens/s
+step     1024:    0.332s net,        49399.2 gens/s, 9.846e+08 cell-updates/s (median of 3; 49237.1-49652.3 gens/s), peak 36 MiB, second half 39550.9 gens/s
+pattern patterns/misc/extra/lotr1.ANSI-1M.rle
+load-only 1.560s (algo RuleLoader, maxmem 8000 MB, rules out/tree/)
+step        8: TIMEOUT after 60s at gen 168,          2.9 gens/s, 2.722e+07 cell-updates/s, peak 2668 MiB

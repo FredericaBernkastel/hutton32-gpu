@@ -4,26 +4,26 @@ universe: 48x48 copies at pitch 8 = 6144x6528 tiles = 98304x104448 cells (1.027e
 exported out/golly/sparse100k.mc (48434 macrocell nodes, 1.4s): population 55478319 bbox 96447x102469
 expected after 16384 gens: population 55478381 bbox 96447x102469 hash 144be5c0cde9cb81
 GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
-  flat          : 16384 gens in 1.814s = 9031.0 gens/s = 9.273e13 cell-updates/s (universe area) | verify: 0 misses, 0 mismatching tiles of 40108032 | 5 runs after a warm-up, median of gens/s: min 8.9827e3, max 9.0361e3
-  active blocks : 16384 gens in 0.058s = 284907.9 gens/s = 2.925e15 cell-updates/s (universe area) | verify: 0 misses, 0 mismatching tiles of 40108032 | 5 runs after a warm-up, median of gens/s: min 2.8017e5, max 2.8808e5
+  flat          : 16384 gens in 1.790s = 9153.1 gens/s = 9.398e13 cell-updates/s (universe area) | verify: 0 misses, 0 mismatching tiles of 40108032 | 5 runs after a warm-up, median of gens/s: min 9.1475e3, max 9.1584e3
+  active blocks : 16384 gens in 0.058s = 280230.8 gens/s = 2.877e15 cell-updates/s (universe area) | verify: 0 misses, 0 mismatching tiles of 40108032 | 5 runs after a warm-up, median of gens/s: min 2.7293e5, max 2.8072e5
 pattern out/golly/sparse100k.mc
-load-only 0.051s (algo RuleLoader, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
-step       16:    8.120s net,         2017.6 gens/s (median of 3; 1995.9-2079.0 gens/s), peak 551 MiB, second half 8496.0 gens/s
-step     1024:    3.705s net,         4422.7 gens/s (median of 3; 4421.5-4476.3 gens/s), peak 235 MiB, second half 31227.1 gens/s
-step    16384:    3.731s net,         4391.5 gens/s (median of 3; 4290.5-4407.8 gens/s), peak 235 MiB
+load-only 0.050s (algo RuleLoader, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
+step       16:    7.926s net,         2067.0 gens/s (median of 3; 2063.5-2067.3 gens/s), peak 551 MiB, second half 8717.0 gens/s
+step     1024:    3.699s net,         4429.4 gens/s (median of 3; 4399.4-4433.9 gens/s), peak 235 MiB, second half 31143.2 gens/s
+step    16384:    3.726s net,         4397.3 gens/s (median of 3; 4373.1-4398.3 gens/s), peak 235 MiB
 pattern out/golly/sparse100k.mc
-load-only 0.057s (algo RuleLoader, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
-step     1024:    8.325s net,       125960.4 gens/s (median of 3; 125384.5-127216.7 gens/s), peak 512 MiB, second half 2386421.6 gens/s
-step    65536:    8.456s net,       123996.9 gens/s (median of 3; 123375.2-124413.5 gens/s), peak 501 MiB, second half 715321.3 gens/s
+load-only 0.052s (algo RuleLoader, maxmem 8000 MB, rules C:\git\rust\hutton32-gpu\research\tools\..\rules\)
+step     1024:    8.262s net,       126921.9 gens/s (median of 3; 126121.5-127370.7 gens/s), peak 512 MiB, second half 2572821.4 gens/s
+step    65536:    8.534s net,       122874.8 gens/s (median of 3; 122312.9-123017.3 gens/s), peak 501 MiB, second half 703356.9 gens/s
 This is bgolly 5.1 Copyright 2005-2026 The Golly Gang.
 - C:\Program Files\golly-5.1-win-64bit\bgolly.exe -q -q -a RuleLoader -s rules/ -M 8000 -m 16384 -i 1024 -o out/golly/sparse100k_out.mc out/golly/sparse100k.mc
 (->out/golly/sparse100k_out.mc)population 55478381 bbox 96447x102469 hash 144be5c0cde9cb81
 pattern sparse100k.mc rule Hutton32b | a=2 step=2^10 | level 17 | population 55478319 bbox 96447x102469
-  gen       1024: level 17, nodes   2119637, finds    16814854, misses    2079302, brute    398227, cpu    1.6245s
-  gen       2048: level 17, nodes   2417910, finds    19699297, misses    2376515, brute    407404, cpu    1.8744s
-  gen       4096: level 17, nodes   2765974, finds    23161613, misses    2721930, brute    407404, cpu    2.1232s
-  gen       8192: level 17, nodes   3147306, finds    26931935, misses    3097329, brute    407404, cpu    2.3801s
-  gen      16384: level 17, nodes   3739355, finds    32759489, misses    3676818, brute    407404, cpu    2.8173s
+  gen       1024: level 17, nodes   2119637, finds    16814854, misses    2079302, brute    398227, cpu    1.6047s
+  gen       2048: level 17, nodes   2417910, finds    19699297, misses    2376515, brute    407404, cpu    1.8569s
+  gen       4096: level 17, nodes   2765974, finds    23161613, misses    2721930, brute    407404, cpu    2.1109s
+  gen       8192: level 17, nodes   3147306, finds    26931935, misses    3097329, brute    407404, cpu    2.3680s
+  gen      16384: level 17, nodes   3739355, finds    32759489, misses    3676818, brute    407404, cpu    2.7940s
   level  side      nodes      finds    inserts   requests     misses  waves  waves_miss  max_batch
       2     4      29670  (base tiles; brute calls 407404, cell evals 21185008)
       3     8     407404    4709520     400004    2113547     407404    928         927      28410

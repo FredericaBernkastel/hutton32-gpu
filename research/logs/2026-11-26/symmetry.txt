@@ -1,0 +1,120 @@
+pattern advanced counter v2.rle rule Hutton32b | base tiles 8x8, sweep tiles 16x16 | 16384 gens (2048 sweeps) in 0.2s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      3  8x8 tile          11010       10985 (1.00x)       10931 (1.01x)   
+      4  16x16             42419       42417 (1.00x)       42395 (1.00x)       198357    78.6% /  78.6% /  78.6%
+      5  32x32             22997       22997 (1.00x)       22997 (1.00x)       591872    96.1% /  96.1% /  96.1%
+  check at 16x16: 2020 entries x 7 symmetries = 14140 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 32x32: 2091 entries x 7 symmetries = 14637 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 0.5s
+pattern squares.rle rule Hutton32 | base tiles 8x8, sweep tiles 16x16 | 4096 gens (512 sweeps) in 0.2s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      3  8x8 tile          11243       11031 (1.02x)       10939 (1.03x)   
+      4  16x16             40997       40788 (1.01x)       40710 (1.01x)       140146    70.7% /  70.9% /  71.0%
+      5  32x32             19719       19719 (1.00x)       19715 (1.00x)       733952    97.3% /  97.3% /  97.3%
+  check at 16x16: 2050 entries x 7 symmetries = 14350 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 32x32: 2191 entries x 7 symmetries = 15337 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 0.5s
+pattern chaotic.rle rule Hutton32b | base tiles 8x8, sweep tiles 16x16 | 8192 gens (1024 sweeps) in 0.3s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      3  8x8 tile          26874       26469 (1.02x)       26469 (1.02x)   
+      4  16x16             95438       94987 (1.00x)       94987 (1.00x)       307046    68.9% /  69.1% /  69.1%
+      5  32x32             50318       50181 (1.00x)       50181 (1.00x)       200704    74.9% /  75.0% /  75.0%
+  check at 16x16: 2031 entries x 7 symmetries = 14217 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 32x32: 2013 entries x 7 symmetries = 14091 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 0.9s
+pattern 32x32 movie.mc rule Hutton32b | base tiles 8x8, sweep tiles 16x16 | 4096 gens (512 sweeps) in 2.3s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      3  8x8 tile         156294      156200 (1.00x)      156135 (1.00x)   
+      4  16x16            364233      364208 (1.00x)      364193 (1.00x)      1114837    67.3% /  67.3% /  67.3%
+      5  32x32            148997      148981 (1.00x)      148973 (1.00x)     34744576    99.6% /  99.6% /  99.6%
+  check at 16x16: 2002 entries x 7 symmetries = 14014 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 32x32: 2014 entries x 7 symmetries = 14098 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 4.0s
+pattern lotr1.PPMd-244K.rle rule Hutton32b | base tiles 8x8, sweep tiles 16x16 | 512 gens (64 sweeps) in 8.4s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      3  8x8 tile        2325292     2325291 (1.00x)     2325291 (1.00x)   
+      4  16x16           2359046     2359046 (1.00x)     2359046 (1.00x)      4591956    48.6% /  48.6% /  48.6%
+      5  32x32            584113      584113 (1.00x)      584113 (1.00x)       626880     6.8% /   6.8% /   6.8%
+  check at 16x16: 2001 entries x 7 symmetries = 14007 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 32x32: 2001 entries x 7 symmetries = 14007 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 48.1s
+pattern lotr1.ANSI-1M.rle rule Hutton32b | base tiles 8x8, sweep tiles 16x16 | 528 gens (66 sweeps) in 36.6s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+memory allocation of 8589934592 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+pattern Unit-Life-Cell-512x512.rle rule B3/S23 | base tiles 16x16, sweep tiles 32x32 | 11520 gens (720 sweeps) in 0.7s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      4  16x16 tile         9694        9359 (1.04x)        9094 (1.07x)   
+      5  32x32             24633       24520 (1.00x)       24336 (1.01x)        88770    72.3% /  72.4% /  72.6%
+      6  64x64             13144       13142 (1.00x)       13130 (1.00x)       302760    95.7% /  95.7% /  95.7%
+  check at 32x32: 2053 entries x 7 symmetries = 14371 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 64x64: 2191 entries x 7 symmetries = 15337 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 2.7s
+pattern soup512.rle rule B3/S23 | base tiles 16x16, sweep tiles 32x32 | 4096 gens (256 sweeps) in 6.7s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      4  16x16 tile       140768      138500 (1.02x)      137284 (1.03x)   
+      5  32x32            245317      244914 (1.00x)      244681 (1.00x)       416145    41.1% /  41.1% /  41.2%
+      6  64x64             51582       51569 (1.00x)       51558 (1.00x)       107648    52.1% /  52.1% /  52.1%
+  check at 32x32: 2011 entries x 7 symmetries = 14077 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 64x64: 2064 entries x 7 symmetries = 14448 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 7.4s
+pattern soup2048.rle rule B3/S23 | base tiles 16x16, sweep tiles 32x32 | 4096 gens (256 sweeps) in 88.9s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      4  16x16 tile      1906851     1866339 (1.02x)     1843401 (1.03x)   
+      5  32x32           3278953     3276845 (1.00x)     3275486 (1.00x)      5338164    38.6% /  38.6% /  38.6%
+      6  64x64            642448      642360 (1.00x)      642298 (1.00x)      1201280    46.5% /  46.5% /  46.5%
+  check at 32x32: 2001 entries x 7 symmetries = 14007 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 64x64: 2002 entries x 7 symmetries = 14014 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 57.7s
+pattern metapixel-galaxy.mc rule B3/S23 | base tiles 16x16, sweep tiles 32x32 | 4096 gens (256 sweeps) in 10.4s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      4  16x16 tile        25751       21606 (1.19x)       17928 (1.44x)   
+      5  32x32             65512       58739 (1.12x)       52615 (1.25x)       210174    68.8% /  72.1% /  75.0%
+      6  64x64             41407       39152 (1.06x)       36407 (1.14x)    270800000   100.0% / 100.0% / 100.0%
+  check at 32x32: 2048 entries x 7 symmetries = 14336 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 64x64: 2071 entries x 7 symmetries = 14497 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 2.9s
+pattern gotts-dots.mc rule B3/S23 | base tiles 16x16, sweep tiles 32x32 | 4096 gens (256 sweeps) in 0.3s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      4  16x16 tile         5415        5253 (1.03x)        5178 (1.05x)   
+      5  32x32             12422       12331 (1.01x)       12247 (1.01x)        28022    55.7% /  56.0% /  56.3%
+      6  64x64              4427        4421 (1.00x)        4417 (1.00x)       107648    95.9% /  95.9% /  95.9%
+  check at 32x32: 2071 entries x 7 symmetries = 14497 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 64x64: 2214 entries x 7 symmetries = 15498 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 1.8s
+pattern catacryst.mc rule B3/S23 | base tiles 16x16, sweep tiles 32x32 | 4096 gens (256 sweeps) in 2.1s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      4  16x16 tile        25961       25272 (1.03x)       24958 (1.04x)   
+      5  32x32             56873       56267 (1.01x)       55942 (1.02x)       118126    51.9% /  52.4% /  52.6%
+      6  64x64             18269       18095 (1.01x)       17982 (1.02x)     17372288    99.9% /  99.9% /  99.9%
+  check at 32x32: 2032 entries x 7 symmetries = 14224 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 64x64: 2030 entries x 7 symmetries = 14210 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 3.2s
+pattern wedge-grow.mc rule B3/S23 | base tiles 16x16, sweep tiles 32x32 | 4096 gens (256 sweeps) in 8.0s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      4  16x16 tile         7698        7531 (1.02x)        7441 (1.03x)   
+      5  32x32             18247       18125 (1.01x)       18011 (1.01x)        42537    57.1% /  57.4% /  57.7%
+      6  64x64              6324        6294 (1.00x)        6285 (1.01x)    270800000   100.0% / 100.0% / 100.0%
+  check at 32x32: 2028 entries x 7 symmetries = 14196 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 64x64: 2108 entries x 7 symmetries = 14756 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 2.1s
+pattern totalperiodic.mc rule B3/S23 | base tiles 16x16, sweep tiles 32x32 | 4096 gens (256 sweeps) in 0.1s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      4  16x16 tile          620         584 (1.06x)         576 (1.08x)   
+      5  32x32              2248        2211 (1.02x)        2201 (1.02x)         5975    62.4% /  63.0% /  63.2%
+      6  64x64              1266        1264 (1.00x)        1264 (1.00x)        18560    93.2% /  93.2% /  93.2%
+  check at 32x32: 2248 entries x 7 symmetries = 15736 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 64x64: 1266 entries x 7 symmetries = 8862 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 0.4s
+pattern ruler.mc rule B3/S23 | base tiles 16x16, sweep tiles 32x32 | 4096 gens (256 sweeps) in 0.3s
+  level  window        entries   rotations (C4)       + mirrors (D4)     requests   hit rate: exact / C4 / D4
+      4  16x16 tile         3962        3848 (1.03x)        3806 (1.04x)   
+      5  32x32              9562        9499 (1.01x)        9470 (1.01x)        25044    61.8% /  62.1% /  62.2%
+      6  64x64              3967        3965 (1.00x)        3962 (1.00x)       107648    96.3% /  96.3% /  96.3%
+  check at 32x32: 2391 entries x 7 symmetries = 16737 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  check at 64x64: 3967 entries x 7 symmetries = 27769 images solved; wrong results per symmetry (rot90 rot180 rot270 mirrorEW mirrorNS transpose anti): [0, 0, 0, 0, 0, 0, 0]
+  analysis 1.8s
+
+real	8m6.368s
+user	0m0.121s
+sys	0m0.306s
