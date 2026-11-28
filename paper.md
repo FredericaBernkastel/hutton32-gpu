@@ -4,7 +4,7 @@
 
 ![GPU HashLife (GHL) at a glance](research/figures/ghl_overview.svg)
 
-*GHL at a glance.* The strip on top is the algorithm, and it defines the terms that the panels use: a universe held as a grid of tile IDs advances by one table probe per tile; a miss is resolved by the HashLife recursion, run in waves down to a memo floor; below the floor the rule is evaluated as a bit-sliced circuit. (1) Universes of the evaluation as cells, named by their pattern files, each with the share of its probes that miss, by generations run. (2) Below the floor: Hutton32b as its 367 gates, drawn from the netlist while it evaluates 32 cells of [`squares.rle`], and the adder tree of the Life kernel (Section IV-C). (3) Above the floor: `squares.rle` cut into 16×16 tiles, one sweep of the hit path with the results that its memo table lacked, one memo entry and the table itself (Sections IV-B and IV-D). (4) The miss path: the waves of one 64-generation step, the windows that a floor wave brute-forces, the depth per universe (the thresholds of Table XXIX) and the engine per region (Sections IV-E and IV-F). (5) The measured rates that set the floor (Section III) and the components' rates against Golly's (Table XI). Nothing in it is drawn by hand: `overview` runs the CPU reference engine on the patterns and [`ghl_diagram.py`] draws its output, the logged rates and the two gate networks, checking the circuit against the rule table on every cell of the frame it shows. GHL's components were measured separately (Table IX), so a mark at the right of each heading says how far that panel's content is built: a filled circle for what was measured on the GPU, a diamond for what the CPU reference engine ran, a dashed circle for what the cost model computes.
+*GHL at a glance.* The strip on top is the algorithm, and it defines the terms that the panels use: a universe held as a grid of tile IDs advances by one table probe per tile; a miss is resolved by the HashLife recursion, run in waves down to a memo floor; below the floor the rule is evaluated as a bit-sliced circuit. (1) Universes of the evaluation as cells, named by their pattern files, each with the share of its probes that miss, by generations run. (2) Below the floor: Hutton32b as its 367 gates, drawn from the netlist while it evaluates 32 cells of [`squares.rle`], and the adder tree of the Life kernel (Section IV-C). (3) Above the floor: `squares.rle` cut into 16×16 tiles, one sweep of the hit path with the results that its memo table lacked, one memo entry and the table itself (Sections IV-B and IV-D). (4) The miss path: the waves of one 64-generation step, the windows that a floor wave brute-forces, the depth per universe (the thresholds of Table XXXI) and the engine per region (Sections IV-E and IV-F). (5) The measured rates that set the floor (Section III) and the components' rates against Golly's (Table XI). Nothing in it is drawn by hand: `overview` runs the CPU reference engine on the patterns and [`ghl_diagram.py`] draws its output, the logged rates and the two gate networks, checking the circuit against the rule table on every cell of the frame it shows. GHL's components were measured separately (Table IX), so a mark at the right of each heading says how far that panel's content is built: a filled circle for what was measured on the GPU, a diamond for what the CPU reference engine ran, a dashed circle for what the cost model computes.
 
 **Abstract**—HashLife, as implemented in Golly, is the state of the art for long runs of large cellular automata, but it memoizes down to blocks of a few cells, and on dense universes whose content does not repeat that costs more than it saves, by orders of magnitude. We present GPU HashLife (GHL), a HashLife for every rule of Golly's HashLife family (radius-1 neighbourhoods, up to 256 states) whose design follows from four rates measured on a GPU: brute-force evaluation, random table probes, concurrent inserts and dispatch latency. The cost of a probe in cell-updates of brute force sets a memo floor for each rule: windows below it are never memoized but evaluated by a bit-sliced network of the rule, at the same rate on any content. Above the floor GHL runs the HashLife recursion level-synchronously, one data-parallel wave per level, steps the top level as a positional sweep over tile IDs, and chooses its engine per region and per universe from novelty and active area. We evaluate its components on Conway's Life and on a 32-state rule. They beat Golly by one to four orders of magnitude on dense new content and, once their tables are learned, on dense content that recurs. On small universes run long enough to repeat, and on sparse recurring universes of the two-state rule, HashLife's doubling steps stay faster, and GHL falls back to the HashLife recursion. Final states match Golly's. GHL has not yet run as one program: the on-GPU miss path is specified and its primitives are measured, but it is not assembled.
 
@@ -219,7 +219,7 @@ Input: level l, batch Q of distinct windows; every step is one dispatch at fixed
 ```
 
 ```
-Algorithm 3  Controller: engine per 256x256 region, 16-generation steps
+Algorithm 3  Controller: engine per region (run at 16-generation steps, regions of 64x64 to 1024x1024)
  1  start every region at the floor f
  2  coarser alternatives: price them from the region's own statistics (requests and misses
     above a level do not depend on what happens below it); switch when 15 % cheaper
@@ -314,27 +314,27 @@ about 40 %. GHL raises the sweep tile while its hit rate stays above that. Each 
 
 *Floor.* Brute-forcing large isolated windows is the worst choice everywhere: each carries its own halo and the recursion asks for thirteen of them where eight would tile the result. Below 16×16 windows hashing costs more than the cells: an 8×8 window is 0.7 ns of brute force and 3.5 ns of bookkeeping. For Hutton32b GHL therefore stores 8×8 base tiles and brute-forces missed 16×16 windows (F16); Table XXIII gives the measurements. The floor of a rule follows its $\rho$. For Life, with $\rho$ about 380, GHL stores 16×16 base tiles and brute-forces missed 32×32 windows (F32): priced at the Life kernel's rate, a Life soup runs fastest at F64 and the recurring Unit Life Cell at F16, and F32 is within 15 % of the best on both (Table XXIV).
 
-*Engine per region.* The recursion is already a per-window switch between memo and brute force: a window that hits costs a probe, one that misses at the floor is brute-forced. A second engine pays only where content is new at every scale below the region: plain cells stepped per 256×256 region, with memo only above the region. Algorithm 3 enters it on sustained novelty at 32×32 windows and above and leaves it lazily. A region must be at least four times the step, because a window yields its centre a quarter of its side later, so 256×256 is the smallest region at which a learned universe can take 64-generation steps; while learning, at 16-generation steps, the model favours smaller regions on the four Hutton32b universes measured (Table XXVII). On Life the controller does not pay at any region size, and the memo engine keeps F32 in every region (Table XXVIII); the engine per universe (Algorithm 1) is unaffected. Two simpler controllers failed and shaped this one (Section VI-G): experiments must jump to a depth where being wrong is cheap, and the evidence for finer depths must be sampled, not obtained by whole-step trials. While anything is being learned, steps stay at 16 generations, because a step that does not divide a period multiplies the learning time.
+*Engine per region.* The recursion is already a per-window switch between memo and brute force: a window that hits costs a probe, one that misses at the floor is brute-forced. A second engine pays only where content is new at every scale below the region: plain cells stepped per region, with memo only above the region. A region must be at least four times the step, because a window yields its centre a quarter of its side later. The region model of Section VI-G gives the rest for any rule of the family. A stepped region costs $q$ times its cell-updates (7), and $q$ depends on the rule through $\rho$ alone and is the same for every rule once region and step are counted in base tiles. The cells that plain cells step grow with the region (8), so at a given step the region is the smallest the step admits, four steps wide. The step follows (9): one base tile's side, 8 generations for Hutton32b and 16 for Life, while periodic content is new, because a step that does not divide a period multiplies the learning time, and two to eight base tiles' sides where the memo engine carries the universe (Table XXX). Plain cells belong in the regions where a floor run prices them lower. Algorithm 3, the controller that was built and run at 16-generation steps, does not choose that well yet: it enters plain cells on sustained novelty at 32×32 windows and above and leaves them lazily, and against the choice per region made in hindsight it is 49–55 % dearer on Hutton32b and loses to the uniform floor on Life, where it is switched off (Tables XXVII, XXVIII, XXIX); the engine per universe (Algorithm 1) is unaffected. Two simpler controllers failed and shaped it (Section VI-G): experiments must jump to a depth where being wrong is cheap, and the evidence for finer depths must be sampled, not obtained by whole-step trials.
 
 *Depth per universe.* A missed floor window needs about seven dispatches plus one per brute-forced generation, and the levels above add about five per floor wave. Latency is global: one region at a shallow floor makes the whole universe pay that floor's dispatches. GHL therefore chooses the universe-wide floor $f$ that minimises
 
 $$C(f) = L(f) + \sum_{r} w_r(f) \qquad (6)$$
 
-with $L(f)$ the dispatch latency per generation at floor $f$ and $w_r(f)$ the work of region $r$; regions may only go coarser than $f$. With the counter's measured work per region this gives the thresholds $A_1$ and $A_2$ of Algorithm 1 (Table XXIX).
+with $L(f)$ the dispatch latency per generation at floor $f$ and $w_r(f)$ the work of region $r$; regions may only go coarser than $f$. With the counter's measured work per region this gives the thresholds $A_1$ and $A_2$ of Algorithm 1 (Table XXXI).
 
 **TABLE VIII.** Parameters of GHL and the measurements that set them
 
 | Parameter | Value | Set by |
 |---|---|---|
 | Base tile | half the floor: 8×8 cells in five bit-planes (Hutton32b), 16×16 cells in one (Life) | floors (Tables XXIII, XXIV) |
-| Memo floor | Hutton32b: 16×16 windows (F16), 32×32 (F32) for mid-sized active areas; Life: F32 | $V_L / \rho$ (Table II), floors (Table XXIII), depth (Table XXIX) |
+| Memo floor | Hutton32b: 16×16 windows (F16), 32×32 (F32) for mid-sized active areas; Life: F32 | $V_L / \rho$ (Table II), floors (Table XXIII), depth (Table XXXI) |
 | Brute-force engine | Hutton32b: 367-gate circuit on five bit-planes; Life: adder tree on one plane | Tables XIII, XIV, XVI |
 | Generations per dispatch on small grids | $k = 16$ in a shared tile | Tables XIII, XVI |
 | Sweep tile | start at 16×16; raise while the hit rate exceeds 40 % | (5), Tables XVII, XIX |
-| Step while learning | 16 generations | Table XXV |
-| Engine region | Hutton32b: 256×256 cells, the smallest that admits 64-generation steps; plain cells on sustained novelty at ≥ 32×32 windows. Life: no per-region controller, F32 in every region | region ≥ 4 × step; Tables V, XXV, XXVI, XXVII, XXVIII |
-| $A_1$: below it, no memo | Hutton32b: $\approx 1.0 \cdot 10^{6}$ active cells | Table XXIX |
-| $A_2$: F32 between $A_1$ and $A_2$, F16 above | Hutton32b: $\approx 1.3 \cdot 10^{7}$ active cells; for another rule both follow from (6) and its work per region | Table XXIX |
+| Step | one base tile's side while periodic content is new: 8 generations (Hutton32b), 16 (Life); two to eight where the memo engine carries the universe | (9), Tables XXV, XXX |
+| Engine region | four steps wide, the smallest a step admits: 32×32 cells at 8-generation steps (Hutton32b), 64×64 at 16 (Life); plain cells where a floor run prices them lower. Algorithm 3 as built: 16-generation steps, entry on sustained novelty at ≥ 32×32 windows; switched off for Life | region ≥ 4 × step; (7)–(9); Tables V, XXV, XXVI, XXVII, XXVIII, XXIX, XXX |
+| $A_1$: below it, no memo | Hutton32b: $\approx 1.0 \cdot 10^{6}$ active cells | Table XXXI |
+| $A_2$: F32 between $A_1$ and $A_2$, F16 above | Hutton32b: $\approx 1.3 \cdot 10^{7}$ active cells; for another rule both follow from (6) and its work per region | Table XXXI |
 | Miss-path dispatch | fixed capacity with early exit, one pass, ≈ 54 µs per 16-dispatch wave | Table I |
 | Memo entries | 32 B, open addressing; tables sharded across bindings below 2 GiB | Table I |
 
@@ -375,7 +375,7 @@ GHL is not yet one program. Table IX lists where each component runs in this eva
 | Claim protocol for find-or-insert | built, GPU benchmark | GPU |
 | Fixed-capacity 16-dispatch wave | built as a benchmark of empty waves | GPU |
 | Level-synchronous recursion with memo floor | built, CPU reference engine ([`hl.rs`]) | CPU |
-| Per-region floors, plain-cells mode, controller, depth choice | operation counts on the CPU, priced with measured constants (`adapt`) | model |
+| Per-region floors, plain-cells mode, controller, the engine per region chosen in hindsight, depth choice | operation counts on the CPU, priced with measured constants (`adapt`) | model |
 | GPU miss path (expand, evaluate on atlas, intern) as one pipeline | specified, not built | model |
 | Racing of executors, table rebuild, cycle detection | specified, not built | none |
 
@@ -691,7 +691,7 @@ The same soup moves its best floor from F16 to F64 when the brute-force engine b
 | [`16x16 movie`] | **0.52**, 2.5 | 1.12, 1.5 | 38.4, 0.3 | 39.9, 0.9 | F16 74× |
 | All eight | 35.1 | 53.8 | 177 | 154 | best per content: **19.4** |
 
-F16 is the safe default: its worst case is 2.6× behind, while plain cells are up to 74× behind because one moving signal forces a whole 256×256 region to be stepped. The step matters as much as the engine: the ROM learned through 64-generation steps needs 2,112 generations (35.6 ms), through 16-generation steps 528 (9.8 ms). Choosing per content is worth 1.8× on this mix, all of it from the ROM. At the bit-plane kernel's rate ($2.9 \cdot 10^{11}$) the best engine per content stays the same, although two lower places swap (F32 and C64 on the ROM, C64 and C16 on `squares`): uniform F16 costs 29.1 ms instead of 35.1 and the best engine per content 15.2 instead of 19.4.
+F16 is the safe default: its worst case is 2.6× behind, while plain cells are up to 74× behind because one moving signal forces a whole 256×256 region to be stepped. The step matters as much as the engine: the ROM learned through 64-generation steps needs 2,112 generations (35.6 ms), through 16-generation steps 528 (9.8 ms); Table XXX follows the step down to 8 generations. Choosing per content is worth 1.8× on this mix, all of it from the ROM. At the bit-plane kernel's rate ($2.9 \cdot 10^{11}$) the best engine per content stays the same, although two lower places swap (F32 and C64 on the ROM, C64 and C16 on `squares`): uniform F16 costs 29.1 ms instead of 35.1 and the best engine per content 15.2 instead of 19.4.
 
 **TABLE XXVI.** Algorithm 3 against uniform F16 (8×8 base tiles, 16-generation steps; model)
 
@@ -717,7 +717,7 @@ These are model times, and every gain from plain cells in Tables XXV to XXVIII r
 | 1024×1024 | 106.4 | 18.5 | 0.70 | 5.42 | 131.0 | 11 | 14.9 | 29.2 |
 | Uniform F16, for reference | 35.0 | 24.7 | 0.67 | 5.42 | 65.8 | | | |
 
-The region of 256×256 is not the model's optimum. A smaller region confines plain cells to where content is new: they cost less at every size down, 8.5 ms on the ROM at 64×64 against 9.8 ms at 256×256 and 14.9 ms at 1024×1024, and the controller is 7 % cheaper on the mixed universe at 128×128 and 12 % at 64×64. A smaller region also gives each decision fewer samples: on the mixed universe the controller changes mode 2,651 times at 64×64 against 157 at 256×256, and on the counter, where it should stay at F16, the switching costs 16 % at 128×128 and 37 % at 64×64. Its prices for plain cells assume a fixed halo of 30 %, whatever the region (the time charged counts the exact halo), so plain cells look cheaper to it than they are in small regions. Over the four universes 64×64 and 128×128 come out 7 % and 4 % below 256×256, and every larger region is worse. Priced from the engine's counters instead, the controller costs 54–69 ms on the mixed universe at every region size against 32.2 ms for uniform F16, so the ranking of region sizes is the model's. 256×256 remains the smallest region at which a learned universe can step 64 generations at a time; a region that follows the step, 64×64 or 128×128 while learning, is not built.
+The region of 256×256 is not the model's optimum. A smaller region confines plain cells to where content is new: they cost less at every size down, 8.5 ms on the ROM at 64×64 against 9.8 ms at 256×256 and 14.9 ms at 1024×1024, and the controller is 7 % cheaper on the mixed universe at 128×128 and 12 % at 64×64. A smaller region also gives each decision fewer samples: on the mixed universe the controller changes mode 2,651 times at 64×64 against 157 at 256×256, and on the counter, where it should stay at F16, the switching costs 16 % at 128×128 and 37 % at 64×64. Its prices for plain cells assume a fixed halo of 30 %, whatever the region (the time charged counts the exact halo), so plain cells look cheaper to it than they are in small regions. Over the four universes 64×64 and 128×128 come out 7 % and 4 % below 256×256, and every larger region is worse. Priced from the engine's counters instead, the controller costs 54–69 ms on the mixed universe at every region size against 32.2 ms for uniform F16, so the ranking of region sizes is the model's. What the region should be once the choice of engine is right, and at which step, is the subject of the region model below.
 
 **TABLE XXVIII.** Algorithm 3 on Life by region size: 16×16 base tiles, floor F32 with F64 and plain cells as its alternatives, 16-generation steps, priced at the Life kernel's rate as in Table XXIV; model time (ms) per universe, the controller's mode changes over all five, and plain cells per region alone on the soup and the Unit Life Cell (not run above 256×256)
 
@@ -730,11 +730,84 @@ The region of 256×256 is not the model's optimum. A smaller region confines pla
 | 1024×1024 | 1.34 | 0.51 | **1.22** | 0.85 | **0.49** | 4.41 | 1 | | |
 | Uniform F32, for reference | 1.35 | **0.49** | **1.22** | 0.85 | **0.49** | **4.40** | | | |
 
-On Life the controller, with the thresholds set on Hutton32b, does not pay. On the soup it halves the time at every region up to 512×512 (0.61–0.67 ms against 1.35 ms for uniform F32), as plain cells alone would (0.54 ms at 64×64). On recurring content it loses: the Unit Life Cell costs 1.19–2.90 ms against 0.49 ms, because a region in plain cells is stepped whole, while F32 brute-forces only the windows that miss: at 256×256 the controller makes fewer memo inserts than F32 (84,379 against 109,550) but 36 times its cell evaluations ($7.3 \cdot 10^{9}$ against $2.0 \cdot 10^{8}$), on a universe of 4,668 live cells in 511 × 511; the metapixel galaxy costs up to 1.9× uniform F32. At 1024×1024 the controller hardly switches and matches F32. Summed over the five universes no region beats uniform F32 (4.40 ms; 4.41 at 1024×1024, 4.62 at 64×64, 7.23 at 256×256). Within the memo engine GHL therefore runs Life at F32 in every region; Algorithm 1 still chooses the engine per universe, the plain kernel for the soup. Priced from the engine's counters, the controller gains nothing on the soup either (1.25–1.45 ms against 1.32 ms for F32). A controller with thresholds set for Life is not built.
+On Life the controller, with the thresholds set on Hutton32b, does not pay. On the soup it halves the time at every region up to 512×512 (0.61–0.67 ms against 1.35 ms for uniform F32), as plain cells alone would (0.54 ms at 64×64). On recurring content it loses: the Unit Life Cell costs 1.19–2.90 ms against 0.49 ms, because a region in plain cells is stepped whole, while F32 brute-forces only the windows that miss: at 256×256 the controller makes fewer memo inserts than F32 (84,379 against 109,550) but 36 times its cell evaluations ($7.3 \cdot 10^{9}$ against $2.0 \cdot 10^{8}$), on a universe of 4,668 live cells in 511 × 511; the metapixel galaxy costs up to 1.9× uniform F32. At 1024×1024 the controller hardly switches and matches F32. Summed over the five universes no region beats uniform F32 (4.40 ms; 4.41 at 1024×1024, 4.62 at 64×64, 7.23 at 256×256). As built, the controller is therefore switched off for Life, and the memo engine runs at F32 in every region; Algorithm 1 still chooses the engine per universe, the plain kernel for the soup. Priced from the engine's counters, the controller gains nothing on the soup either (1.25–1.45 ms against 1.32 ms for F32). A controller with thresholds set for Life is not built.
+
+*The region model.* In both sweeps the best region lies at an end of the range and moves with the universe, because every row answers two questions at once: what an engine costs in a region of that size, and how well Algorithm 3 chooses between the engines. A model of the first question, in three parts, separates the two and gives the region for any rule.
+
+First, requests and misses at and above a level do not depend on the engine below it. A floor run therefore knows which regions plain cells would step: a region with content is stepped when a region-level window misses in it or next to it. Priced in this way from the floor run, plain cells cost what the plain-cells runs of Tables XXVII and XXVIII charged, to within $10^{-4}$ ms on all 16 pairs of universe and region, and the price also exists where plain cells were not run.
+
+Second, a region of side $s$ stepped for $T$ generations costs $q$ times its $s^{2} T$ cell-updates:
+
+$$q = 1 + \eta + \gamma + \varepsilon, \qquad \eta \le \frac{2(T-1)}{s} \left( 1 + \frac{2T-1}{3s} \right), \qquad \gamma = \frac{c_v \rho}{b^{2} T}, \qquad \varepsilon = \frac{c_m \rho}{s^{2} T} \qquad (7)$$
+
+Here $\eta$ is the halo, zero inside a block of stepped regions and at its bound for a region stepped alone; $\gamma$ is the conversion of the region to tile IDs once per step, with $c_v = 4.8$ probes per base tile of side $b$; and $\varepsilon$ is the memo at and above the region, with $c_m$ between 13 and 68 probes per stepped region, more where more of the tree above the regions misses. The rule enters through $\rho$ alone, and because the floor ties the base tile to $\rho$ ($b^{3} \approx 10 \rho$ for both rules), $\gamma$ and $\varepsilon$ are the same for every rule once step and region are counted in base tiles: a step of one base tile's side adds 47 % of conversion for Hutton32b ($b = T = 8$) and 44 % for Life ($b = T = 16$). At 16-generation steps and 64×64 regions $q$ is 1.27–1.49 on the Hutton32b universes and 1.62–1.99 on those of Life, where the memo alone adds 10–39 % against 1–3 %.
+
+Third, the cells that plain cells step grow with the region, because a region is stepped whole. With $\Omega(s)$ the cell-updates of the stepped regions, $s^{2} T$ times their number, and $c$ the time of one cell evaluation,
+
+$$C_\text{cells}(s) = c \cdot q(s) \cdot \Omega(s), \qquad \alpha = \frac{\partial \ln \Omega}{\partial \ln s} \qquad (8)$$
+
+Between neighbouring sizes $\alpha$ is 0.11–0.42 for the ROM, a rectangle of new content of which only the rim grows; 0.5–1.1 for the soup; and 0.5–2.3 elsewhere, in the mixed universe and in patterns whose new content is a few moving signals or lies inside one region, so that the number of stepped regions hardly falls as they grow. At a fixed step $q$ falls with the region only through the halo and the memo, $\partial \ln q / \partial \ln s = -(\eta + 2\varepsilon)/q$, which is 0.03–0.19 for Hutton32b and 0.18–0.47 for Life at 64×64 and less above. $\alpha$ exceeds it between all neighbouring sizes but three, pairs of sizes at which a small pattern fills the same cells, so that the two prices differ by less than 1 %. **At a fixed step the cheapest region is therefore the smallest, four steps wide**: plain cells in every region cost 8.46 ms at 64×64 and 14.9 at 1024×1024 on the ROM, and 0.54 and 4.00 on the soup.
+
+**TABLE XXIX.** The engine per region chosen in hindsight: per region, plain cells or the floor, whichever the floor run prices lower over the whole run, assigned and then run. Model time (ms) at 16-generation steps on the universes of Tables XXVII and XXVIII, with Algorithm 3 from those tables and plain cells in every region as the floor run prices them
+
+| Region | | | | | | Sum | Algorithm 3, sum | Plain cells in every region, sum |
+|---|---|---|---|---|---|---|---|---|
+| ***Hutton32b*** | *Mixed* | *ROM* | *Counter* | *8 perturbed `chaotic`* |  | | | |
+| 64×64 | **18.0** | **8.47** | **0.63** | **4.97** |  | **32.1** | **48.3** | **81.5** |
+| 128×128 | 18.7 | 8.78 | **0.63** | 5.40 |  | 33.5 | 49.8 | 133.8 |
+| 256×256 | 18.7 | 8.76 | **0.63** | 5.34 |  | 33.5 | 51.9 | 165.0 |
+| 512×512 | 23.4ᵃ | 8.75ᵃ | 0.64ᵃ | 5.39ᵃ |  | 38.1ᵃ | 65.5 | 422.7 |
+| 1024×1024 | 35.0ᵃ | 13.7ᵃ | 0.65ᵃ | 5.37ᵃ |  | 54.7ᵃ | 131.0 | 740.3 |
+| Uniform F16, for reference | 35.0 | 24.7 | 0.67 | 5.42 |  | 65.8 | | |
+| ***Life*** | *Random soup* | *Unit Life Cell* | *Metapixel galaxy* | *catacryst* | *gotts-dots* | | | |
+| 64×64 | **0.50** | **0.49** | 1.25 | **0.74** | **0.46** | **3.44** | 4.62 | **6.24** |
+| 128×128 | 0.57 | **0.49** | 1.40 | 0.80 | 0.47 | 3.73 | 6.41 | 15.6 |
+| 256×256 | 0.58 | **0.49** | 1.34 | 0.84 | 0.49 | 3.74 | 7.23 | 51.8 |
+| 512×512 | 0.58ᵃ | 0.50ᵃ | **1.20**ᵃ | 0.84ᵃ | 0.49ᵃ | 3.61ᵃ | 6.29 | 207.0 |
+| 1024×1024 | 1.31ᵃ | 0.50ᵃ | **1.20**ᵃ | 0.84ᵃ | 0.49ᵃ | 4.34ᵃ | **4.41** | 601.2 |
+| Uniform F32, for reference | 1.35 | 0.49 | 1.22 | 0.85 | 0.49 | 4.40 | | |
+
+ᵃ The choice as the floor run prices it. It is run for regions up to 256×256; above that the reference engine steps plain-cells regions cell by cell for minutes.
+
+Table XXIX takes the choice of engine out of the controller's hands: per region, the engine that the floor run prices lower over the whole run is assigned in hindsight, and the assignment is run. On Hutton32b it costs 32.1 ms at 64×64 against 48.3 for Algorithm 3 and 65.8 for uniform F16, and it grows with the region as the model says, to a priced 54.7 ms at 1024×1024; Algorithm 3 is 49–55 % above it up to 256×256 and further above in larger regions. On Life, where Algorithm 3 never beats uniform F32, the choice costs 3.44 ms at 64×64 against 4.40: plain cells in the soup (0.50 ms against 1.35) and in part of catacryst and gotts-dots (65 of 207 and 23 of 132 regions), and on the Unit Life Cell the floor's 0.49 ms. What Algorithm 3 loses, it loses on entry. It enters plain cells when a region's floor misses outweigh its cells for two or three steps; such bursts end as the floor learns, a region in plain cells learns nothing below itself, and the controller leaves it lazily. The smaller the region, the more easily one burst fills it, which is why the counter costs 0.92 ms at 64×64 where the choice in hindsight costs 0.63. **The limit of Algorithm 3 is its entry rule, not the region.**
+
+The price per region has a blind spot of its own. Memo entries are shared, so a region that pays to learn content which other regions then reuse looks dear when it is priced alone. At 16-generation steps the price is within 1.2 % of the run on the Hutton32b universes, the soup and the Unit Life Cell; it is up to 8 % low on catacryst and gotts-dots and 14–26 % low on the metapixel galaxy, which is built from copies of one cell, so that the choice costs 1.25 ms there at 64×64, above the 1.22 ms of uniform F32. The eight `chaotic` copies show the same at 8-generation steps (13 % low). And like every gain from plain cells in this section, that of the choice exists only for regions stepped as blocks: priced from the engine's counters, with each plain-cells region an isolated window twice its side, it costs 145.3 ms on Hutton32b at 64×64 against 60.8 for uniform F16.
+
+*The step.* A region is at least four steps wide, so the smallest region is tied to the step: $s = 4T$. Along that line $\gamma$ falls as $1/T$ and $\varepsilon$ as $1/T^{3}$, while $\Omega$ grows with the region and with the time that content takes to recur, $\mathrm{lcm}(P, T)$ generations for content of period $P$. With $\lambda = \partial \ln \Omega / \partial \ln T$ at a fixed region, plain cells are cheapest where
+
+$$\frac{\gamma + 3\varepsilon}{q} = \alpha + \lambda \qquad (9)$$
+
+The left side is nearly one function of $T/b$ for both rules: 0.44–0.56 for Hutton32b and 0.47–0.81 for Life at a step of one base tile's side, where their memos differ most, and 0.20–0.25 at two, 0.09–0.10 at four and 0.04–0.05 at eight for both. The right side belongs to the content. The ROM recurs after 33 steps at every step from 8 to 64 generations, so $\lambda = 1$ and the shortest step wins: plain cells in every region cost 5.08, 8.46, 16.8 and 35.5 ms at steps of 8, 16, 32 and 64 generations. The soup never recurs ($\lambda = 0$), and its $\alpha$ of about 0.5 meets the left side at one base tile's side: 0.54 ms at 16 generations, 0.64 at 32, 0.88 at 64. Where the memo engine carries a universe, the step works through the floor instead: the hashing above the floor is paid once per step, and the Unit Life Cell's falls from step to step, 0.35, 0.27, 0.24, 0.23 and 0.22 ms at 16 to 256 generations.
+
+**TABLE XXX.** Region and step together: regions four steps wide, uniform floor / engine per region chosen in hindsight (model ms), on the universes and at the floors of Table XXIX
+
+| Step, region | | | | | | Sum: uniform floor | Sum: engine per region |
+|---|---|---|---|---|---|---|---|
+| ***Hutton32b***, 8×8 base tiles | *Mixed* | *ROM* | *Counter* | *8 perturbed `chaotic`* |  | | |
+| 8, 32×32 | 32.8 / **14.3** | 22.4 / **5.08** | 0.71 / 0.70 | 5.52 / 4.99 |  | **61.4** | **25.1** |
+| 16, 64×64 | 35.0 / 18.0 | 24.7 / 8.47 | 0.65 / 0.63 | 5.42 / **4.97** |  | 65.8 | 32.1 |
+| 32, 128×128 | 35.5 / 25.6 | 25.3 / 15.7 | 0.63 / **0.61** | 5.28 / 5.27 |  | 66.7 | 47.1 |
+| 64, 256×256 | 35.6 / 35.4 | 25.5 / 25.3 | 0.62 / **0.61** | 5.21 / 5.17 |  | 66.9 | 66.5 |
+| ***Life***, 16×16 base tiles | *Random soup* | *Unit Life Cell* | *Metapixel galaxy* | *catacryst* | *gotts-dots* | | |
+| 16, 64×64 | 1.35 / **0.50** | 0.49 / 0.49 | 1.22 / 1.25 | 0.85 / 0.74 | 0.49 / 0.46 | 4.40 | 3.44 |
+| 32, 128×128 | 1.33 / **0.50** | 0.42 / 0.42 | 1.18 / 1.33 | 0.74 / 0.70 | 0.43 / 0.42 | 4.10 | 3.37 |
+| 64, 256×256 | 1.33 / 0.51 | 0.39 / 0.38 | 1.18 / **1.16** | 0.70 / 0.70 | 0.41 / **0.41** | 4.01 | **3.16** |
+| 128, 512×512 | 1.33 / 0.58ᵃ | 0.37 / **0.37**ᵃ | 1.19 / 1.17ᵃ | 0.69 / **0.69**ᵃ | 0.41 / **0.41**ᵃ | 3.99 | 3.22ᵃ |
+| 256, 1024×1024 | 1.33 / 1.33ᵃ | 0.37 / **0.37**ᵃ | 1.18 / **1.16**ᵃ | 0.69 / **0.69**ᵃ | 0.41 / **0.41**ᵃ | **3.98** | 3.96ᵃ |
+
+ᵃ Priced, not run, as in Table XXIX.
+
+![The engine per region by region size](research/figures/region_model.svg)
+
+**Fig. 5.** Model time of the engine per region over the uniform floor of each rule at 16-generation steps, summed over the universes of Table XXIX: Algorithm 3; the engine per region chosen in hindsight, both at 16-generation steps; and the same choice with regions four steps wide (dashed: the step is a quarter of the side). Above 256×256 the choice is priced, not run.
+
+Table XXX and Fig. 5 give the answer for both rules. Hutton32b's universes are carried by the ROM, and their best region is the smallest that 8×8 base tiles admit: at 8-generation steps and 32×32 regions the engine per region costs 25.1 ms, against 32.1 at 16 generations and 64×64 and 65.8 for uniform F16; the uniform floor alone gains 7 % from the shorter step (61.4 ms). At the bit-plane kernel's rate the order stands (the ROM in plain cells: 3.82, 5.88, 11.1 and 22.8 ms). Life's universes are carried by the memo, and the engine per region is cheapest at 64-generation steps and 256×256 regions, 3.16 ms against 3.44 at 16 generations, within 2 % of that at 128 generations; at 256 generations the soup's plain cells no longer pay and the choice returns to the uniform floor (3.96 against 3.98 ms). The two rules differ here because their universes do, not because (7)–(9) do: counted in base tiles the price of a stepped region is the same, periodic new content wants the shortest step under either rule, and content that the memo carries wants a longer one. Priced from the engine's counters, the choice again gains nothing (69.7 ms against 61.2 for uniform F16 at 8-generation steps).
+
+For a rule of Golly's family GHL therefore sets the region from the step, four steps wide, and the step from the base tile: one base tile's side while periodic content is new, two to eight where the memo engine carries the universe, with plain cells in the regions that a floor run prices lower. A controller that makes that choice while the universe runs is not built: Algorithm 3 is the closest that was, and its entry rule is where it falls short.
 
 Three earlier controllers did not work (64-generation steps, 4×4 base tiles). Walking down one level at a time from plain cells cost 97.8 ms on the ROM's learning phase against 38.6 ms for plain cells and 40.4 ms for F16 throughout: the first step down is a 256×256 brute window, the most expensive mode there is, so the experiment always failed. Whole-step trials of the next finer level cost 64.1 ms on the mixed universe against 55.1 ms for uniform F16 and 46.8 ms for the best fixed mode per region. Sampled evidence with 64-generation steps cost 78.5 ms, because plain cells learn the ROM four times slower at that step and mode boundaries cost a halo that a contiguous block would not.
 
-**TABLE XXIX.** Dispatch time per generation of each engine (fixed-capacity dispatches at 3.4 µs), independent of the universe's size, and the active area at which each becomes the best engine
+**TABLE XXXI.** Dispatch time per generation of each engine (fixed-capacity dispatches at 3.4 µs), independent of the universe's size, and the active area at which each becomes the best engine
 
 | Engine | Generations per floor wave | Dispatches per generation | Dispatch time per generation | Best for, byte-LUT pricing | Best for, bit-plane pricing |
 |---|---|---|---|---|---|
@@ -748,9 +821,9 @@ The thresholds use the counter's measured work per region and generation: 38 ns 
 
 ### H. CPU kernels
 
-The circuit also changes the host side. Table XXX gives one i5-6600K thread ([`bench/`]; all engines compared cell by cell before timing; ranges span two sets of runs, which differed by up to 30 %).
+The circuit also changes the host side. Table XXXII gives one i5-6600K thread ([`bench/`]; all engines compared cell by cell before timing; ranges span two sets of runs, which differed by up to 30 %).
 
-**TABLE XXX.** Cell-updates per second on one CPU thread
+**TABLE XXXII.** Cell-updates per second on one CPU thread
 
 | Engine | Uniform random states | Tiled counter |
 |---|---|---|
@@ -770,11 +843,11 @@ On all four cores, with one band of rows per thread, the bit-sliced forms reach 
 
 The on-GPU miss path is a composition of measured parts. Per tile-step at 16×16 tiles,
 
-$$t = \frac{1}{R_P} + \mu \left( \frac{4 V_L}{R_B} + \frac{2}{R_I} + t_\text{gather} \right) \approx 0.27\ \text{ns} + \mu \cdot 50\ \text{ns} \qquad (7)$$
+$$t = \frac{1}{R_P} + \mu \left( \frac{4 V_L}{R_B} + \frac{2}{R_I} + t_\text{gather} \right) \approx 0.27\ \text{ns} + \mu \cdot 50\ \text{ns} \qquad (10)$$
 
 Here $1/R_P$ is one probe out of cache, $4 V_L / R_B$ = 44 ns brute-forces the $2s \times 2s$ window with the byte-LUT kernel, $2/R_I$ = 1.5–2 ns pays two inserts, and $t_\text{gather}$, copying the four tiles of a missed window into the atlas, is taken as about 4 ns; that last term is an estimate, not a measurement.
 
-**TABLE XXXI.** Projected rates of memoized stepping with the miss path on the GPU, against GHL's own brute-force engine
+**TABLE XXXIII.** Projected rates of memoized stepping with the miss path on the GPU, against GHL's own brute-force engine
 
 | Workload | $\mu$ at 16×16 | Projected cell-updates/s | vs bit-plane brute force ($3.0 \cdot 10^{11}$) |
 |---|---|---|---|
@@ -795,7 +868,7 @@ The closest case is a small universe with constant novelty. On the single counte
 
 * **Not one program.** The GPU results for memoized stepping are hit-path measurements on tables learned by the CPU, on periodic patterns replicated with phase offsets. They establish steady-state rates and correctness, not learning speed on the GPU. The fixed-capacity wave was measured empty; overflow and replay are designed, not built. The racing of executors, table rebuild and cycle detection are specified only.
 * **Workloads favour the hit path.** Copies in the composed universes sit at whole-tile offsets; Table XVIII shows that table size and learning grow with every additional alignment class. The sparse universe's active-block list is fixed, so block activation was not exercised.
-* **Section VI-G is simulation.** Floors, engines and depth are costed from the reference engine's operation counts; the plain-cells mode is costed, not executed as cells, and the controller was tuned on the same composite it is reported on.
+* **Section VI-G is simulation.** Floors, engines and depth are costed from the reference engine's operation counts; the plain-cells mode is costed, not executed as cells, and the controller was tuned on the same composite it is reported on. The engine per region of Tables XXIX and XXX is chosen in hindsight from a finished run: it measures what the choice is worth and is not a controller.
 * **One machine, three rules.** All constants come from one RTX 5060 Ti under wgpu on Windows. Pass, submit and read-back costs varied by up to 5× between runs on different days. Within a set of five runs most figures varied by a few percent; the largest spread, 30 %, was one run of the byte-LUT kernel on 18.7 M cells. GPU timings include the CPU's recording of commands (1.0 µs of a 3.2 µs chained dispatch); GPU timestamp queries were not used. On an 8 GB card of the same bus the brute and out-of-cache probe rates should be similar and memo capacity halves; this was not measured.
 * **Miss rates are pattern statistics** measured on fourteen patterns over $10^{4}\text{–}10^{6}$ generations. A circuit whose state space is explored more slowly would keep missing longer.
 * **The circuit** exists for Hutton32b only and is not proven minimal. Hutton32 differs from it in 74,854 neighbourhoods, and that edit has not been made, so the bit-plane kernels compute Hutton32b. On the Hutton32 pattern [`squares`] they agree cell for cell with Hutton32 over the 65,536 generations checked, because it never reaches a neighbourhood in which the two rules differ; that does not hold for Hutton32 patterns in general. The bit-plane kernel was measured up to $1.07 \cdot 10^{9}$ cells; one binding holds 2 GiB, so a $10^{10}$-cell universe as plain cells (6.3 GB per buffer) would need a kernel spanning several bindings.
@@ -851,7 +924,7 @@ Sources marked † were read as abstract or secondary summary only. Text in squa
 
 Everything the tables need is in the repository: the harness in [`research/`], every pattern in [`patterns/`] (sources and rules in its README) and the two canonical tables in [`rules/`]. Each table is one command, run in bash (git-bash on Windows, WSL or Linux) from [`research/`]. [`reproduce.sh`] builds the harness first; run with no argument it lists the targets, and its source holds the exact harness commands behind each one. It needs Rust, Python 3 and a GPU with Vulkan or DX12. The Golly targets also need `bgolly`, which is taken from `$BGOLLY`, from Golly 5.1's Windows install path or from `PATH`, with [`rules/`] as its rule folder. GPU figures should be taken on an otherwise idle machine.
 
-**TABLE XXXII.** One command per table
+**TABLE XXXIV.** One command per table
 
 | Table or claim | Command | Needs |
 |---|---|---|
@@ -862,7 +935,7 @@ Everything the tables need is in the repository: the harness in [`research/`], e
 | Table V | `bash reproduce.sh cond-miss` | |
 | Table VII: forms A and C | `bash reproduce.sh forms` | network (numpy) |
 | Table VII, Section IV-C: the circuit against the table | `bash reproduce.sh circuit` | network (numpy) |
-| Section V-C, Table XXXIII: reference engine against per-cell stepping; CPU rules against both tables; Hutton32 and Hutton32b compared | `bash reproduce.sh correctness` | |
+| Section V-C, Table XXXV: reference engine against per-cell stepping; CPU rules against both tables; Hutton32 and Hutton32b compared | `bash reproduce.sh correctness` | |
 | Table X | `bash reproduce.sh golly` | Golly |
 | Table X: the ROM at step 1 past one period, until Golly's memory limit | `bash reproduce.sh golly-rom-long` | Golly |
 | Table X: Golly with Hutton32b as an `@TREE` rule | `bash reproduce.sh golly-tree` | Golly |
@@ -887,10 +960,12 @@ Everything the tables need is in the repository: the harness in [`research/`], e
 | Table XXVI | `bash reproduce.sh controller` | |
 | Table XXVII | `bash reproduce.sh region-size` | |
 | Table XXVIII | `bash reproduce.sh region-size-life` | |
-| Table XXIX: work per generation of the counter | `bash reproduce.sh counter-work` | |
-| Tables XXV and XXIX at the bit-plane rate | `bash reproduce.sh reprice` | |
-| Table XXX: one thread | `bash reproduce.sh cpu-bench` | |
-| Table XXX: four threads; the CPU column of Table XI | `bash reproduce.sh cpu-parallel` | |
+| Table XXX | `bash reproduce.sh region-step` | |
+| Tables XXIX and XXX, Fig. 5 and the checks of the region model, from the logs of the three targets above | `bash reproduce.sh region-model` | |
+| Table XXXI: work per generation of the counter | `bash reproduce.sh counter-work` | |
+| Tables XXV and XXXI at the bit-plane rate | `bash reproduce.sh reprice` | |
+| Table XXXII: one thread | `bash reproduce.sh cpu-bench` | |
+| Table XXXII: four threads; the CPU column of Table XI | `bash reproduce.sh cpu-parallel` | |
 | Appendix B: the committed tables are the published files | `bash reproduce.sh rules-upstream` | network |
 | Table XVI | `bash reproduce.sh life-kernels` | |
 | Table X: Life soup and Unit Life Cell; Table XI: the soup on the GPU against Golly's final state | `bash reproduce.sh life-golly` | Golly |
@@ -900,15 +975,15 @@ Everything the tables need is in the repository: the harness in [`research/`], e
 | Table XXIV | `bash reproduce.sh life-floors` | |
 | The overview diagram (its data: `overview`, about a minute on the CPU) and Figs. 2–4 | `bash reproduce.sh figures` | |
 
-`sweep`, `sweep-tiles` and `unaligned` learn the ROM's table on the CPU before each GPU run, 84–88 s per period at 16×16 tiles, and 261 s and 297 s with two and four alignment classes. The raw output of every run behind the tables is in [`logs/`], one file per target, written by [`run_batch.sh`] into a dated folder. Every figure of a target comes from the newest folder that holds the target, and a ratio divides runs from one folder: all targets on either side of a ratio in Tables X, XI, XII, XXI and XXII and Section VI-H (`golly`, `golly-tree`, `runlength`, `head2head`, `rom-kernels`, `cpu-parallel`, `sparse`, `life-golly`, `life-sparse` and the GPU targets they are set against) were run on 2026-11-26. The one quantity that combines the two days is $\rho$ of Table I, a ratio of GPU rates: $R_B$ from 2026-11-26, $R_P$ from 2026-11-25. Where a target was run on both days the later folder supersedes the earlier, whose GPU timings of large grids and of the active-block sweep still included the upload of the grid. Tables II, III, VIII, IX, XI and XXXI derive from or restate the others; Table VI and Algorithms 1–3 come from the design and the code. The circuit is regenerated in [`bitslice/`] with [`rule_circuit.py`], [`optimize.py`] `25 1` (a 25-minute budget), [`optimize_more.py`] `6.5 7` and [`emit.py`], which also need `pip install yowasp-yosys python-sat`; the optimiser runs on a wall-clock budget, so a rerun does not reproduce the netlist gate for gate, and [`circuit.netlist`] is the artifact. The mixed universe of Table XXVI is the `--compose` string in [`composite_spec.txt`] (items `file@x,y[+pre-run gens][~perturbation seed]`). The three controllers that Section VI-G reports as failed were replaced in [`cmd_adapt.rs`] and cannot be rerun.
+`sweep`, `sweep-tiles` and `unaligned` learn the ROM's table on the CPU before each GPU run, 84–88 s per period at 16×16 tiles, and 261 s and 297 s with two and four alignment classes. The raw output of every run behind the tables is in [`logs/`], one file per target, written by [`run_batch.sh`] into a dated folder. Every figure of a target comes from the newest folder that holds the target, and a ratio divides runs from one folder: all targets on either side of a ratio in Tables X, XI, XII, XXI and XXII and Section VI-H (`golly`, `golly-tree`, `runlength`, `head2head`, `rom-kernels`, `cpu-parallel`, `sparse`, `life-golly`, `life-sparse` and the GPU targets they are set against) were run on 2026-11-26. The one quantity that combines the two days is $\rho$ of Table I, a ratio of GPU rates: $R_B$ from 2026-11-26, $R_P$ from 2026-11-25. The folder of 2026-11-28 holds the three region sweeps (`region-size`, `region-size-life`, `region-step`); their figures are model times, operation counts priced with fixed constants, and do not depend on the day or the machine's load. Where a target was run on both of the earlier days the later folder supersedes the earlier, whose GPU timings of large grids and of the active-block sweep still included the upload of the grid. Tables II, III, VIII, IX, XI and XXXIII derive from or restate the others; Table VI and Algorithms 1–3 come from the design and the code. The circuit is regenerated in [`bitslice/`] with [`rule_circuit.py`], [`optimize.py`] `25 1` (a 25-minute budget), [`optimize_more.py`] `6.5 7` and [`emit.py`], which also need `pip install yowasp-yosys python-sat`; the optimiser runs on a wall-clock budget, so a rerun does not reproduce the netlist gate for gate, and [`circuit.netlist`] is the artifact. The mixed universe of Table XXVI is the `--compose` string in [`composite_spec.txt`] (items `file@x,y[+pre-run gens][~perturbation seed]`). The three controllers that Section VI-G reports as failed were replaced in [`cmd_adapt.rs`] and cannot be rerun.
 
 CPU and Golly timings differ between the two days by more than between runs of one day, in both directions: Golly with the Hutton32 rules ran up to 17 % slower on the later day (the `32x32 movie` 26 % faster), its Life runs 4–18 % faster (up to 47 % on runs shorter than 0.1 s), and its runs of the sparse universe at step 16, and over $2^{20}$ generations at step 1024, twice as fast; the CPU reference engine ran between 6 % faster and 16 % slower, and the single-thread byte-table loops of `rom-kernels` and `lut-kernel` 20–40 % slower. The clock (3.5 GHz) and the power plan were the same on both days; on the later day other programs kept about one of the host's four cores busy. The cause was not isolated, so CPU and Golly rates carry an uncertainty of this order across days, and ratios near 1, those of Table XXII and the recursion rows of Table XI, lie within it.
 
 ## Appendix B. The Rule Tables
 
-Each rule has one authoritative definition (Table XXXIII). The harness's CPU rule implementation and the circuit of Section IV-C equal the Hutton32 and Hutton32b tables on all $2^{25}$ neighbourhoods; the circuit was built and checked against the Hutton32b table. Hutton32 and Hutton32b differ in 74,854 neighbourhoods, all with an excited special transmission state, a confluent state or a crossing in the centre.
+Each rule has one authoritative definition (Table XXXV). The harness's CPU rule implementation and the circuit of Section IV-C equal the Hutton32 and Hutton32b tables on all $2^{25}$ neighbourhoods; the circuit was built and checked against the Hutton32b table. Hutton32 and Hutton32b differ in 74,854 neighbourhoods, all with an excited special transmission state, a confluent state or a crossing in the centre.
 
-**TABLE XXXIII.** Canonical rule tables
+**TABLE XXXV.** Canonical rule tables
 
 | Rule | Canonical table | Verified identical to it: 0 of $2^{25}$ neighbourhoods differ |
 |---|---|---|
@@ -934,13 +1009,14 @@ Each rule has one authoritative definition (Table XXXIII). The harness's CPU rul
 | [`cmd_brute2.rs`] | hostile content; class-compressed table |
 | [`cmd_insert.rs`] | lock-free find-or-insert with 32-bit CAS |
 | [`cmd_sparse.rs`] | sparse universe, active-block sweep, macrocell writer |
-| [`cmd_adapt.rs`] | per-region floors and engines on the position-aware recursion ([`hl.rs: result_at`]), cost model, controller, `--compose` universes |
+| [`cmd_adapt.rs`] | per-region floors and engines on the position-aware recursion ([`hl.rs: result_at`]), cost model, controller, the region model (plain cells and the cheaper engine per region priced from a floor run; `--policies hindsight` runs that choice), `--compose` universes |
 | [`cmd_bitslice.rs`] | the plain bit-plane kernel (`gpu-bitslice`), the shared-tile kernel (`gpu-tile`) and the one-thread-per-window kernel (`gpu-window`) |
 | [`bitslice/`] | the rule as a gate network: [`rule_circuit.py`], [`resub.py`], [`abc_flow.py`], [`xag.py`], [`optimize.py`], [`emit.py`]; artifacts [`circuit.netlist`], [`step_planes.wgsl`], [`step_planes.rs`]; [`verify.py`]; [`scalar.py`] and [`tables.py`] (forms A and C); [`bench/`] (CPU benchmark on one or more threads) |
 | [`bitslice_series.sh`] | every GPU measurement of the bit-plane, window and shared-tile kernels |
 | [`time_golly.py`] | `bgolly` timing: median of repeats per step size, peak working set, rate over the second half of the run |
 | [`head2head.py`] | `bgolly` against the CPU engine, both timed the same way and without output, final states compared in a separate run |
 | [`engine_choice.sh`] | engine-per-content table |
+| [`region_sweep.sh`], [`region_sweep_life.sh`], [`region_step_sweep.sh`], [`region_model.py`] | the region sweeps of both rules, the sweep along region = 4 × step, and the region model's checks, tables and Fig. 5 from their logs |
 | [`figures.py`], [`svgplot.py`] | Figs. 2–4 from the logged medians, as SVG without plotting libraries |
 | [`ghl_diagram.py`], [`ghl_logs.py`], [`ghl_netlist.py`] | the overview diagram, drawn from the output of `overview`, from the rates and ratios that `ghl_logs.py` reads out of [`logs/`], and from the two gate networks, which `ghl_netlist.py` parses, lays out and evaluates on the cells shown |
 | [`logs/`] | raw output of every target behind the tables; [`run_batch.sh`] runs targets one at a time into a dated folder |
@@ -1093,6 +1169,10 @@ Each rule has one authoritative definition (Table XXXIII). The harness's CPU rul
 [`time_golly.py`]: research/tools/time_golly.py
 [`head2head.py`]: research/tools/head2head.py
 [`engine_choice.sh`]: research/tools/engine_choice.sh
+[`region_sweep.sh`]: research/tools/region_sweep.sh
+[`region_sweep_life.sh`]: research/tools/region_sweep_life.sh
+[`region_step_sweep.sh`]: research/tools/region_step_sweep.sh
+[`region_model.py`]: research/tools/region_model.py
 [`figures.py`]: research/tools/figures.py
 [`svgplot.py`]: research/tools/svgplot.py
 [`ghl_logs.py`]: research/tools/ghl_logs.py

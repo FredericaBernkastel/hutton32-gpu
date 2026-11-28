@@ -1,0 +1,12 @@
+2026-11-28 05:52:18 region model: floor runs price plain cells and the hindsight choice per region; model times, deterministic
+2026-11-28 05:52:22 start region-size-life
+2026-11-28 05:57:16 start region-step
+2026-11-28 06:05:23 done  region-size-life (exit 0)
+2026-11-28 06:05:23 start region-size
+2026-11-28 06:19:26 done  region-step (exit 0)
+2026-11-28 07:06:20 note: the region-size run above was stopped: its hindsight runs at 512x512 and 1024x1024 took over an hour; the scripts now run that choice up to 256x256 and price it above
+2026-11-28 07:06:40 start region-size
+2026-11-28 07:06:40 start region-step
+2026-11-28 07:29:30 done  region-step (exit 0)
+2026-11-28 07:41:30 done  region-size (exit 0)
+2026-11-28 07:50:55 note: region-size and region-step above ran side by side; times are model times and do not depend on the load

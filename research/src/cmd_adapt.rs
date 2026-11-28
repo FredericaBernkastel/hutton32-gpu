@@ -10,6 +10,11 @@
 //!
 //! Operation counts come from the reference engine. Times are a model built from the constants
 //! measured on the GPU (`gpu-brute`, `gpu-probe`, `gpu-insert`).
+//!
+//! The region model. Requests and misses at and above the region level do not depend on the engine
+//! below it, so every run also records what plain cells in every region would have cost
+//! (`PlainModel`), and a fixed-floor run what the cheaper of the two engines per region would have
+//! cost in hindsight (`hindsight`); `Kind::Assigned` then runs that assignment.
 
 use crate::{cmd_stats, cmd_stats::Loaded, hl, hl::{Engine, FloorPolicy, Outcome}, opt, opt_or, pattern::Grid, sim::Sim};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -75,12 +80,58 @@ struct Region {
   cost_brute: f64,
   /// macro-steps with work, per mode: index = floor, BRUTE_SLOT = plain cells
   time_in: [u32; MAXL],
+  /// what the memo engine cost at and below the region level (the part plain cells would replace)
+  memo_below: f64,
+  /// region-level windows (level rl + 1) that missed here
+  top_misses: u64,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Kind {
   Fixed(Mode),
   Adaptive,
+  /// plain cells in the regions of `Policy::assign`, the floor `init` everywhere else
+  Assigned,
+}
+
+/// What plain cells in every region would have cost in this run, whatever engine ran: the charge
+/// that `end_step` makes for `Kind::Fixed(Mode::Brute)`, from the region-level misses alone.
+#[derive(Clone, Copy, Default)]
+pub struct PlainModel {
+  /// region-steps with content, and those of them that would have been stepped as cells
+  pub nonempty: u64,
+  pub charged: u64,
+  /// cell evaluations of the charged regions themselves and of their halos
+  pub own_evals: f64,
+  pub halo_evals: f64,
+}
+
+/// One macro-step of a fixed-floor run, kept for the choice in hindsight: the regions whose
+/// region-level window missed, those with a brute-forced window, and the non-empty regions next
+/// to either.
+struct StepTrace {
+  top_miss: Vec<(i64, i64)>,
+  any_brute: Vec<(i64, i64)>,
+  near: Vec<(i64, i64)>,
+}
+
+/// Cell evaluations of one charged region for a macro-step of `t` generations: its own cells, and
+/// the halo outside the charged set (side strips of width r and corner squares r x r, r = t-1..0).
+fn block_evals(charged: &FxHashSet<(i64, i64)>, x: i64, y: i64, s: f64, t: u64) -> (f64, f64) {
+  let out = |dx: i64, dy: i64| !charged.contains(&(x + dx, y + dy));
+  let sides = [out(-1, 0), out(1, 0), out(0, -1), out(0, 1)].iter().filter(|&&b| b).count() as f64;
+  let corner = |dx: i64, dy: i64| out(dx, 0) && out(0, dy) && out(dx, dy);
+  let corners = [corner(-1, -1), corner(1, -1), corner(-1, 1), corner(1, 1)].iter().filter(|&&b| b).count() as f64;
+  let mut halo = 0.0;
+  for r in 0..t {
+    let r = r as f64;
+    halo += sides * r * s + corners * r * r;
+  }
+  (s * s * t as f64, halo)
+}
+
+fn near(set: &FxHashSet<(i64, i64)>, x: i64, y: i64) -> bool {
+  (-1..=1).any(|dy| (-1..=1).any(|dx| set.contains(&(x + dx, y + dy))))
 }
 
 pub struct Policy {
@@ -102,6 +153,16 @@ pub struct Policy {
   /// whole-step trials instead)
   pub sample_shift: u32,
   step: u64,
+  /// `Kind::Assigned`: the regions stepped as plain cells
+  pub assign: FxHashSet<(i64, i64)>,
+  // ---- the region model ----
+  lvl_req: [u64; MAXL],
+  lvl_miss: [u64; MAXL],
+  top_miss: FxHashSet<(i64, i64)>,
+  any_brute: FxHashSet<(i64, i64)>,
+  pub plain: PlainModel,
+  /// kept by fixed-floor runs only
+  trace: Vec<StepTrace>,
 }
 
 impl Policy {
@@ -115,6 +176,13 @@ impl Policy {
       maxf,
       sample_shift: 4,
       step: 0,
+      assign: Default::default(),
+      lvl_req: [0; MAXL],
+      lvl_miss: [0; MAXL],
+      top_miss: Default::default(),
+      any_brute: Default::default(),
+      plain: Default::default(),
+      trace: Vec::new(),
       regions: Default::default(),
       init,
       total_hash: 0.0,
@@ -129,6 +197,13 @@ impl Policy {
     let init = match self.kind {
       Kind::Fixed(m) => m,
       Kind::Adaptive => self.init,
+      Kind::Assigned => {
+        if self.assign.contains(&key) {
+          Mode::Brute
+        } else {
+          self.init
+        }
+      }
     };
     self.regions.entry(key).or_insert_with(|| Region {
       mode: init,
@@ -149,6 +224,8 @@ impl Policy {
       cost_hash: 0.0,
       cost_brute: 0.0,
       time_in: [0; MAXL],
+      memo_below: 0.0,
+      top_misses: 0,
     })
   }
   /// cell evaluations to brute-force one window of level l with every cell stepped every
@@ -217,7 +294,8 @@ impl Policy {
     // a brute region is charged if it has content and something around it had to be computed
     let mut charged: FxHashSet<(i64, i64)> = Default::default();
     for &key in nonempty {
-      let is_brute = self.regions.get(&key).map(|r| r.mode == Mode::Brute).unwrap_or(matches!(self.kind, Kind::Fixed(Mode::Brute)));
+      let unseen = matches!(self.kind, Kind::Fixed(Mode::Brute)) || (self.kind == Kind::Assigned && self.assign.contains(&key));
+      let is_brute = self.regions.get(&key).map(|r| r.mode == Mode::Brute).unwrap_or(unseen);
       if !is_brute {
         continue;
       }
@@ -235,18 +313,28 @@ impl Policy {
     let t = 1u64 << k;
     let mut cells_cost: FxHashMap<(i64, i64), f64> = Default::default();
     for &(x, y) in &charged {
-      // own cells every generation, plus the halo that falls outside the charged set: side strips
-      // of width r and corner squares r x r, for r = t-1 .. 0
-      let out = |dx: i64, dy: i64| !charged.contains(&(x + dx, y + dy));
-      let sides = [out(-1, 0), out(1, 0), out(0, -1), out(0, 1)].iter().filter(|&&b| b).count() as f64;
-      let corner = |dx: i64, dy: i64| out(dx, 0) && out(0, dy) && out(dx, dy);
-      let corners = [corner(-1, -1), corner(1, -1), corner(-1, 1), corner(1, 1)].iter().filter(|&&b| b).count() as f64;
-      let mut evals = 0.0;
-      for r in 0..t {
-        let r = r as f64;
-        evals += s * s + sides * r * s + corners * r * r;
+      // own cells every generation, plus the halo that falls outside the charged set
+      let (own, halo) = block_evals(&charged, x, y, s, t);
+      cells_cost.insert((x, y), (own + halo) * self.model.cell);
+    }
+
+    // ---- the region model: the same charge with every region in plain cells ----
+    // a region would be stepped if it has content and a region-level window missed in or next to it
+    {
+      let all: FxHashSet<(i64, i64)> = nonempty.iter().copied().filter(|&(x, y)| near(&self.top_miss, x, y)).collect();
+      self.plain.nonempty += nonempty.len() as u64;
+      self.plain.charged += all.len() as u64;
+      for &(x, y) in &all {
+        let (own, halo) = block_evals(&all, x, y, s, t);
+        self.plain.own_evals += own;
+        self.plain.halo_evals += halo;
       }
-      cells_cost.insert((x, y), evals * self.model.cell);
+      if matches!(self.kind, Kind::Fixed(Mode::Floor(_))) {
+        let near_any: Vec<(i64, i64)> = nonempty.iter().copied().filter(|&(x, y)| near(&self.top_miss, x, y) || near(&self.any_brute, x, y)).collect();
+        self.trace.push(StepTrace { top_miss: self.top_miss.iter().copied().collect(), any_brute: self.any_brute.iter().copied().collect(), near: near_any });
+      }
+      self.top_miss.clear();
+      self.any_brute.clear();
     }
 
     let window_cost: Vec<(f64, f64)> = (0..MAXL).map(|l| if l > a && l < BRUTE_SLOT { self.cost_brute_window(l) } else { (0.0, 0.0) }).collect();
@@ -256,13 +344,14 @@ impl Policy {
     let (mut th, mut tb) = (0.0, 0.0);
     for &key in &keys {
       // ---- charge ----
-      let (mode, mut ch, mut cb) = {
+      let (mode, mut ch, mut cb, below) = {
         let reg = &self.regions[&key];
-        let (mut ch, mut cb) = (0.0, 0.0);
+        let (mut ch, mut cb, mut below) = (0.0, 0.0, 0.0);
         for l in a + 1..BRUTE_SLOT {
           if reg.req[l] == 0 {
             continue;
           }
+          let before = ch + cb;
           ch += reg.req[l] as f64 * probe + (reg.miss[l] - reg.brute[l]) as f64 * descend;
           if reg.mode == Mode::Brute && l <= rl + 1 {
             // the engine brute-forced these windows only to stay correct; the model steps the
@@ -272,8 +361,15 @@ impl Policy {
             ch += reg.brute[l] as f64 * window_cost[l].0;
             cb += reg.brute[l] as f64 * window_cost[l].1;
           }
+          // what plain cells would replace: everything below the region level, and the
+          // subdivision of a missed region-level window
+          if l <= rl {
+            below += ch + cb - before;
+          } else if l == rl + 1 {
+            below += reg.miss[l] as f64 * descend;
+          }
         }
-        (reg.mode, ch, cb)
+        (reg.mode, ch, cb, below)
       };
       if let Some(&c) = cells_cost.get(&key) {
         cb += c;
@@ -288,6 +384,8 @@ impl Policy {
       let reg = self.regions.get_mut(&key).unwrap();
       reg.cost_hash += ch;
       reg.cost_brute += cb;
+      reg.memo_below += below;
+      reg.top_misses += reg.miss[rl + 1] as u64;
       if worked {
         reg.time_in[match mode {
           Mode::Floor(f) => f,
@@ -473,6 +571,103 @@ impl Policy {
     None
   }
 
+  // ---- the region model ------------------------------------------------------------------
+  /// Hashing that every engine below the region level pays alike: probes at and above the
+  /// region level and the subdivision of the windows that miss above it.
+  fn common_cost(&self) -> f64 {
+    let req: u64 = self.lvl_req[self.rl + 1..].iter().sum();
+    let descends: u64 = self.lvl_miss[self.rl + 2..].iter().sum();
+    req as f64 * self.model.probe + descends as f64 * self.cost_descend()
+  }
+
+  /// Model time of plain cells in every region, from this run's region-level requests and misses:
+  /// (memo at and above the region, conversion of the stepped regions to IDs, cells).
+  pub fn plain_cost(&self) -> (f64, f64, f64) {
+    let memo = self.common_cost() + self.lvl_miss[self.rl + 1] as f64 * self.model.insert;
+    (memo, self.plain.charged as f64 * self.region_convert(), (self.plain.own_evals + self.plain.halo_evals) * self.model.cell)
+  }
+
+  /// Cells and conversion cost of stepping the regions of `set` as plain cells and the others at
+  /// the floor of this (fixed-floor) run; and for every region what it would cost if it were in
+  /// the set, the others as given. A region is stepped if it has content and something next to it
+  /// had to be computed: a region-level window of a plain-cells region, any brute-forced window of
+  /// a floor region.
+  fn cells_given(&self, set: &FxHashSet<(i64, i64)>) -> (f64, FxHashMap<(i64, i64), f64>) {
+    let (s, t) = ((1u64 << self.rl) as f64, 1u64 << self.k);
+    let (cell, convert) = (self.model.cell, self.region_convert());
+    let mut total = 0.0;
+    let mut alone: FxHashMap<(i64, i64), f64> = Default::default();
+    for st in &self.trace {
+      let tm: FxHashSet<(i64, i64)> = st.top_miss.iter().copied().collect();
+      let ab: FxHashSet<(i64, i64)> = st.any_brute.iter().copied().collect();
+      let needs = |n: (i64, i64), also: Option<(i64, i64)>| if set.contains(&n) || also == Some(n) { tm.contains(&n) } else { ab.contains(&n) };
+      let stepped = |x: i64, y: i64, also: Option<(i64, i64)>| (-1..=1).any(|dy| (-1..=1).any(|dx| needs((x + dx, y + dy), also)));
+      let charged: FxHashSet<(i64, i64)> = st.near.iter().copied().filter(|&(x, y)| set.contains(&(x, y)) && stepped(x, y, None)).collect();
+      for &(x, y) in &st.near {
+        let inside = charged.contains(&(x, y));
+        if !inside && (set.contains(&(x, y)) || !stepped(x, y, Some((x, y)))) {
+          continue;
+        }
+        let (own, halo) = block_evals(&charged, x, y, s, t);
+        let c = (own + halo) * cell + convert;
+        *alone.entry((x, y)).or_default() += c;
+        if inside {
+          total += c;
+        }
+      }
+    }
+    (total, alone)
+  }
+
+  /// The cheaper of the two engines per region in hindsight, from a fixed-floor run: plain cells
+  /// where they would have cost less over the whole run than the memo engine did at and below the
+  /// region level. Best response to the neighbours' choice, iterated; the model time is that of
+  /// the best assignment met, so it is never above the floor everywhere or plain cells everywhere.
+  /// A region that is empty when a step begins is never stepped as cells (its neighbours' halos
+  /// cover what enters it), so in plain cells it costs its memo entries only.
+  pub fn hindsight(&self) -> Hindsight {
+    let common = self.common_cost();
+    let insert = self.model.insert;
+    let total_for = |set: &FxHashSet<(i64, i64)>, cells: f64| {
+      common + cells + self.regions.iter().map(|(k, r)| if set.contains(k) { r.top_misses as f64 * insert } else { r.memo_below }).sum::<f64>()
+    };
+    let none: FxHashSet<(i64, i64)> = Default::default();
+    let floor_ns = total_for(&none, 0.0);
+    let (mut best, mut best_set) = (floor_ns, none.clone());
+    // neighbours share halos, so the answer depends on where the iteration starts: from the floor
+    // everywhere and from plain cells everywhere there is content
+    let every: FxHashSet<(i64, i64)> = self.regions.keys().copied().chain(self.trace.iter().flat_map(|st| st.near.iter().copied())).collect();
+    for start in [none, every] {
+      let mut set = start;
+      let (cells, mut alone) = self.cells_given(&set);
+      let total = total_for(&set, cells);
+      if total < best {
+        best = total;
+        best_set = set.clone();
+      }
+      for _ in 0..16 {
+        let next: FxHashSet<(i64, i64)> = self
+          .regions
+          .iter()
+          .filter(|(k, r)| alone.get(k).copied().unwrap_or(0.0) + r.top_misses as f64 * insert < r.memo_below)
+          .map(|(k, _)| *k)
+          .collect();
+        if next == set {
+          break;
+        }
+        let (cells, al) = self.cells_given(&next);
+        let total = total_for(&next, cells);
+        set = next;
+        alone = al;
+        if total < best {
+          best = total;
+          best_set = set.clone();
+        }
+      }
+    }
+    Hindsight { cells: best_set, ns: best, floor_ns, regions: self.regions.values().filter(|r| r.memo_below > 0.0).count() }
+  }
+
   /// share of worked region-steps per mode
   pub fn mode_histogram(&self) -> Vec<(String, f64)> {
     let mut h = [0u64; MAXL];
@@ -516,6 +711,15 @@ impl Policy {
   }
 }
 
+/// The choice of `Policy::hindsight`: the regions for plain cells, the model time of that
+/// assignment and of the floor everywhere, and the number of regions with work.
+pub struct Hindsight {
+  pub cells: FxHashSet<(i64, i64)>,
+  pub ns: f64,
+  pub floor_ns: f64,
+  pub regions: usize,
+}
+
 /// One region of the controller's grid: its position in regions, the macro-steps with work it
 /// spent in each mode as `(side of the brute-forced window, steps)` with side 0 for plain cells,
 /// and its model cost.
@@ -549,6 +753,17 @@ impl FloorPolicy for Policy {
   }
   fn record(&mut self, cx: i64, cy: i64, l: usize, o: Outcome) {
     let rl = self.rl;
+    let key = (cx >> rl, cy >> rl);
+    self.lvl_req[l] += 1;
+    if o != Outcome::Hit {
+      self.lvl_miss[l] += 1;
+      if l == rl + 1 {
+        self.top_miss.insert(key);
+      }
+    }
+    if o == Outcome::Brute {
+      self.any_brute.insert(key);
+    }
     let r = self.region(cx, cy);
     r.req[l] += 1;
     if let Mode::Floor(f) = r.mode {
@@ -670,10 +885,30 @@ struct RunResult {
   region_costs: FxHashMap<(i64, i64), f64>,
   regions: Vec<RegionReport>,
   cpu_s: f64,
+  /// the region model of this run: plain cells in every region as (memo, conversion, cells) in ms
+  plain: (f64, f64, f64),
+  plain_stats: PlainModel,
+  /// fixed-floor runs: the floor, and the cheaper engine per region in hindsight
+  floor: Option<Mode>,
+  hind: Option<Hindsight>,
 }
 
 #[allow(clippy::too_many_arguments)]
-fn run_policy(label: &str, kind: Kind, init: Mode, g: &Grid, lut: &crate::ca::Rule, a: usize, k: usize, rl: usize, steps: u64, model: Model, maxf: usize, nominal_out: &mut f64) -> RunResult {
+fn run_policy(
+  label: &str,
+  kind: Kind,
+  init: Mode,
+  g: &Grid,
+  lut: &crate::ca::Rule,
+  a: usize,
+  k: usize,
+  rl: usize,
+  steps: u64,
+  model: Model,
+  maxf: usize,
+  nominal_out: &mut f64,
+  assign: Option<&FxHashSet<(i64, i64)>>,
+) -> RunResult {
   let t0 = Instant::now();
   let mut e = Engine::new(lut, a, k);
   let (mut root, mut level) = e.from_grid(g);
@@ -689,6 +924,9 @@ fn run_policy(label: &str, kind: Kind, init: Mode, g: &Grid, lut: &crate::ca::Ru
   }
   let (tf0, ti0) = (e.tile_finds, e.tile_inserts);
   let mut pol = Policy::new(kind, rl, a, k, init, model, maxf);
+  if let Some(set) = assign {
+    pol.assign = set.clone();
+  }
   let mut nominal = 0.0;
   let mut cells: Vec<(i64, i64)> = Vec::new();
   for _ in 0..steps {
@@ -723,6 +961,23 @@ fn run_policy(label: &str, kind: Kind, init: Mode, g: &Grid, lut: &crate::ca::Ru
   } else {
     String::new()
   };
+  // the region model must restate what was charged: plain cells in the plain-cells run, the
+  // floor in a fixed-floor run
+  let charged_ns = pol.total_hash + pol.total_brute;
+  let close = |x: f64, y: f64| (x - y).abs() <= 1e-9 * x.abs().max(y.abs()).max(1.0);
+  let (pm, pc, pb) = pol.plain_cost();
+  let hind = match kind {
+    Kind::Fixed(Mode::Floor(_)) => {
+      let h = pol.hindsight();
+      assert!(close(h.floor_ns, charged_ns), "region model: the floor restated as {} ns, charged {} ns", h.floor_ns, charged_ns);
+      Some(h)
+    }
+    Kind::Fixed(Mode::Brute) => {
+      assert!(close(pm + pc + pb, charged_ns), "region model: plain cells restated as {} ns, charged {} ns", pm + pc + pb, charged_ns);
+      None
+    }
+    _ => None,
+  };
   RunResult {
     label: label.to_string(),
     finds,
@@ -738,6 +993,13 @@ fn run_policy(label: &str, kind: Kind, init: Mode, g: &Grid, lut: &crate::ca::Ru
     region_costs: pol.region_costs(),
     regions: pol.region_report(),
     cpu_s: t0.elapsed().as_secs_f64(),
+    plain: (pm / 1e6, pc / 1e6, pb / 1e6),
+    plain_stats: pol.plain,
+    floor: match kind {
+      Kind::Fixed(m @ Mode::Floor(_)) => Some(m),
+      _ => None,
+    },
+    hind,
   }
 }
 
@@ -756,7 +1018,7 @@ pub struct ControllerMap {
 pub fn controller_map(g: &Grid, lut: &crate::ca::Rule, a: usize, k: usize, rl: usize, gens: u64) -> ControllerMap {
   let maxf = 4usize.clamp(a, rl - 1);
   let mut plain_ns = 0.0;
-  let r = run_policy("adaptive", Kind::Adaptive, Mode::Floor(a.clamp(a, maxf)), g, lut, a, k, rl, gens >> k, Model::default(), maxf, &mut plain_ns);
+  let r = run_policy("adaptive", Kind::Adaptive, Mode::Floor(a.clamp(a, maxf)), g, lut, a, k, rl, gens >> k, Model::default(), maxf, &mut plain_ns, None);
   ControllerMap { adaptive_ms: r.hash_ms + r.brute_ms, plain_ms: plain_ns / 1e6, hist: r.hist, note: r.note.trim().to_string(), regions: r.regions }
 }
 
@@ -803,7 +1065,16 @@ pub fn run(args: &[String]) {
     if which != "all" && !which.split(',').any(|w| label.contains(w)) {
       continue;
     }
-    let r = run_policy(&label, kind, init, &g, &lut, a, k, rl, steps, model, maxf, &mut nominal);
+    let r = run_policy(&label, kind, init, &g, &lut, a, k, rl, steps, model, maxf, &mut nominal, None);
+    eprintln!("  [{:>7.1}s cpu] {}", r.cpu_s, r.label);
+    runs.push(r);
+  }
+  // `hindsight`: run the cheaper engine per region, as the first fixed-floor run prices it
+  if which.split(',').any(|w| w == "hindsight") {
+    let from = runs.iter().find(|r| r.hind.is_some()).expect("--policies hindsight needs a fixed-floor run before it");
+    let (set, floor) = (from.hind.as_ref().unwrap().cells.clone(), from.floor.unwrap());
+    let label = "hindsight per region".to_string();
+    let r = run_policy(&label, Kind::Assigned, floor, &g, &lut, a, k, rl, steps, model, maxf, &mut nominal, Some(&set));
     eprintln!("  [{:>7.1}s cpu] {}", r.cpu_s, r.label);
     runs.push(r);
   }
@@ -873,4 +1144,33 @@ pub fn run(args: &[String]) {
   }
   println!("\ncross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):");
   println!("  {}", runs.iter().map(|r| format!("{} {:.2} ms", r.label.replace("fixed: ", ""), r.counter_ms)).collect::<Vec<_>>().join(" | "));
+
+  // ---- the region model: plain cells and the cheaper engine per region, priced from the floor run ----
+  if let Some(f) = runs.iter().find(|r| r.hind.is_some()) {
+    let (pm, pc, pb) = f.plain;
+    let st = f.plain_stats;
+    let side = 1u64 << rl;
+    let own_ms = st.own_evals * model.cell / 1e6;
+    println!();
+    println!("region model, priced from '{}' (requests and misses at and above the region level do not depend on the engine below it):", f.label.replace("fixed: ", ""));
+    println!(
+      "  plain cells in every {side}x{side} region: hash {:.2} + cells {:.2} = {:.2} ms | {} of {} non-empty region-steps stepped | per cell-update of a stepped region: halo +{:.1}%, conversion +{:.1}%, memo at and above the region +{:.1}%",
+      pm + pc,
+      pb,
+      pm + pc + pb,
+      st.charged,
+      st.nonempty,
+      100.0 * st.halo_evals / st.own_evals.max(1.0),
+      100.0 * pc / own_ms.max(1e-12),
+      100.0 * pm / own_ms.max(1e-12)
+    );
+    for r in runs.iter().filter(|r| r.label == "fixed: plain cells") {
+      println!("  the plain-cells run charged {:.2} ms: the model is off by {:+.4} ms", r.hash_ms + r.brute_ms, pm + pc + pb - r.hash_ms - r.brute_ms);
+    }
+    let h = f.hind.as_ref().unwrap();
+    println!("  the cheaper engine per region in hindsight: {:.2} ms, plain cells in {} of {} regions with work", h.ns / 1e6, h.cells.len(), h.regions);
+    for r in runs.iter().filter(|r| r.label.starts_with("hindsight")) {
+      println!("  run as assigned it charged {:.2} ms: the model is off by {:+.4} ms", r.hash_ms + r.brute_ms, h.ns / 1e6 - r.hash_ms - r.brute_ms);
+    }
+  }
 }

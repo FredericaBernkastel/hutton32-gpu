@@ -143,6 +143,8 @@ fn main() {
           "  export --pattern P --out F [--as RULE]       write RLE",
           "  ruletree --rule R --name N [--out F]         write a Golly @TREE rule from a LUT",
           "  adapt --pattern P | --compose SPEC [--gens N --k K --rl R --a A]  adaptive subdivision / engine choice",
+          "        [--policies all|NAME,...]  rows to run, by part of their name: 16x16 (a fixed floor), plain, adaptive;",
+          "        hindsight = run the cheaper engine per region as the fixed-floor run prices it (the region model)",
           "  overview [--out F]                           the data of the overview diagram (tools/ghl_diagram.py), as JSON",
           "GPU (all results are checked against the CPU):",
           "  gpu-baseline [--pattern P --reps N --gens G] archived kernel, verbatim structure",

@@ -3,6 +3,9 @@
     from svgplot import chart
     chart("out.svg", "x label", "y label", series=[("name", [(x, y), ...]), ...])
 
+Ticks are the decades of the data unless `xticks` or `yticks` list them (then labelled as plain
+numbers); `dashed` names series to draw with a dashed line.
+
 Colours follow a fixed, colour-blind-safe order and every series also gets its own marker
 shape, so the chart stays readable without colour. Text uses the reader's sans-serif font.
 """
@@ -35,10 +38,13 @@ def _marker(kind, x, y, c):
     return f"<polygon points='{x:.1f},{y - r - 1:.1f} {x + r + 1:.1f},{y:.1f} {x:.1f},{y + r + 1:.1f} {x - r - 1:.1f},{y:.1f}' fill='{fill}' stroke='{stroke}' stroke-width='1.5'/>"
 
 
-def chart(path, xlabel, ylabel, series, width=640, height=400, xlog=True, ylog=True, title=None):
+def chart(path, xlabel, ylabel, series, width=640, height=400, xlog=True, ylog=True, title=None, xticks=None, yticks=None, dashed=()):
     xs = [x for _, pts in series for x, _ in pts]
     ys = [y for _, pts in series for _, y in pts]
-    xt, yt = _ticks(min(xs), max(xs)), _ticks(min(ys), max(ys))
+    xt, yt = xticks or _ticks(min(xs), max(xs)), yticks or _ticks(min(ys), max(ys))
+    assert xt[0] <= min(xs) and max(xs) <= xt[-1] and yt[0] <= min(ys) and max(ys) <= yt[-1], "data outside the ticks"
+    xf = _fmt if xticks is None else (lambda v: f"{v:g}")
+    yf = _fmt if yticks is None else (lambda v: f"{v:g}")
     x0, x1, y0, y1 = xt[0], xt[-1], yt[0], yt[-1]
     # the right margin holds the legend: wide enough for its longest name (13 px Helvetica, ~7 px a character)
     ml, mr, mt, mb = 72, max(190, 44 + 7 * max(len(n) for n, _ in series) + 12), 20 if not title else 40, 52
@@ -52,22 +58,23 @@ def chart(path, xlabel, ylabel, series, width=640, height=400, xlog=True, ylog=T
         o.append(f"<text x='{ml}' y='22' font-weight='bold'>{title}</text>")
     for v in xt:
         o.append(f"<line x1='{X(v):.1f}' y1='{mt}' x2='{X(v):.1f}' y2='{mt + ph}' stroke='#e4e4e4'/>")
-        o.append(f"<text x='{X(v):.1f}' y='{mt + ph + 18}' text-anchor='middle'>{_fmt(v)}</text>")
+        o.append(f"<text x='{X(v):.1f}' y='{mt + ph + 18}' text-anchor='middle'>{xf(v)}</text>")
     for v in yt:
         o.append(f"<line x1='{ml}' y1='{Y(v):.1f}' x2='{ml + pw}' y2='{Y(v):.1f}' stroke='#e4e4e4'/>")
-        o.append(f"<text x='{ml - 8}' y='{Y(v) + 4:.1f}' text-anchor='end'>{_fmt(v)}</text>")
+        o.append(f"<text x='{ml - 8}' y='{Y(v) + 4:.1f}' text-anchor='end'>{yf(v)}</text>")
     o.append(f"<rect x='{ml}' y='{mt}' width='{pw}' height='{ph}' fill='none' stroke='#555'/>")
     o.append(f"<text x='{ml + pw / 2:.1f}' y='{height - 10}' text-anchor='middle'>{xlabel}</text>")
     o.append(f"<text transform='translate(18,{mt + ph / 2:.1f}) rotate(-90)' text-anchor='middle'>{ylabel}</text>")
     for i, (name, pts) in enumerate(series):
         c, m = COLOURS[i % len(COLOURS)], MARKERS[i % len(MARKERS)]
         pts = sorted(pts)
+        dash = " stroke-dasharray='6 4'" if name in dashed else ""
         if len(pts) > 1:
             d = " ".join(f"{X(x):.1f},{Y(y):.1f}" for x, y in pts)
-            o.append(f"<polyline points='{d}' fill='none' stroke='{c}' stroke-width='2'/>")
+            o.append(f"<polyline points='{d}' fill='none' stroke='{c}' stroke-width='2'{dash}/>")
         o += [_marker(m, X(x), Y(y), c) for x, y in pts]
         ly = mt + 14 + 22 * i
-        o.append(f"<line x1='{ml + pw + 14}' y1='{ly}' x2='{ml + pw + 38}' y2='{ly}' stroke='{c}' stroke-width='2'/>")
+        o.append(f"<line x1='{ml + pw + 14}' y1='{ly}' x2='{ml + pw + 38}' y2='{ly}' stroke='{c}' stroke-width='2'{dash}/>")
         o.append(_marker(m, ml + pw + 26, ly, c))
         o.append(f"<text x='{ml + pw + 44}' y='{ly + 4}'>{name}</text>")
     o.append("</svg>")

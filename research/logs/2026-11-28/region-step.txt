@@ -1,0 +1,683 @@
+=== region-step       region = 4 x step: steps of 8 to 64 generations (Hutton32b), 16 to 256 (Life) (tools/region_step_sweep.sh; about 15 minutes)
+=== step 8, region 32x32 (--k 3 --rl 5)
+--- Hutton32b
+universe: composite of 16 patterns, 5034x3813 cells, population 4870720 | base tile 8x8, macro-step 8 gens, region 32x32 | 4096 gens
+  [   14.7s cpu] fixed: brute at 16x16
+  [   20.2s cpu] hindsight per region
+all 2 policies end in the same state: population 4872039 hash c5fffdd20a3e0782
+plain cells over non-empty regions, no halo: 130.38 ms model time (2.425e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16         14900589    4910555     3.145e9    15.89     16.91     32.80    3.97x    264.8  16:100%
+hindsight per region          10054034    2274067     4.621e9     7.38      6.95     14.34    9.09x    128.9  16:79% cells:21%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 32.51 ms | hindsight per region 34.51 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 32x32 region: hash 10.12 + cells 18.57 = 28.69 ms | 394969 of 2960384 non-empty region-steps stepped | per cell-update of a stepped region: halo +6.8%, conversion +47.3%, memo at and above the region +10.9%
+  the cheaper engine per region in hindsight: 13.80 ms, plain cells in 3052 of 5307 regions with work
+  run as assigned it charged 14.34 ms: the model is off by -0.5319 ms
+universe: lotr1.PPMd-244K.rle, 1548x1461 cells, population 1956035 | base tile 8x8, macro-step 8 gens, region 32x32 | 2112 gens
+  [    9.6s cpu] fixed: brute at 16x16
+  [    9.2s cpu] hindsight per region
+all 2 policies end in the same state: population 1956035 hash 60171ba351375507
+plain cells over non-empty regions, no halo: 26.21 ms model time (4.875e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16          4568080    2963256     2.416e9     9.41     12.99     22.39    1.17x    195.3  16:100%
+hindsight per region            830284     594483     2.582e9     1.77      3.31      5.08    5.16x     69.6  16:6% cells:94%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 22.66 ms | hindsight per region 17.53 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 32x32 region: hash 1.77 + cells 3.31 = 5.08 ms | 74382 of 595056 non-empty region-steps stepped | per cell-update of a stepped region: halo +0.9%, conversion +47.3%, memo at and above the region +6.8%
+  the cheaper engine per region in hindsight: 5.08 ms, plain cells in 2400 of 2400 regions with work
+  run as assigned it charged 5.08 ms: the model is off by -0.0000 ms
+universe: advanced counter v2.rle, 191x197 cells, population 24058 | base tile 8x8, macro-step 8 gens, region 32x32 | 16384 gens
+  [    0.2s cpu] fixed: brute at 16x16
+  [    0.4s cpu] hindsight per region
+all 2 policies end in the same state: population 24079 hash 7a3d776391de0629
+plain cells over non-empty regions, no halo: 3.52 ms model time (6.543e8 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16           891248     142663     4.344e7     0.48      0.23      0.71    4.95x      4.8  16:100%
+hindsight per region            864266     141652     1.187e8     0.47      0.23      0.70    5.06x      4.8  16:86% cells:14%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 0.69 ms | hindsight per region 1.13 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 32x32 region: hash 0.84 + cells 1.59 = 2.43 ms | 32215 of 79872 non-empty region-steps stepped | per cell-update of a stepped region: halo +12.2%, conversion +47.3%, memo at and above the region +11.7%
+  the cheaper engine per region in hindsight: 0.70 ms, plain cells in 23 of 62 regions with work
+  run as assigned it charged 0.70 ms: the model is off by +0.0001 ms
+universe: composite of 8 patterns, 1751x708 cells, population 127872 | base tile 8x8, macro-step 8 gens, region 32x32 | 8192 gens
+  [    1.6s cpu] fixed: brute at 16x16
+  [    7.9s cpu] hindsight per region
+all 2 policies end in the same state: population 127872 hash 8ce4d9887b613042
+plain cells over non-empty regions, no halo: 7.58 ms model time (1.409e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16          6769133    1141413     3.364e8     3.72      1.81      5.52    1.37x     38.2  16:100%
+hindsight per region           5507728     972662     2.303e9     3.02      1.98      4.99    1.52x     32.6  16:75% cells:25%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 5.30 ms | hindsight per region 16.57 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 32x32 region: hash 3.88 + cells 6.71 = 10.60 ms | 136003 of 172032 non-empty region-steps stepped | per cell-update of a stepped region: halo +12.1%, conversion +47.3%, memo at and above the region +17.5%
+  the cheaper engine per region in hindsight: 4.34 ms, plain cells in 121 of 266 regions with work
+  run as assigned it charged 4.99 ms: the model is off by -0.6565 ms
+=== step 16, region 64x64 (--k 4 --rl 6)
+--- Hutton32b
+universe: composite of 16 patterns, 5034x3813 cells, population 4870720 | base tile 8x8, macro-step 16 gens, region 64x64 | 4096 gens
+  [   12.7s cpu] fixed: brute at 16x16
+  [   34.1s cpu] hindsight per region
+all 2 policies end in the same state: population 4872039 hash c5fffdd20a3e0782
+plain cells over non-empty regions, no halo: 136.56 ms model time (2.540e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16         14694161    4642539     3.145e9    18.06     16.91     34.97    3.90x    256.6  16:100%
+hindsight per region           7562472    1851829    1.049e10     7.36     10.68     18.04    7.57x    117.7  16:74% cells:26%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 32.19 ms | hindsight per region 65.77 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 64x64 region: hash 10.00 + cells 43.38 = 53.39 ms | 113124 of 387584 non-empty region-steps stepped | per cell-update of a stepped region: halo +8.8%, conversion +23.7%, memo at and above the region +1.4%
+  the cheaper engine per region in hindsight: 17.81 ms, plain cells in 909 of 1781 regions with work
+  run as assigned it charged 18.04 ms: the model is off by -0.2212 ms
+universe: lotr1.PPMd-244K.rle, 1548x1461 cells, population 1956035 | base tile 8x8, macro-step 16 gens, region 64x64 | 2112 gens
+  [    8.9s cpu] fixed: brute at 16x16
+  [   17.5s cpu] hindsight per region
+all 2 policies end in the same state: population 1956035 hash 60171ba351375507
+plain cells over non-empty regions, no halo: 26.74 ms model time (4.974e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16          7246252    3112853     2.416e9    11.74     12.99     24.73    1.08x    199.8  16:100%
+hindsight per region            715961     487095     5.466e9     1.76      6.71      8.47    3.16x     67.2  16:13% cells:87%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 23.54 ms | hindsight per region 33.06 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 64x64 region: hash 1.65 + cells 6.82 = 8.46 ms | 18975 of 75900 non-empty region-steps stepped | per cell-update of a stepped region: halo +2.0%, conversion +23.7%, memo at and above the region +1.0%
+  the cheaper engine per region in hindsight: 8.46 ms, plain cells in 627 of 650 regions with work
+  run as assigned it charged 8.47 ms: the model is off by -0.0129 ms
+universe: advanced counter v2.rle, 191x197 cells, population 24058 | base tile 8x8, macro-step 16 gens, region 64x64 | 16384 gens
+  [    0.2s cpu] fixed: brute at 16x16
+  [    1.7s cpu] hindsight per region
+all 2 policies end in the same state: population 24079 hash 7a3d776391de0629
+plain cells over non-empty regions, no halo: 3.97 ms model time (7.382e8 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16           562972     102845     4.344e7     0.42      0.23      0.65    6.10x      3.6  16:100%
+hindsight per region            556272     100854     5.536e8     0.40      0.23      0.63    6.30x      3.6  16:56% cells:44%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 0.56 ms | hindsight per region 3.46 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 64x64 region: hash 0.89 + cells 4.14 = 5.03 ms | 10033 of 11264 non-empty region-steps stepped | per cell-update of a stepped region: halo +17.0%, conversion +23.7%, memo at and above the region +1.5%
+  the cheaper engine per region in hindsight: 0.63 ms, plain cells in 14 of 25 regions with work
+  run as assigned it charged 0.63 ms: the model is off by -0.0006 ms
+universe: composite of 8 patterns, 1751x708 cells, population 127872 | base tile 8x8, macro-step 16 gens, region 64x64 | 8192 gens
+  [    1.4s cpu] fixed: brute at 16x16
+  [   22.0s cpu] hindsight per region
+all 2 policies end in the same state: population 127872 hash 8ce4d9887b613042
+plain cells over non-empty regions, no halo: 10.10 ms model time (1.879e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16          4970617     879292     3.364e8     3.61      1.81      5.42    1.86x     30.2  16:100%
+hindsight per region           4615413     831900     7.098e9     3.24      1.73      4.97    2.03x     28.8  16:72% cells:28%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 4.55 ms | hindsight per region 43.01 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 64x64 region: hash 2.65 + cells 12.00 = 14.66 ms | 27998 of 28672 non-empty region-steps stepped | per cell-update of a stepped region: halo +21.7%, conversion +23.7%, memo at and above the region +3.3%
+  the cheaper engine per region in hindsight: 4.96 ms, plain cells in 64 of 120 regions with work
+  run as assigned it charged 4.97 ms: the model is off by -0.0080 ms
+--- Life
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 16 gens, region 64x64 | 1024 gens
+  [    3.5s cpu] fixed: brute at 32x32
+  [    7.1s cpu] hindsight per region
+all 2 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 0.33 ms model time (4.649e8 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           429530     184749     1.062e9     0.59      0.76      1.35    0.25x     18.9  32:100%
+hindsight per region            161848      54239     1.718e9     0.18      0.31      0.50    0.67x      8.5  32:43% cells:57%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.32 ms | hindsight per region 1.52 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 64x64 region: hash 0.18 + cells 0.36 = 0.54 ms | 7067 of 7094 non-empty region-steps stepped | per cell-update of a stepped region: halo +7.7%, conversion +44.2%, memo at and above the region +10.5%
+  the cheaper engine per region in hindsight: 0.49 ms, plain cells in 126 of 184 regions with work
+  run as assigned it charged 0.50 ms: the model is off by -0.0062 ms
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 16 gens, region 64x64 | 11520 gens
+  [    0.7s cpu] fixed: brute at 32x32
+  [    1.3s cpu] hindsight per region
+all 2 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 2.19 ms model time (3.050e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           793791     109550     2.018e8     0.35      0.15      0.49    4.47x      4.8  32:100%
+hindsight per region            788108     109435     3.372e8     0.34      0.15      0.49    4.49x      4.8  32:92% cells:8%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.51 ms | hindsight per region 0.62 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 64x64 region: hash 0.53 + cells 0.90 = 1.43 ms | 16516 of 46540 non-empty region-steps stepped | per cell-update of a stepped region: halo +15.4%, conversion +44.2%, memo at and above the region +24.2%
+  the cheaper engine per region in hindsight: 0.49 ms, plain cells in 34 of 117 regions with work
+  run as assigned it charged 0.49 ms: the model is off by -0.0002 ms
+universe: metapixel-galaxy.mc, 30720x30720 cells, population 7408195 | base tile 16x16, macro-step 16 gens, region 64x64 | 4096 gens
+  [    6.2s cpu] fixed: brute at 32x32
+  [   13.2s cpu] hindsight per region
+all 2 policies end in the same state: population 7058413 hash fc73d4132e165098
+plain cells over non-empty regions, no halo: 1010.68 ms model time (1.405e12 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32          1789787     264320     5.367e8     0.84      0.39      1.22  825.49x     11.9  32:100%
+hindsight per region           1652720     243259     2.431e9     0.79      0.46      1.25  810.92x     10.9  32:93% cells:7%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.25 ms | hindsight per region 2.69 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 64x64 region: hash 0.98 + cells 1.35 = 2.33 ms | 24917 of 21436137 non-empty region-steps stepped | per cell-update of a stepped region: halo +15.2%, conversion +44.2%, memo at and above the region +39.0%
+  the cheaper engine per region in hindsight: 0.95 ms, plain cells in 434 of 1087 regions with work
+  run as assigned it charged 1.25 ms: the model is off by -0.2954 ms
+universe: catacryst.mc, 2555x1772 cells, population 58 | base tile 16x16, macro-step 16 gens, region 64x64 | 4096 gens
+  [    1.6s cpu] fixed: brute at 32x32
+  [    4.9s cpu] hindsight per region
+all 2 policies end in the same state: population 5472 hash 65406ea642e721f9
+plain cells over non-empty regions, no halo: 0.90 ms model time (1.257e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           957227     159791     4.665e8     0.51      0.34      0.85    1.07x      9.0  32:100%
+hindsight per region            850281     126791     1.210e9     0.42      0.32      0.74    1.22x      6.9  32:89% cells:11%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.86 ms | hindsight per region 1.36 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 64x64 region: hash 0.44 + cells 0.68 = 1.12 ms | 11957 of 19178 non-empty region-steps stepped | per cell-update of a stepped region: halo +21.4%, conversion +44.2%, memo at and above the region +33.6%
+  the cheaper engine per region in hindsight: 0.71 ms, plain cells in 65 of 207 regions with work
+  run as assigned it charged 0.74 ms: the model is off by -0.0333 ms
+universe: gotts-dots.mc, 187x39 cells, population 41 | base tile 16x16, macro-step 16 gens, region 64x64 | 4096 gens
+  [    0.9s cpu] fixed: brute at 32x32
+  [    2.2s cpu] hindsight per region
+all 2 policies end in the same state: population 7825 hash 42453fa495f0b4bc
+plain cells over non-empty regions, no halo: 0.97 ms model time (1.351e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           524219      93818     2.704e8     0.29      0.19      0.49    2.00x      5.3  32:100%
+hindsight per region            483866      81742     5.501e8     0.26      0.20      0.46    2.12x      4.5  32:93% cells:7%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.49 ms | hindsight per region 0.68 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 64x64 region: hash 0.29 + cells 0.53 = 0.82 ms | 9372 of 20610 non-empty region-steps stepped | per cell-update of a stepped region: halo +19.4%, conversion +44.2%, memo at and above the region +22.4%
+  the cheaper engine per region in hindsight: 0.42 ms, plain cells in 23 of 132 regions with work
+  run as assigned it charged 0.46 ms: the model is off by -0.0351 ms
+=== step 32, region 128x128 (--k 5 --rl 7)
+--- Hutton32b
+universe: composite of 16 patterns, 5034x3813 cells, population 4870720 | base tile 8x8, macro-step 32 gens, region 128x128 | 4096 gens
+  [   12.1s cpu] fixed: brute at 16x16
+  [   93.7s cpu] hindsight per region
+all 2 policies end in the same state: population 4872039 hash c5fffdd20a3e0782
+plain cells over non-empty regions, no halo: 154.06 ms model time (2.866e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16         14412889    4530335     3.145e9    18.60     16.91     35.51    4.34x    253.2  16:100%
+hindsight per region           7823901    1908111    3.026e10     8.17     17.40     25.58    6.02x    122.4  16:65% cells:35%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 32.00 ms | hindsight per region 174.17 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 128x128 region: hash 9.10 + cells 84.54 = 93.64 ms | 26817 of 54656 non-empty region-steps stepped | per cell-update of a stepped region: halo +11.8%, conversion +11.8%, memo at and above the region +0.2%
+  the cheaper engine per region in hindsight: 25.55 ms, plain cells in 309 of 602 regions with work
+  run as assigned it charged 25.58 ms: the model is off by -0.0294 ms
+universe: lotr1.PPMd-244K.rle, 1548x1461 cells, population 1956035 | base tile 8x8, macro-step 32 gens, region 128x128 | 2112 gens
+  [    9.2s cpu] fixed: brute at 16x16
+  [   34.7s cpu] hindsight per region
+all 2 policies end in the same state: population 1956035 hash 60171ba351375507
+plain cells over non-empty regions, no halo: 29.02 ms model time (5.398e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16          7935226    3151628     2.416e9    12.34     12.99     25.32    1.15x    201.0  16:100%
+hindsight per region           1062544     583187    1.118e10     2.21     13.44     15.65    1.85x     72.2  16:30% cells:70%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 23.76 ms | hindsight per region 64.23 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 128x128 region: hash 1.74 + cells 15.08 = 16.82 ms | 5148 of 10296 non-empty region-steps stepped | per cell-update of a stepped region: halo +3.9%, conversion +11.8%, memo at and above the region +0.1%
+  the cheaper engine per region in hindsight: 15.61 ms, plain cells in 158 of 182 regions with work
+  run as assigned it charged 15.65 ms: the model is off by -0.0404 ms
+universe: advanced counter v2.rle, 191x197 cells, population 24058 | base tile 8x8, macro-step 32 gens, region 128x128 | 16384 gens
+  [    0.2s cpu] fixed: brute at 16x16
+  [    7.9s cpu] hindsight per region
+all 2 policies end in the same state: population 24079 hash 7a3d776391de0629
+plain cells over non-empty regions, no halo: 5.77 ms model time (1.074e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16           437810      87436     4.344e7     0.39      0.23      0.63    9.23x      3.2  16:100%
+hindsight per region            507875      85765     2.646e9     0.38      0.23      0.61    9.47x      3.1  16:46% cells:54%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 0.51 ms | hindsight per region 14.95 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 128x128 region: hash 0.70 + cells 7.29 = 7.98 ms | 2048 of 2048 non-empty region-steps stepped | per cell-update of a stepped region: halo +26.2%, conversion +11.8%, memo at and above the region +0.2%
+  the cheaper engine per region in hindsight: 0.61 ms, plain cells in 7 of 11 regions with work
+  run as assigned it charged 0.61 ms: the model is off by -0.0001 ms
+universe: composite of 8 patterns, 1751x708 cells, population 127872 | base tile 8x8, macro-step 32 gens, region 128x128 | 8192 gens
+  [    1.3s cpu] fixed: brute at 16x16
+  [   25.2s cpu] hindsight per region
+all 2 policies end in the same state: population 127872 hash 8ce4d9887b613042
+plain cells over non-empty regions, no halo: 23.09 ms model time (4.295e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16          4163843     761122     3.364e8     3.47      1.81      5.28    4.37x     26.6  16:100%
+hindsight per region           4434495     761122     8.331e9     3.46      1.81      5.27    4.38x     26.6  16:86% cells:14%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 4.21 ms | hindsight per region 48.59 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 128x128 region: hash 2.83 + cells 29.14 = 31.97 ms | 8192 of 8192 non-empty region-steps stepped | per cell-update of a stepped region: halo +26.2%, conversion +11.8%, memo at and above the region +0.4%
+  the cheaper engine per region in hindsight: 5.27 ms, plain cells in 18 of 50 regions with work
+  run as assigned it charged 5.27 ms: the model is off by -0.0000 ms
+--- Life
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 32 gens, region 128x128 | 1024 gens
+  [    3.4s cpu] fixed: brute at 32x32
+  [    8.0s cpu] hindsight per region
+all 2 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 0.47 ms model time (6.575e8 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           316166     163432     1.062e9     0.57      0.76      1.33    0.35x     18.3  32:100%
+hindsight per region            102249      35590     1.985e9     0.13      0.37      0.50    0.94x      5.6  32:59% cells:41%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.27 ms | hindsight per region 1.62 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 128x128 region: hash 0.11 + cells 0.52 = 0.64 ms | 1254 of 1254 non-empty region-steps stepped | per cell-update of a stepped region: halo +10.7%, conversion +22.1%, memo at and above the region +1.6%
+  the cheaper engine per region in hindsight: 0.51 ms, plain cells in 40 of 71 regions with work
+  run as assigned it charged 0.50 ms: the model is off by +0.0011 ms
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 32 gens, region 128x128 | 11520 gens
+  [    0.7s cpu] fixed: brute at 32x32
+  [    4.0s cpu] hindsight per region
+all 2 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 3.00 ms model time (4.168e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           476105      74451     2.018e8     0.27      0.15      0.42    7.17x      3.8  32:100%
+hindsight per region            477591      74355     1.009e9     0.27      0.15      0.42    7.20x      3.8  32:91% cells:9%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.39 ms | hindsight per region 1.01 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 128x128 region: hash 0.45 + cells 1.98 = 2.43 ms | 4531 of 7949 non-empty region-steps stepped | per cell-update of a stepped region: halo +15.9%, conversion +22.1%, memo at and above the region +4.5%
+  the cheaper engine per region in hindsight: 0.42 ms, plain cells in 18 of 58 regions with work
+  run as assigned it charged 0.42 ms: the model is off by -0.0002 ms
+universe: metapixel-galaxy.mc, 30720x30720 cells, population 7408195 | base tile 16x16, macro-step 32 gens, region 128x128 | 4096 gens
+  [    3.6s cpu] fixed: brute at 32x32
+  [   25.5s cpu] hindsight per region
+all 2 policies end in the same state: population 7058413 hash fc73d4132e165098
+plain cells over non-empty regions, no halo: 1280.00 ms model time (1.779e12 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32          1347149     210160     5.367e8     0.80      0.39      1.18 1080.64x     10.3  32:100%
+hindsight per region           1297734     203075     5.997e9     0.78      0.56      1.33  958.92x     10.0  32:96% cells:4%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.07 ms | hindsight per region 5.21 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 128x128 region: hash 1.66 + cells 7.29 = 8.95 ms | 17214 of 3393567 non-empty region-steps stepped | per cell-update of a stepped region: halo +12.3%, conversion +22.1%, memo at and above the region +3.4%
+  the cheaper engine per region in hindsight: 1.11 ms, plain cells in 121 of 487 regions with work
+  run as assigned it charged 1.33 ms: the model is off by -0.2261 ms
+universe: catacryst.mc, 2555x1772 cells, population 58 | base tile 16x16, macro-step 32 gens, region 128x128 | 4096 gens
+  [    1.5s cpu] fixed: brute at 32x32
+  [    7.2s cpu] hindsight per region
+all 2 policies end in the same state: population 5472 hash 65406ea642e721f9
+plain cells over non-empty regions, no halo: 2.09 ms model time (2.898e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           546037     114023     4.665e8     0.41      0.34      0.74    2.80x      7.6  32:100%
+hindsight per region            490877      89983     1.826e9     0.33      0.38      0.70    2.97x      5.8  32:90% cells:10%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.70 ms | hindsight per region 1.67 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 128x128 region: hash 0.44 + cells 2.15 = 2.59 ms | 4470 of 5528 non-empty region-steps stepped | per cell-update of a stepped region: halo +27.7%, conversion +22.1%, memo at and above the region +4.0%
+  the cheaper engine per region in hindsight: 0.70 ms, plain cells in 35 of 134 regions with work
+  run as assigned it charged 0.70 ms: the model is off by -0.0053 ms
+universe: gotts-dots.mc, 187x39 cells, population 41 | base tile 16x16, macro-step 32 gens, region 128x128 | 4096 gens
+  [    0.9s cpu] fixed: brute at 32x32
+  [    2.7s cpu] hindsight per region
+all 2 policies end in the same state: population 7825 hash 42453fa495f0b4bc
+plain cells over non-empty regions, no halo: 1.89 ms model time (2.624e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           301853      66448     2.704e8     0.24      0.19      0.43    4.37x      4.4  32:100%
+hindsight per region            278172      57112     7.011e8     0.20      0.21      0.42    4.55x      3.8  32:94% cells:6%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.40 ms | hindsight per region 0.71 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 128x128 region: hash 0.35 + cells 1.66 = 2.01 ms | 3777 of 5005 non-empty region-steps stepped | per cell-update of a stepped region: halo +16.8%, conversion +22.1%, memo at and above the region +2.3%
+  the cheaper engine per region in hindsight: 0.41 ms, plain cells in 8 of 67 regions with work
+  run as assigned it charged 0.42 ms: the model is off by -0.0080 ms
+=== step 64, region 256x256 (--k 6 --rl 8)
+--- Hutton32b
+universe: composite of 16 patterns, 5034x3813 cells, population 4870720 | base tile 8x8, macro-step 64 gens, region 256x256 | 4096 gens
+  [   12.0s cpu] fixed: brute at 16x16
+  [  268.7s cpu] hindsight per region
+all 2 policies end in the same state: population 4872039 hash c5fffdd20a3e0782
+plain cells over non-empty regions, no halo: 165.97 ms model time (3.087e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16         14260981    4491386     3.145e9    18.72     16.91     35.63    4.66x    252.0  16:100%
+hindsight per region          15669304    4475393    8.952e10    18.53     16.82     35.35    4.69x    251.5  16:55% cells:45%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 31.92 ms | hindsight per region 503.91 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 256x256 region: hash 6.89 + cells 137.81 = 144.70 ms | 5138 of 7360 non-empty region-steps stepped | per cell-update of a stepped region: halo +18.9%, conversion +5.9%, memo at and above the region +0.0%
+  the cheaper engine per region in hindsight: 35.33 ms, plain cells in 124 of 239 regions with work
+  run as assigned it charged 35.35 ms: the model is off by -0.0248 ms
+universe: lotr1.PPMd-244K.rle, 1548x1461 cells, population 1956035 | base tile 8x8, macro-step 64 gens, region 256x256 | 2112 gens
+  [    8.9s cpu] fixed: brute at 16x16
+  [   49.7s cpu] hindsight per region
+all 2 policies end in the same state: population 1956035 hash 60171ba351375507
+plain cells over non-empty regions, no halo: 31.25 ms model time (5.813e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16          8116759    3161924     2.416e9    12.49     12.99     25.48    1.23x    201.3  16:100%
+hindsight per region           8256511    3159416    1.486e10    12.42     12.92     25.34    1.23x    201.2  16:74% cells:26%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 23.82 ms | hindsight per region 91.85 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 256x256 region: hash 1.86 + cells 33.70 = 35.55 ms | 1386 of 1386 non-empty region-steps stepped | per cell-update of a stepped region: halo +7.8%, conversion +5.9%, memo at and above the region +0.0%
+  the cheaper engine per region in hindsight: 25.32 ms, plain cells in 22 of 64 regions with work
+  run as assigned it charged 25.34 ms: the model is off by -0.0183 ms
+universe: advanced counter v2.rle, 191x197 cells, population 24058 | base tile 8x8, macro-step 64 gens, region 256x256 | 16384 gens
+  [    0.2s cpu] fixed: brute at 16x16
+  [   53.6s cpu] hindsight per region
+all 2 policies end in the same state: population 24079 hash 7a3d776391de0629
+plain cells over non-empty regions, no halo: 5.77 ms model time (1.074e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16           410933      83691     4.344e7     0.39      0.23      0.62    9.30x      3.0  16:100%
+hindsight per region            719496      82105    1.687e10     0.37      0.23      0.61    9.54x      3.0  16:33% cells:67%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 0.50 ms | hindsight per region 92.41 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 256x256 region: hash 0.35 + cells 9.08 = 9.43 ms | 256 of 256 non-empty region-steps stepped | per cell-update of a stepped region: halo +57.4%, conversion +5.9%, memo at and above the region +0.1%
+  the cheaper engine per region in hindsight: 0.60 ms, plain cells in 8 of 9 regions with work
+  run as assigned it charged 0.61 ms: the model is off by -0.0009 ms
+universe: composite of 8 patterns, 1751x708 cells, population 127872 | base tile 8x8, macro-step 64 gens, region 256x256 | 8192 gens
+  [    1.3s cpu] fixed: brute at 16x16
+  [  249.1s cpu] hindsight per region
+all 2 policies end in the same state: population 127872 hash 8ce4d9887b613042
+plain cells over non-empty regions, no halo: 23.09 ms model time (4.295e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 16x16          3894895     722643     3.364e8     3.40      1.81      5.21    4.43x     25.4  16:100%
+hindsight per region           5422462     718255    8.085e10     3.36      1.81      5.17    4.47x     25.3  16:37% cells:63%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 16x16 4.10 ms | hindsight per region 444.16 ms
+
+region model, priced from 'brute at 16x16' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 256x256 region: hash 1.39 + cells 36.34 = 37.73 ms | 1024 of 1024 non-empty region-steps stepped | per cell-update of a stepped region: halo +57.4%, conversion +5.9%, memo at and above the region +0.1%
+  the cheaper engine per region in hindsight: 5.18 ms, plain cells in 37 of 45 regions with work
+  run as assigned it charged 5.17 ms: the model is off by +0.0089 ms
+--- Life
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 64 gens, region 256x256 | 1024 gens
+  [    3.9s cpu] fixed: brute at 32x32
+  [   14.5s cpu] hindsight per region
+all 2 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 0.70 ms model time (9.731e8 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           291996     159282     1.062e9     0.56      0.76      1.33    0.53x     18.2  32:100%
+hindsight per region            118437      42389     3.143e9     0.14      0.37      0.51    1.37x      5.6  32:59% cells:41%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.26 ms | hindsight per region 2.46 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 256x256 region: hash 0.08 + cells 0.80 = 0.88 ms | 232 of 232 non-empty region-steps stepped | per cell-update of a stepped region: halo +13.8%, conversion +11.0%, memo at and above the region +0.2%
+  the cheaper engine per region in hindsight: 0.54 ms, plain cells in 20 of 32 regions with work
+  run as assigned it charged 0.51 ms: the model is off by +0.0236 ms
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 64 gens, region 256x256 | 11520 gens
+  [    0.8s cpu] fixed: brute at 32x32
+  [   23.7s cpu] hindsight per region
+all 2 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 5.11 ms model time (7.101e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           335413      58977     2.018e8     0.24      0.15      0.39   13.18x      3.3  32:100%
+hindsight per region            354110      58754     5.619e9     0.24      0.15      0.38   13.29x      3.3  32:94% cells:6%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.34 ms | hindsight per region 4.35 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 256x256 region: hash 0.35 + cells 3.79 = 4.14 ms | 959 of 1693 non-empty region-steps stepped | per cell-update of a stepped region: halo +30.9%, conversion +11.0%, memo at and above the region +1.0%
+  the cheaper engine per region in hindsight: 0.38 ms, plain cells in 11 of 36 regions with work
+  run as assigned it charged 0.38 ms: the model is off by -0.0004 ms
+universe: metapixel-galaxy.mc, 30720x30720 cells, population 7408195 | base tile 16x16, macro-step 64 gens, region 256x256 | 4096 gens
+  [    3.3s cpu] fixed: brute at 32x32
+  [   90.4s cpu] hindsight per region
+all 2 policies end in the same state: population 7058413 hash fc73d4132e165098
+plain cells over non-empty regions, no halo: 1552.35 ms model time (2.158e12 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32          1137115     183791     5.367e8     0.79      0.39      1.18 1316.59x      9.5  32:100%
+hindsight per region           1193256     181504    2.128e10     0.77      0.38      1.16 1340.05x      9.4  32:97% cells:3%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.99 ms | hindsight per region 16.36 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 256x256 region: hash 3.83 + cells 38.19 = 42.02 ms | 11202 of 514452 non-empty region-steps stepped | per cell-update of a stepped region: halo +13.0%, conversion +11.0%, memo at and above the region +0.3%
+  the cheaper engine per region in hindsight: 1.16 ms, plain cells in 49 of 244 regions with work
+  run as assigned it charged 1.16 ms: the model is off by -0.0009 ms
+universe: catacryst.mc, 2555x1772 cells, population 58 | base tile 16x16, macro-step 64 gens, region 256x256 | 4096 gens
+  [    1.6s cpu] fixed: brute at 32x32
+  [   17.6s cpu] hindsight per region
+all 2 policies end in the same state: population 5472 hash 65406ea642e721f9
+plain cells over non-empty regions, no halo: 5.13 ms model time (7.126e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           389331      97099     4.665e8     0.37      0.34      0.70    7.28x      7.1  32:100%
+hindsight per region            405249      97072     4.292e9     0.37      0.34      0.70    7.29x      7.1  32:88% cells:12%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.64 ms | hindsight per region 3.48 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 256x256 region: hash 0.57 + cells 6.37 = 6.94 ms | 1641 of 1699 non-empty region-steps stepped | per cell-update of a stepped region: halo +28.7%, conversion +11.0%, memo at and above the region +0.4%
+  the cheaper engine per region in hindsight: 0.70 ms, plain cells in 26 of 95 regions with work
+  run as assigned it charged 0.70 ms: the model is off by -0.0000 ms
+universe: gotts-dots.mc, 187x39 cells, population 41 | base tile 16x16, macro-step 64 gens, region 256x256 | 4096 gens
+  [    1.0s cpu] fixed: brute at 32x32
+  [    4.3s cpu] hindsight per region
+all 2 policies end in the same state: population 7825 hash 42453fa495f0b4bc
+plain cells over non-empty regions, no halo: 3.56 ms model time (4.945e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           221933      56501     2.704e8     0.22      0.19      0.41    8.63x      4.1  32:100%
+hindsight per region            225199      56501     1.042e9     0.22      0.19      0.41    8.63x      4.1  32:96% cells:4%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.37 ms | hindsight per region 0.94 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 256x256 region: hash 0.39 + cells 4.02 = 4.41 ms | 1137 of 1179 non-empty region-steps stepped | per cell-update of a stepped region: halo +17.3%, conversion +11.0%, memo at and above the region +0.3%
+  the cheaper engine per region in hindsight: 0.41 ms, plain cells in 6 of 43 regions with work
+  run as assigned it charged 0.41 ms: the model is off by -0.0000 ms
+=== step 128, region 512x512 (--k 7 --rl 9)
+--- Life
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 128 gens, region 512x512 | 1024 gens
+  [    3.5s cpu] fixed: brute at 32x32
+all 1 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 1.40 ms model time (1.946e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           287015     158474     1.062e9     0.56      0.76      1.33    1.06x     18.1  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.26 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 512x512 region: hash 0.08 + cells 1.68 = 1.76 ms | 58 of 58 non-empty region-steps stepped | per cell-update of a stepped region: halo +20.2%, conversion +5.5%, memo at and above the region +0.0%
+  the cheaper engine per region in hindsight: 0.58 ms, plain cells in 1 of 9 regions with work
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 128 gens, region 512x512 | 11520 gens
+  [    0.7s cpu] fixed: brute at 32x32
+all 1 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 12.55 ms model time (1.745e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           277491      52123     2.018e8     0.23      0.15      0.37   33.65x      3.1  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.31 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 512x512 region: hash 0.44 + cells 11.50 = 11.94 ms | 324 of 520 non-empty region-steps stepped | per cell-update of a stepped region: halo +47.0%, conversion +5.5%, memo at and above the region +0.2%
+  the cheaper engine per region in hindsight: 0.37 ms, plain cells in 9 of 27 regions with work
+universe: metapixel-galaxy.mc, 30720x30720 cells, population 7408195 | base tile 16x16, macro-step 128 gens, region 512x512 | 4096 gens
+  [    3.2s cpu] fixed: brute at 32x32
+all 1 policies end in the same state: population 7058413 hash fc73d4132e165098
+plain cells over non-empty regions, no halo: 2241.61 ms model time (3.116e12 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32          1045449     171468     5.367e8     0.80      0.39      1.19 1883.03x      9.1  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.95 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 512x512 region: hash 7.18 + cells 145.52 = 152.70 ms | 5351 of 92859 non-empty region-steps stepped | per cell-update of a stepped region: halo +12.7%, conversion +5.5%, memo at and above the region +0.0%
+  the cheaper engine per region in hindsight: 1.17 ms, plain cells in 20 of 124 regions with work
+universe: catacryst.mc, 2555x1772 cells, population 58 | base tile 16x16, macro-step 128 gens, region 512x512 | 4096 gens
+  [    1.6s cpu] fixed: brute at 32x32
+all 1 policies end in the same state: population 5472 hash 65406ea642e721f9
+plain cells over non-empty regions, no halo: 11.39 ms model time (1.584e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           333205      90896     4.665e8     0.36      0.34      0.69   16.49x      6.9  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.62 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 512x512 region: hash 0.64 + cells 14.60 = 15.24 ms | 472 of 472 non-empty region-steps stepped | per cell-update of a stepped region: halo +28.2%, conversion +5.5%, memo at and above the region +0.1%
+  the cheaper engine per region in hindsight: 0.69 ms, plain cells in 22 of 56 regions with work
+universe: gotts-dots.mc, 187x39 cells, population 41 | base tile 16x16, macro-step 128 gens, region 512x512 | 4096 gens
+  [    0.9s cpu] fixed: brute at 32x32
+all 1 policies end in the same state: population 7825 hash 42453fa495f0b4bc
+plain cells over non-empty regions, no halo: 6.86 ms model time (9.529e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           196853      53178     2.704e8     0.21      0.19      0.41   16.85x      4.0  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.36 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 512x512 region: hash 0.38 + cells 8.20 = 8.58 ms | 284 of 284 non-empty region-steps stepped | per cell-update of a stepped region: halo +19.6%, conversion +5.5%, memo at and above the region +0.0%
+  the cheaper engine per region in hindsight: 0.41 ms, plain cells in 9 of 28 regions with work
+=== step 256, region 1024x1024 (--k 8 --rl 10)
+--- Life
+universe: soup512.rle, 512x512 cells, population 130619 | base tile 16x16, macro-step 256 gens, region 1024x1024 | 1024 gens
+  [    3.5s cpu] fixed: brute at 32x32
+all 1 policies end in the same state: population 13711 hash e801b85f64251a0d
+plain cells over non-empty regions, no halo: 2.12 ms model time (2.953e9 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           285997     158251     1.062e9     0.56      0.76      1.33    1.60x     18.1  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 1.26 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 1024x1024 region: hash 0.06 + cells 2.87 = 2.93 ms | 11 of 11 non-empty region-steps stepped | per cell-update of a stepped region: halo +35.1%, conversion +2.8%, memo at and above the region +0.0%
+  the cheaper engine per region in hindsight: 1.33 ms, plain cells in 5 of 9 regions with work
+universe: Unit-Life-Cell-512x512.rle, 511x511 cells, population 4668 | base tile 16x16, macro-step 256 gens, region 1024x1024 | 11520 gens
+  [    0.7s cpu] fixed: brute at 32x32
+all 1 policies end in the same state: population 4703 hash 59bd6014886444bd
+plain cells over non-empty regions, no halo: 41.52 ms model time (5.771e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           252032      49692     2.018e8     0.22      0.15      0.37  113.11x      3.0  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.31 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 1024x1024 region: hash 1.04 + cells 55.62 = 56.66 ms | 195 of 215 non-empty region-steps stepped | per cell-update of a stepped region: halo +47.7%, conversion +2.8%, memo at and above the region +0.0%
+  the cheaper engine per region in hindsight: 0.37 ms, plain cells in 11 of 26 regions with work
+universe: metapixel-galaxy.mc, 30720x30720 cells, population 7408195 | base tile 16x16, macro-step 256 gens, region 1024x1024 | 4096 gens
+  [    3.2s cpu] fixed: brute at 32x32
+all 1 policies end in the same state: population 7058413 hash fc73d4132e165098
+plain cells over non-empty regions, no halo: 2809.88 ms model time (3.906e12 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           972487     162139     5.367e8     0.79      0.39      1.18 2389.44x      8.8  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.92 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 1024x1024 region: hash 10.42 + cells 419.73 = 430.15 ms | 1950 of 14550 non-empty region-steps stepped | per cell-update of a stepped region: halo +11.5%, conversion +2.8%, memo at and above the region +0.0%
+  the cheaper engine per region in hindsight: 1.16 ms, plain cells in 12 of 72 regions with work
+universe: catacryst.mc, 2555x1772 cells, population 58 | base tile 16x16, macro-step 256 gens, region 1024x1024 | 4096 gens
+  [    1.6s cpu] fixed: brute at 32x32
+all 1 policies end in the same state: population 5472 hash 65406ea642e721f9
+plain cells over non-empty regions, no halo: 25.11 ms model time (3.490e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           315399      88794     4.665e8     0.35      0.34      0.69   36.55x      6.9  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.61 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 1024x1024 region: hash 0.70 + cells 31.78 = 32.47 ms | 130 of 130 non-empty region-steps stepped | per cell-update of a stepped region: halo +26.6%, conversion +2.8%, memo at and above the region +0.0%
+  the cheaper engine per region in hindsight: 0.69 ms, plain cells in 12 of 25 regions with work
+universe: gotts-dots.mc, 187x39 cells, population 41 | base tile 16x16, macro-step 256 gens, region 1024x1024 | 4096 gens
+  [    0.9s cpu] fixed: brute at 32x32
+all 1 policies end in the same state: population 7825 hash 42453fa495f0b4bc
+plain cells over non-empty regions, no halo: 15.26 ms model time (2.121e10 cell-updates)
+
+policy                           finds    inserts brute evals  hash ms  cells ms  total ms vs cells  mem MiB  time per mode
+fixed: brute at 32x32           189763      52144     2.704e8     0.21      0.19      0.41   37.64x      4.0  32:100%
+
+cross-check, cost from raw engine counters (every brute window isolated, no plain-cells model):
+  brute at 32x32 0.36 ms
+
+region model, priced from 'brute at 32x32' (requests and misses at and above the region level do not depend on the engine below it):
+  plain cells in every 1024x1024 region: hash 0.42 + cells 18.98 = 19.41 ms | 79 of 79 non-empty region-steps stepped | per cell-update of a stepped region: halo +24.4%, conversion +2.8%, memo at and above the region +0.0%
+  the cheaper engine per region in hindsight: 0.41 ms, plain cells in 6 of 13 regions with work

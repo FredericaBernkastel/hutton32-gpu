@@ -34,8 +34,10 @@ floors            fixed floors and plain cells (adapt)
 cond-miss         conditional miss rate per window size (root)
 engine-choice     engine per content (tools/engine_choice.sh)
 controller        the controller (adapt)
-region-size       the controller region, 64x64 to 1024x1024 (tools/region_sweep.sh; about 15 minutes)
-region-size-life  the same for Life (tools/region_sweep_life.sh; about 7 minutes)
+region-size       the controller region, 64x64 to 1024x1024 (tools/region_sweep.sh; 20 to 35 minutes)
+region-size-life  the same for Life (tools/region_sweep_life.sh; about 13 minutes)
+region-step       region = 4 x step: steps of 8 to 64 generations (Hutton32b), 16 to 256 (Life) (tools/region_step_sweep.sh; 15 to 25 minutes)
+region-model      the region model against the three sweeps above: tables and Fig. 5 (tools/region_model.py)
 counter-work      work per generation of the counter, which sets the thresholds (adapt)
 forms             forms A and C, checked on all 2^25 neighbourhoods (pip installs numpy)
 circuit           the circuit vs the table on all 2^25 neighbourhoods (pip installs numpy)
@@ -227,6 +229,10 @@ run() {
     bash tools/region_sweep.sh $R ;;
   region-size-life)
     bash tools/region_sweep_life.sh $R ;;
+  region-step)
+    bash tools/region_step_sweep.sh $R ;;
+  region-model)
+    py tools/region_model.py ;;
   counter-work)
     $R adapt --pattern "$CTR" --gens 16384 --a 3 ;;
   forms)
