@@ -6,7 +6,7 @@
 
 *GHL at a glance.* The strip on top is the algorithm, and it defines the terms that the panels use: a universe held as a grid of tile IDs advances by one table probe per tile; a miss is resolved by the HashLife recursion, run in waves down to a memo floor; below the floor the rule is evaluated as a bit-sliced circuit. (1) Universes of the evaluation as cells, named by their pattern files, each with the share of its probes that miss, by generations run. (2) Below the floor: Hutton32b as its 367 gates, drawn from the netlist while it evaluates 32 cells of [`squares.rle`], and the adder tree of the Life kernel (Section IV-C). (3) Above the floor: `squares.rle` cut into 16×16 tiles, one sweep of the hit path with the results that its memo table lacked, one memo entry and the table itself (Sections IV-B and IV-D). (4) The miss path: the waves of one 64-generation step, the windows that a floor wave brute-forces, the depth per universe (the thresholds of Table XXXI) and the engine per region (Sections IV-E and IV-F). (5) The measured rates that set the floor (Section III) and the components' rates against Golly's (Table XI). Nothing in it is drawn by hand: `overview` runs the CPU reference engine on the patterns and [`ghl_diagram.py`] draws its output, the logged rates and the two gate networks, checking the circuit against the rule table on every cell of the frame it shows. GHL's components were measured separately (Table IX), so a mark at the right of each heading says how far that panel's content is built: a filled circle for what was measured on the GPU, a diamond for what the CPU reference engine ran, a dashed circle for what the cost model computes.
 
-**Abstract**—HashLife, as implemented in Golly, is the state of the art for long runs of large cellular automata, but it memoizes down to blocks of a few cells, and on dense universes whose content does not repeat that costs more than it saves, by orders of magnitude. We present GPU HashLife (GHL), a HashLife for every rule of Golly's HashLife family (radius-1 neighbourhoods, up to 256 states) whose design follows from four rates measured on a GPU: brute-force evaluation, random table probes, concurrent inserts and dispatch latency. The cost of a probe in cell-updates of brute force sets a memo floor for each rule: windows below it are never memoized but evaluated by a bit-sliced network of the rule, at the same rate on any content. Above the floor GHL runs the HashLife recursion level-synchronously, one data-parallel wave per level, steps the top level as a positional sweep over tile IDs, and chooses its engine per region and per universe from novelty and active area. We evaluate its components on Conway's Life and on a 32-state rule. They beat Golly by one to four orders of magnitude on dense new content and, once their tables are learned, on dense content that recurs. On small universes run long enough to repeat, and on sparse recurring universes of the two-state rule, HashLife's doubling steps stay faster, and GHL falls back to the HashLife recursion. Final states match Golly's. GHL has not yet run as one program: the on-GPU miss path is specified and its primitives are measured, but it is not assembled.
+**Abstract**—HashLife, as implemented in Golly, is the state of the art for long runs of large cellular automata, but it memoizes down to blocks of a few cells, and on dense universes whose content does not repeat that costs more than it saves, by orders of magnitude. We present GPU HashLife (GHL), a HashLife for every rule of Golly's HashLife family (radius-1 neighbourhoods, up to 256 states) whose design follows from four rates measured on a GPU: brute-force evaluation, random table probes, concurrent inserts and dispatch latency. The cost of a probe in cell-updates of brute force sets a memo floor for each rule: windows below it are never memoized but evaluated by a bit-sliced network of the rule, at the same rate on any content; for a rule given as a table the network is compiled from the table without manual work. Above the floor GHL runs the HashLife recursion level-synchronously, one data-parallel wave per level, steps the top level as a positional sweep over tile IDs, and chooses its engine per region and per universe from novelty and active area. We evaluate its components on Conway's Life and on a 32-state rule. They beat Golly by one to four orders of magnitude on dense new content and, once their tables are learned, on dense content that recurs. On small universes run long enough to repeat, and on sparse recurring universes of the two-state rule, HashLife's doubling steps stay faster, and GHL falls back to the HashLife recursion. Final states match Golly's. GHL has not yet run as one program: the on-GPU miss path is specified and its primitives are measured, but it is not assembled.
 
 **Index Terms**—Cellular automata, HashLife, memoization, hash consing, GPU computing, bit slicing, von Neumann neighbourhood.
 
@@ -22,7 +22,7 @@ We ask what HashLife should look like when its memo table lives in GPU memory, a
 
 1. A cost model of memoized stepping in four measured rates (Section III). Its central quantity, the exchange rate $\rho$ between a table probe and a brute-force cell-update, depends on the rule through its brute-force engine: about 50 for the 32-state rule and 380 for Life on the measured GPU. Together with the recursion's operation counts priced by the model, it places the memo floor at 16×16-cell windows for the 32-state rule and at 32×32 for Life (Sections III-C, IV-F and VI-G), rather than at HashLife's 2×2 leaves.
 2. GPU HashLife (GHL), one algorithm for every rule of Golly's HashLife family and for dense, sparse, novel and recurring content (Section IV), whose parameters are set by measurements wherever they were varied (Table VIII). Its components were measured separately; GHL has not yet run as one program (Table IX).
-3. Bit-sliced brute-force engines whose rate does not depend on content: a 367-gate circuit for Hutton32b, equal to the rule table on all $2^{25}$ neighbourhoods, at $3.0 \cdot 10^{11}$ cell-updates/s, and a 26-operation adder tree for Life-like rules at $1.4 \cdot 10^{12}$ (Section IV-C).
+3. Bit-sliced brute-force engines whose rate does not depend on content: a 367-gate circuit for Hutton32b, equal to the rule table on all $2^{25}$ neighbourhoods, at $3.0 \cdot 10^{11}$ cell-updates/s, a 26-operation adder tree for Life-like rules at $1.4 \cdot 10^{12}$ (Section IV-C), and a compiler that turns a Golly rule table into such a circuit and compares it with the table on every neighbourhood that can be enumerated (Section VI-I).
 4. An evaluation on Life and on Hutton32 and Hutton32b against Golly 5.1 at its best step size, and against its QuickLife for Life and a four-core CPU brute-force loop for the 32-state rule, on 23 patterns and two sparse composite universes, that states the run length and the learning time with every ratio, compares final states with Golly's, and separates measured GPU components, a measured CPU implementation of the recursion and model projections (Sections V–VI).
 5. A reproduction package in which every table is one command (Appendix A).
 
@@ -260,11 +260,11 @@ A node's ID is its slot index, so there is no separate allocator and the childre
 
 ### C. Brute-force engine: the rule as a bit-sliced network
 
-The engine is the fastest of three forms, each equal to the rule on every neighbourhood. *Outer-totalistic two-state rules* (Life-like, in B/S notation) depend only on the centre and the number of live neighbours: a carry-save adder tree of 26 two-input operations adds the eight neighbour bits of 32 cells into a four-bit count, and the B and S sets are decoded from it. *A rule given as a table* can be synthesised into a bit-sliced circuit; for Hutton32b it has 367 gates. *Where no circuit is available*, a kernel looks the table up directly when its entries fit in memory ($2^{25}$ bytes for 32 states on the von Neumann neighbourhood), or walks Golly's rule tree with one dependent load per neighbour; the byte-LUT kernel of Section III-B is this form for the Hutton32 rules, and a tree kernel was not built.
+The engine is the fastest of three forms, each equal to the rule on every neighbourhood. *Outer-totalistic two-state rules* (Life-like, in B/S notation) depend only on the centre and the number of live neighbours: a carry-save adder tree of 26 two-input operations adds the eight neighbour bits of 32 cells into a four-bit count, and the B and S sets are decoded from it. *A rule given as a table* becomes a bit-sliced circuit [\[28\]]: one started by hand from the rule's structure has 367 gates for Hutton32b, and Section VI-I compiles circuits from tables without that start, the one of Hutton32b with fewer gates. *Where no circuit is available*, a kernel looks the table up directly when its entries fit in memory ($2^{25}$ bytes for 32 states on the von Neumann neighbourhood), or walks Golly's rule tree with one dependent load per neighbour; the byte-LUT kernel of Section III-B is this form for the Hutton32 rules, and a tree kernel was not built.
 
 For Life the network needs one plane. An invocation loads the word of 32 cells and the eight words around it, forms the eight neighbour words with shifts, and evaluates the adder tree and the decode, about 60 operations for 32 cells. It moves 2 bits per cell-update instead of 10 and reaches $1.42 \cdot 10^{12}$ cell-updates/s on large grids (Section VI-C).
 
-For Hutton32b the rule tells apart 15 classes of states per neighbour and 29 for the centre. Starting from a network written by hand from the rule's structure (473 gates), global resubstitution with observability don't-cares, ABC rewriting scripts run through Yosys, and an inverter placement solved as MaxSAT reduce canonical Hutton32b to **367 gates** (165 AND, 137 OR and 14 XOR gates with two inputs, and 51 NOT; depth 25), reached after 24 minutes of a 25-minute optimisation budget. Every intermediate network was kept only if it agreed with the table on all $2^{25}$ entries; the final netlist, its WGSL emission and its Rust emission were each checked exhaustively, after a deliberately corrupted gate was confirmed to be caught. The network is not proven minimal.
+For Hutton32b the rule tells apart 15 classes of states per neighbour and 29 for the centre. Starting from a network written by hand from the rule's structure (473 gates), global resubstitution with observability don't-cares, ABC rewriting scripts [\[29\]] run through Yosys, and an inverter placement solved as MaxSAT reduce canonical Hutton32b to **367 gates** (165 AND, 137 OR and 14 XOR gates with two inputs, and 51 NOT; depth 25), reached after 24 minutes of a 25-minute optimisation budget. Every intermediate network was kept only if it agreed with the table on all $2^{25}$ entries; the final netlist, its WGSL emission and its Rust emission were each checked exhaustively, after a deliberately corrupted gate was confirmed to be caught. The network is not proven minimal.
 
 Applied to bit-planes, the gates update 32 cells per operation. A cell is five bits in five `u32` words, one per bit; an invocation loads its group and the groups above and below, forms the east and west neighbours of each plane with two shifts and an OR, evaluates the network and stores five words. Table VII compares this form with the alternatives.
 
@@ -371,6 +371,7 @@ GHL is not yet one program. Table IX lists where each component runs in this eva
 | Component | Status | Evidence |
 |---|---|---|
 | Plain and shared-tile bit-sliced kernels, Hutton32b and Life | built, GPU | GPU |
+| Compiler from rule tables to circuits ([`ruletable2netlist`]) | built; its circuits of Hutton32b and Hutton32 run on the plain kernel | GPU |
 | Positional hit-path sweep (dense) and active-block sweep (sparse) | built, GPU; table learned on the CPU; active-block list fixed, block activation not built | GPU |
 | Claim protocol for find-or-insert | built, GPU benchmark | GPU |
 | Fixed-capacity 16-dispatch wave | built as a benchmark of empty waves | GPU |
@@ -837,6 +838,69 @@ Bit-planes are 2.0–3.5× the table on real content in portable `u64` code and 
 
 On all four cores, with one band of rows per thread, the bit-sliced forms reach $6.3\text{–}6.7 \cdot 10^{9}$ cell-updates/s on random states and $6.1\text{–}6.2 \cdot 10^{9}$ on a $4096^{2}$ grid that holds the ROM (372 gens/s), 1.8× one AVX2 thread, and the 256-bit form gains nothing over `u64`; that suggests the host's memory bandwidth as the limit, which was not measured. This is the CPU column of Table XI; the GPU's bit-plane kernel is 62× it.
 
+### I. Circuits compiled from rule tables
+
+The circuit of Section IV-C began as a network written by hand from the meaning of the states. For a rule given as a Golly table that step can be left out. [`ruletable2netlist`], a Rust crate with no dependency outside the repository, compiles the table to a netlist of the form the bit-plane kernels evaluate, checks the netlist against the table and makes it smaller, without a manual step. It reads the table format of Golly's loader [\[2\]] in full: the four neighbourhoods, up to 256 states, variables, bound variables and variables as the new state, and every symmetry, `permute` included.
+
+*From the table to a network.* Each line of the table, under each symmetry, is a transition: a set of states per cell, the groups of cells bound to one variable, and the new state, which is a state or a copy of a cell. The first transition that matches a neighbourhood applies, and a neighbourhood that matches none keeps its state. The transitions are first simplified in the manner of multiple-valued two-level minimisation [\[30\]]: a transition is removed if the later ones give the same state wherever it is the first to match, and a cell's set of states is widened, to every state where that is possible, if no result changes. Each such step is checked on all the neighbourhoods it touches. The same is done once per bit of the state, where only that bit has to stay the same. The network then has one predicate per cell and set (a Shannon expansion over the bits of the state, the codes that are no state being free). The conditions of the transitions are sums of products of these predicates and of the centre's bits, and the divisors that many products share are extracted and built once [\[31\]]: a condition such as "an excited arrow from the west, or from the south, or from another side" becomes one signal for all the transitions that test it. A chain gives earlier groups of transitions priority over later ones, for the whole state or for each bit. The network is compared with the table on every neighbourhood of the rule, 64 per machine word, which for the $2^{25}$ neighbourhoods of a 32-state rule on the von Neumann neighbourhood is a fraction of a second.
+
+*The rule's own symmetry.* A rule may look the same after a quarter turn of the grid if the states are relabelled with it, an arrow that points east becoming one that points north, although its table spells out every direction. The compiler finds the relabelling from the function: it pairs each state with the one that does the same things one turn on, as a centre and as a neighbour, improves the pairing by exchanges on the neighbourhoods with one cell that is not state 0, and then checks every centre state on all neighbourhoods, because a table may keep the symmetry for some centre states and break it for others (a fixed priority among inputs that arrive together breaks it). The centre states that turn into one another have an orientation, and one table serves them all: the transitions of orientation 0, their conditions read through the centre's orientation and their results turned back. A cell that many of these transitions test for sets the turn does not change, such as the cell an arrow points at, is selected once by the orientation, bit by bit, and tested there. A test that all the neighbours share, each for the set as it sees it, or all but the one at a fixed place for the orientation, is one signal ("an excited input from any side but the one I point at"), and a set that the function allows to grow to the set with all its turned images is grown, so that it reads the same whichever way the centre points. The transitions then decide which result applies, one signal per result, and the bits of the next state follow from those signals.
+
+*Optimisation.* The network is reduced by resubstitution with observability don't-cares, guided by simulation [\[32\]], [\[33\]]. Every node is simulated on some thousands of neighbourhoods. Where a node's value does not reach an output it is free; if a constant, another node, one or two new gates over other nodes, or a selection between two nodes by a third agree with it everywhere else, it is replaced, and the nodes that only it used disappear. A replacement is kept only if the network becomes smaller and still equals the table on every neighbourhood; a neighbourhood that refutes a replacement joins the simulated ones. When no replacement makes the network smaller it is changed and the sweeps resume, for as long as the time allowed lasts. The change is one of two. Replacements that leave the size unchanged are applied to a third of the nodes; or the whole network is derived again through a cover by cuts, the way synthesis tools restructure a network [\[29\]]: every node is a function of at most four to six nodes below it, cuts that cover the outputs with little logic are chosen, and each chosen node is built from its truth table alone, by decomposition over one variable at a time. One time in three, the trees of AND nodes and of XOR nodes are taken apart and paired again instead, the pairs that most trees share first. The network that results computes the same function on every neighbourhood with other signals for the sweeps to work with. Fewest nodes is not fewest gates, since a node that is read in both polarities costs an inverter, so the last sweeps keep a replacement only if nodes and inverters together go down. At the end AND nodes become AND or OR gates and XOR nodes choose the polarity of their inputs so that the fewest inverters are needed. The search is bounded by time, so two runs give different circuits; what is reported here are the circuits kept in [`compiled/`], and every figure about them is read off those files.
+
+**TABLE XXXIII.** Circuits of the two 32-state rules; nodes are two-input AND and XOR nodes with complemented edges, gates are what a kernel evaluates. Each was read back from its file and found equal to its rule table on all $2^{25}$ neighbourhoods and to the table of next states that the harness computes on its own, and a 40×40 soup of uniform random states run for 16 generations by the table, by the netlist and by Golly ends in the same cells
+
+| Circuit | Rule | Nodes | Gates | AND, OR, XOR, NOT | Depth |
+|---|---|---|---|---|---|
+| compiled from [`Hutton32b.rule`][Hutton32b.rule] | Hutton32b | 316 | **353** | 155, 97, 64, 37 | 69 |
+| compiled from [`Hutton32.table`] | Hutton32 | 303 | **344** | 157, 77, 69, 41 | 81 |
+| the optimiser started from the 367-gate circuit | Hutton32b | 287 | **318** | 133, 98, 56, 31 | 57 |
+| the 367-gate circuit of Section IV-C | Hutton32b | 316 | **367** | 165, 137, 14, 51 | 25 |
+
+*The two 32-state rules.* Hutton32b's 315 transitions are 226 after simplification and Hutton32's 296 are 218. For Hutton32b the compiler finds a quarter turn under which 26 of the 32 centre states are symmetric; 16 of them, the transmission states, have an orientation, and 36 transitions of orientation 0 serve them all. The networks as built have 838 and 914 nodes (955 and 1,038 gates). The compiled circuits (Table XXXIII) have 353 and 344 gates. The circuit of Hutton32b that was started by hand from the meaning of its states and then optimised by resubstitution and ABC has 367; Hutton32 had no circuit before. Started from the 367-gate circuit itself, the compiler's optimiser reaches 318 gates. Counted by the cells a gate depends on, the compiled circuit of Hutton32b spends 97 gates on single cells and 256 on several, the 367-gate circuit 110 and 257. The compiled circuits are deeper (depth 69 and 81 against 25); a kernel that evaluates the gates of a thread in sequence pays for their number, not for their depth.
+
+*On the GPU.* The plain bit-plane kernel takes a compiled circuit as it takes the 367-gate one, as one WGSL function. With each of the two compiled circuits it stepped 2048×2048 cells of uniform random states for eight generations and ended in the cells that the rule's table gives on the CPU (0 of 4,194,304 differ); for Hutton32 this is the first bit-plane run of that rule. Its rate with a compiled circuit was not measured. The chained evaluations of Section VI-C say what to expect: two evaluations of the 367-gate circuit in sequence, 734 gates, pass $2.4 \cdot 10^{11}$ cell-updates/s against $3.0 \cdot 10^{11}$ for one, so circuits of 344 and 353 gates should run at about the rate of the 367-gate one. That is an expectation from gate counts, not a measurement.
+
+**TABLE XXXIV.** The rule tables Golly 5.1 ships, compiled to the network as built from the transitions as written, without simplification or optimisation; a soup is as in Table XXXIII
+
+| Rule | States | Neighbourhood, symmetries | Transitions: written, with symmetries | Nodes as built | Compared on | Soup against Golly |
+|---|---|---|---|---|---|---|
+| Banks-I | 2 | vonNeumann, rotate4reflect | 3, 9 | 17 | all $2^{5}$ | agrees |
+| Banks-II | 3 | vonNeumann, rotate4reflect | 17, 70 | 90 | all 243 | agrees |
+| Banks-III | 2 | Moore, rotate4reflect | 32, 144 | 172 | all $2^{9}$ | agrees |
+| Banks-IV | 4 | vonNeumann, rotate4reflect | 56, 220 | 263 | all $2^{10}$ | agrees |
+| Byl-Loop | 6 | vonNeumann, rotate4 | 144, 561 | 1,241 | all 7,776 | agrees |
+| Chou-Reggia-1 | 8 | vonNeumann, rotate4 | 174, 667 | 1,413 | all $2^{15}$ | agrees |
+| Chou-Reggia-2 | 8 | vonNeumann, rotate4 | 65, 248 | 538 | all $2^{15}$ | agrees |
+| Circle | 17 | Moore, rotate4reflect | 55, 237 | 606 | 4,201,244, a sample | agrees |
+| Codd | 8 | vonNeumann, rotate4 | 286, 1,113 | 1,594 | all $2^{15}$ | agrees |
+| Codd2 | 8 | vonNeumann, rotate4 | 289, 1,125 | 1,593 | all $2^{15}$ | agrees |
+| Devore | 8 | vonNeumann, rotate4 | 461, 1,824 | 2,842 | all $2^{15}$ | agrees |
+| Display256 | 256 | Moore, none | 0, 0 | 0 | 4,198,400, a sample | agrees |
+| Evoloop-finite | 10 | vonNeumann, rotate4 | 132, 515 | 2,243 | all 100,000 | agrees |
+| Evoloop | 9 | vonNeumann, rotate4 | 132, 515 | 2,208 | all 59,049 | agrees |
+| HPP | 34 | vonNeumann, none | 32, 32 | 75 | all 45,435,424 | agrees |
+| Langtons-Loops | 8 | vonNeumann, rotate4 | 219, 857 | 1,651 | all $2^{15}$ | agrees |
+| MarBlocks-3-rep | 3 | Moore, rotate4reflect | 14, 46 | 144 | all 19,683 | agrees |
+| MarBlocks-5-rep | 5 | Moore, rotate4reflect | 44, 188 | 530 | all 1,953,125 | agrees |
+| MarBlocks-7-rep | 7 | Moore, rotate4reflect | 96, 474 | 908 | all 40,353,607 | agrees |
+| MarBlocks3-OT-2x2-minimal | 3 | Moore, permute | 14, 2,188 | 302 | all 19,683 | agrees |
+| MarBlocks5-OT-2x2-minimal | | permute | more than 20,000 with symmetries | not compiled | | |
+| MarBlocks7-OT-2x2-minimal | | permute | more than 20,000 with symmetries | not compiled | | |
+| Perrier | 64 | vonNeumann, none | 637, 637 | 2,321 | all $2^{30}$ | agrees |
+| SDSR-Loop | 9 | vonNeumann, rotate4 | 142, 547 | 2,367 | all 59,049 | agrees |
+| Tempesti | 10 | Moore, none | 1,026, 1,026 | 3,154 | all 1,000,000,000 | agrees |
+| WireWorld | 4 | Moore, rotate8 | 6, 30 | 96 | all $2^{18}$ | agrees |
+| Worm-1040512 | 17 | Moore, none | 85, 85 | 401 | 4,199,420, a sample | agrees |
+| Worm-1042015 | 17 | Moore, none | 85, 85 | 398 | 4,199,420, a sample | agrees |
+| Worm-1042020 | 17 | Moore, none | 85, 85 | 401 | 4,199,420, a sample | agrees |
+| Worm-1252121 | 17 | Moore, none | 85, 85 | 397 | 4,199,420, a sample | agrees |
+| Worm-1525115 | 17 | Moore, none | 85, 85 | 401 | 4,199,420, a sample | agrees |
+| Worm-complement | 17 | Moore, none | 2, 2 | 42 | 4,198,424, a sample | agrees |
+| Worm-shared | 17 | Moore, none | 0, 0 | 0 | 4,198,400, a sample | agrees |
+
+*Other rules.* Golly 5.1 ships 33 rule tables (Table XXXIV). 31 compile. 22 of them have at most $2^{30}$ neighbourhoods, and their networks equal the tables on every one. The other nine have 17 states or more on the Moore neighbourhood; their networks are compared with the tables on 4.2 million neighbourhoods (four million drawn at random, and for every transition some that match it and some that just miss it), and are tested, not proven. For all 31 the soup ends in the same cells by the table, by the network and by Golly. The two tables that do not compile state rules by counts of neighbours through the `permute` symmetry, which the compiler expands into more than 20,000 transitions each; such rules call for counting the neighbours of each state, as the adder tree of Section IV-C does for two states, and that form was not built. The optimisation is applied only where every neighbourhood can be enumerated, because a replacement that is right on a sample of neighbourhoods can be wrong on others; a network that cannot be proven stays as built, where it follows the transitions of the table one to one. Table XXXIV lists the networks as built for all rules; optimising them is the procedure of Table XXXIII and was not part of this evaluation.
+
 ## VII. Discussion
 
 ### A. Projected miss path
@@ -847,7 +911,7 @@ $$t = \frac{1}{R_P} + \mu \left( \frac{4 V_L}{R_B} + \frac{2}{R_I} + t_\text{gat
 
 Here $1/R_P$ is one probe out of cache, $4 V_L / R_B$ = 44 ns brute-forces the $2s \times 2s$ window with the byte-LUT kernel, $2/R_I$ = 1.5–2 ns pays two inserts, and $t_\text{gather}$, copying the four tiles of a missed window into the atlas, is taken as about 4 ns; that last term is an estimate, not a measurement.
 
-**TABLE XXXIII.** Projected rates of memoized stepping with the miss path on the GPU, against GHL's own brute-force engine
+**TABLE XXXV.** Projected rates of memoized stepping with the miss path on the GPU, against GHL's own brute-force engine
 
 | Workload | $\mu$ at 16×16 | Projected cell-updates/s | vs bit-plane brute force ($3.0 \cdot 10^{11}$) |
 |---|---|---|---|
@@ -871,14 +935,14 @@ The closest case is a small universe with constant novelty. On the single counte
 * **Section VI-G is simulation.** Floors, engines and depth are costed from the reference engine's operation counts; the plain-cells mode is costed, not executed as cells, and the controller was tuned on the same composite it is reported on. The engine per region of Tables XXIX and XXX is chosen in hindsight from a finished run: it measures what the choice is worth and is not a controller.
 * **One machine, three rules.** All constants come from one RTX 5060 Ti under wgpu on Windows. Pass, submit and read-back costs varied by up to 5× between runs on different days. Within a set of five runs most figures varied by a few percent; the largest spread, 30 %, was one run of the byte-LUT kernel on 18.7 M cells. GPU timings include the CPU's recording of commands (1.0 µs of a 3.2 µs chained dispatch); GPU timestamp queries were not used. On an 8 GB card of the same bus the brute and out-of-cache probe rates should be similar and memo capacity halves; this was not measured.
 * **Miss rates are pattern statistics** measured on fourteen patterns over $10^{4}\text{–}10^{6}$ generations. A circuit whose state space is explored more slowly would keep missing longer.
-* **The circuit** exists for Hutton32b only and is not proven minimal. Hutton32 differs from it in 74,854 neighbourhoods, and that edit has not been made, so the bit-plane kernels compute Hutton32b. On the Hutton32 pattern [`squares`] they agree cell for cell with Hutton32 over the 65,536 generations checked, because it never reaches a neighbourhood in which the two rules differ; that does not hold for Hutton32 patterns in general. The bit-plane kernel was measured up to $1.07 \cdot 10^{9}$ cells; one binding holds 2 GiB, so a $10^{10}$-cell universe as plain cells (6.3 GB per buffer) would need a kernel spanning several bindings.
+* **The circuits** are not proven minimal. The kernels of Sections VI-C to VI-H evaluate the 367-gate circuit of Hutton32b. Hutton32 differs from Hutton32b in 74,854 neighbourhoods and has only the compiled circuit of Section VI-I, which ran on the plain kernel alone, so every other bit-plane measurement computes Hutton32b. On the Hutton32 pattern [`squares`] those kernels agree cell for cell with Hutton32 over the 65,536 generations checked, because it never reaches a neighbourhood in which the two rules differ; that does not hold for Hutton32 patterns in general. The compiler's search is local and bounded by time, so that two runs give different circuits, and for a rule with more than $2^{30}$ neighbourhoods its netlist is tested on a sample, not proven. The bit-plane kernel was measured up to $1.07 \cdot 10^{9}$ cells; one binding holds 2 GiB, so a $10^{10}$-cell universe as plain cells (6.3 GB per buffer) would need a kernel spanning several bindings.
 * **Life.** Golly's HashLife for Life is specialised (8×8 bit leaves, a 65,536-entry step table) and GHL's reference engine is generic. The Life soups are random fills at density ½; B0, isotropic non-totalistic and many-state Moore rules were not run, and the hexagonal and one-dimensional neighbourhoods have CPU table stepping but no GPU kernel.
 * **Baselines.** Golly figures are `bgolly` without rendering at the best of one to seven step sizes, with the published `@TABLE` rule (an `@TREE` is 5–6 % faster) and an 8 GB memory limit on a 16 GB host, which the ROM exhausts; Golly's ROM rate covers the first minute of each run. Interactive figures will be lower. Golly's and the CPU's rates moved by up to 2× between two days of measurement (Appendix A); every ratio divides runs of the same day. No multi-threaded HashLife was compared; the four-core CPU baseline is brute force. The reference engine is unoptimized and never reclaims nodes.
 * **Literature.** Sections II and VII rest on a survey run for this paper; sources marked † were read only as abstracts.
 
 ### D. Generality
 
-GHL ran on two rules from opposite ends of Golly's HashLife family with the same code above the brute-force engine: the sweep, the recursion and the claim protocol see only tile IDs, and the reference engine, the hit path and the active-block sweep took Life without change. What the rule changes is the engine and, through its $\rho$, the floor (16×16 windows for Hutton32b, 32×32 for Life) and the thresholds $A_1$ and $A_2$. A rule without a synthesised circuit would run on a table kernel, as Hutton32 does at $1.85 \cdot 10^{11}$, or, for many-state Moore rules whose tables do not fit, on a rule-tree kernel; its measured rate would set its floor. Which engine wins is decided by the content more than by the rule: dense new content favours the GPU's brute force in both rules, and small or sparse recurring content favours HashLife's doubling steps in both. The 32-state patterns measured here are dense more often than the Life patterns.
+GHL ran on two rules from opposite ends of Golly's HashLife family with the same code above the brute-force engine: the sweep, the recursion and the claim protocol see only tile IDs, and the reference engine, the hit path and the active-block sweep took Life without change. What the rule changes is the engine and, through its $\rho$, the floor (16×16 windows for Hutton32b, 32×32 for Life) and the thresholds $A_1$ and $A_2$. A rule given as a Golly table gets a circuit from the compiler of Section VI-I, and which of the circuit and a table kernel is its engine is settled by their measured rates. A rule given only as a rule tree, or one whose compiled circuit is too large to pay, would run on a table kernel, as Hutton32 does at $1.85 \cdot 10^{11}$ in the measurements of this paper, or, for many-state Moore rules whose tables do not fit, on a rule-tree kernel; its measured rate would set its floor. Which engine wins is decided by the content more than by the rule: dense new content favours the GPU's brute force in both rules, and small or sparse recurring content favours HashLife's doubling steps in both. The 32-state patterns measured here are dense more often than the Life patterns.
 
 ## VIII. Conclusion
 
@@ -918,13 +982,19 @@ Sources marked † were read as abstract or secondary summary only. Text in squa
 [24] A. D. Robison, "Fast computation of additive cellular automata," *Complex Systems*, vol. 1, 1987. [Online]. Available: https://content.wolfram.com/sites/13/2018/02/01-1-15.pdf  
 [25] C. Moore, "Predicting nonlinear cellular automata quickly by decomposing them into linear ones," *Physica D*, vol. 111, no. 1–4, pp. 27–41, 1998, doi: 10.1016/S0167-2789(97)80003-6.  
 [26] D. Griffeath and C. Moore, "Life without Death is P-complete," *Complex Systems*, vol. 10, 1996. [Online]. Available: https://content.wolfram.com/sites/13/2018/02/10-6-3.pdf  
-[27] N. Israeli and N. Goldenfeld, "Coarse-graining of cellular automata, emergence, and the predictability of complex systems," *Phys. Rev. E*, vol. 73, no. 2, Art. no. 026203, 2006, doi: 10.1103/PhysRevE.73.026203.
+[27] N. Israeli and N. Goldenfeld, "Coarse-graining of cellular automata, emergence, and the predictability of complex systems," *Phys. Rev. E*, vol. 73, no. 2, Art. no. 026203, 2006, doi: 10.1103/PhysRevE.73.026203.  
+[28] E. Biham, "A fast new DES implementation in software," in *Fast Software Encryption (FSE 1997)*, Lecture Notes in Computer Science. Springer, 1997, pp. 260–272, doi: 10.1007/BFb0052352.  
+[29] R. Brayton and A. Mishchenko, "ABC: An academic industrial-strength verification tool," in *Computer Aided Verification (CAV 2010)*, Lecture Notes in Computer Science. Springer, 2010, pp. 24–40, doi: 10.1007/978-3-642-14295-6_5.  
+[30] R. L. Rudell and A. Sangiovanni-Vincentelli, "Multiple-valued minimization for PLA optimization," *IEEE Trans. Comput.-Aided Design Integr. Circuits Syst.*, vol. 6, no. 5, pp. 727–750, Sep. 1987, doi: 10.1109/TCAD.1987.1270318.  
+[31] J. Rajski and J. Vasudevamurthy, "The testability-preserving concurrent decomposition and factorization of Boolean expressions," *IEEE Trans. Comput.-Aided Design Integr. Circuits Syst.*, vol. 11, no. 6, pp. 778–793, Jun. 1992, doi: 10.1109/43.137523.  
+[32] A. Mishchenko, R. Brayton, J.-H. R. Jiang, and S. Jang, "Scalable don't-care-based logic optimization and resynthesis," *ACM Trans. Reconfigurable Technol. Syst.*, vol. 4, no. 4, pp. 1–23, Dec. 2011, doi: 10.1145/2068716.2068720.  
+[33] S.-Y. Lee, H. Riener, A. Mishchenko, R. K. Brayton, and G. De Micheli, "A simulation-guided paradigm for logic synthesis and verification," *IEEE Trans. Comput.-Aided Design Integr. Circuits Syst.*, vol. 41, no. 8, pp. 2573–2586, Aug. 2022, doi: 10.1109/TCAD.2021.3108704.
 
 ## Appendix A. Reproducing the Results
 
 Everything the tables need is in the repository: the harness in [`research/`], every pattern in [`patterns/`] (sources and rules in its README) and the two canonical tables in [`rules/`]. Each table is one command, run in bash (git-bash on Windows, WSL or Linux) from [`research/`]. [`reproduce.sh`] builds the harness first; run with no argument it lists the targets, and its source holds the exact harness commands behind each one. It needs Rust, Python 3 and a GPU with Vulkan or DX12. The Golly targets also need `bgolly`, which is taken from `$BGOLLY`, from Golly 5.1's Windows install path or from `PATH`, with [`rules/`] as its rule folder. GPU figures should be taken on an otherwise idle machine.
 
-**TABLE XXXIV.** One command per table
+**TABLE XXXVI.** One command per table
 
 | Table or claim | Command | Needs |
 |---|---|---|
@@ -935,7 +1005,7 @@ Everything the tables need is in the repository: the harness in [`research/`], e
 | Table V | `bash reproduce.sh cond-miss` | |
 | Table VII: forms A and C | `bash reproduce.sh forms` | network (numpy) |
 | Table VII, Section IV-C: the circuit against the table | `bash reproduce.sh circuit` | network (numpy) |
-| Section V-C, Table XXXV: reference engine against per-cell stepping; CPU rules against both tables; Hutton32 and Hutton32b compared | `bash reproduce.sh correctness` | |
+| Section V-C, Table XXXVII: reference engine against per-cell stepping; CPU rules against both tables; Hutton32 and Hutton32b compared | `bash reproduce.sh correctness` | |
 | Table X | `bash reproduce.sh golly` | Golly |
 | Table X: the ROM at step 1 past one period, until Golly's memory limit | `bash reproduce.sh golly-rom-long` | Golly |
 | Table X: Golly with Hutton32b as an `@TREE` rule | `bash reproduce.sh golly-tree` | Golly |
@@ -966,6 +1036,11 @@ Everything the tables need is in the repository: the harness in [`research/`], e
 | Tables XXV and XXXI at the bit-plane rate | `bash reproduce.sh reprice` | |
 | Table XXXII: one thread | `bash reproduce.sh cpu-bench` | |
 | Table XXXII: four threads; the CPU column of Table XI | `bash reproduce.sh cpu-parallel` | |
+| Table XXXIII; the networks of the two tables as built | `bash reproduce.sh rule-circuits` | Golly, for the soups |
+| Table XXXIV | `bash reproduce.sh rule-tables` | Golly: its rule tables and the soups |
+| Section VI-I: the bit-plane kernel with the compiled circuits, every cell compared with the rule | `bash reproduce.sh circuit-kernels-verify` | |
+| Not behind a table: the bit-plane kernel timed with the compiled circuits, which Section VI-I leaves unmeasured | `bash reproduce.sh circuit-kernels` | |
+| Circuits like those of Table XXXIII, made anew; the search is bounded by time, so they differ by run | `bash reproduce.sh rule-circuits-optimise` | |
 | Appendix B: the committed tables are the published files | `bash reproduce.sh rules-upstream` | network |
 | Table XVI | `bash reproduce.sh life-kernels` | |
 | Table X: Life soup and Unit Life Cell; Table XI: the soup on the GPU against Golly's final state | `bash reproduce.sh life-golly` | Golly |
@@ -975,15 +1050,15 @@ Everything the tables need is in the repository: the harness in [`research/`], e
 | Table XXIV | `bash reproduce.sh life-floors` | |
 | The overview diagram (its data: `overview`, about a minute on the CPU) and Figs. 2–4 | `bash reproduce.sh figures` | |
 
-`sweep`, `sweep-tiles` and `unaligned` learn the ROM's table on the CPU before each GPU run, 84–88 s per period at 16×16 tiles, and 261 s and 297 s with two and four alignment classes. The raw output of every run behind the tables is in [`logs/`], one file per target, written by [`run_batch.sh`] into a dated folder. Every figure of a target comes from the newest folder that holds the target, and a ratio divides runs from one folder: all targets on either side of a ratio in Tables X, XI, XII, XXI and XXII and Section VI-H (`golly`, `golly-tree`, `runlength`, `head2head`, `rom-kernels`, `cpu-parallel`, `sparse`, `life-golly`, `life-sparse` and the GPU targets they are set against) were run on 2026-11-26. The one quantity that combines the two days is $\rho$ of Table I, a ratio of GPU rates: $R_B$ from 2026-11-26, $R_P$ from 2026-11-25. The folder of 2026-11-28 holds the three region sweeps (`region-size`, `region-size-life`, `region-step`); their figures are model times, operation counts priced with fixed constants, and do not depend on the day or the machine's load. Where a target was run on both of the earlier days the later folder supersedes the earlier, whose GPU timings of large grids and of the active-block sweep still included the upload of the grid. Tables II, III, VIII, IX, XI and XXXIII derive from or restate the others; Table VI and Algorithms 1–3 come from the design and the code. The circuit is regenerated in [`bitslice/`] with [`rule_circuit.py`], [`optimize.py`] `25 1` (a 25-minute budget), [`optimize_more.py`] `6.5 7` and [`emit.py`], which also need `pip install yowasp-yosys python-sat`; the optimiser runs on a wall-clock budget, so a rerun does not reproduce the netlist gate for gate, and [`circuit.netlist`] is the artifact. The mixed universe of Table XXVI is the `--compose` string in [`composite_spec.txt`] (items `file@x,y[+pre-run gens][~perturbation seed]`). The three controllers that Section VI-G reports as failed were replaced in [`cmd_adapt.rs`] and cannot be rerun.
+`sweep`, `sweep-tiles` and `unaligned` learn the ROM's table on the CPU before each GPU run, 84–88 s per period at 16×16 tiles, and 261 s and 297 s with two and four alignment classes. The raw output of every run behind the tables is in [`logs/`], one file per target, written by [`run_batch.sh`] into a dated folder. Every figure of a target comes from the newest folder that holds the target, and a ratio divides runs from one folder: all targets on either side of a ratio in Tables X, XI, XII, XXI and XXII and Section VI-H (`golly`, `golly-tree`, `runlength`, `head2head`, `rom-kernels`, `cpu-parallel`, `sparse`, `life-golly`, `life-sparse` and the GPU targets they are set against) were run on 2026-11-26. The one quantity that combines the two days is $\rho$ of Table I, a ratio of GPU rates: $R_B$ from 2026-11-26, $R_P$ from 2026-11-25. The folder of 2026-11-28 holds the three region sweeps (`region-size`, `region-size-life`, `region-step`); their figures are model times, operation counts priced with fixed constants, and do not depend on the day or the machine's load. Where a target was run on both of the earlier days the later folder supersedes the earlier, whose GPU timings of large grids and of the active-block sweep still included the upload of the grid. Tables II, III, VIII, IX, XI and XXXV derive from or restate the others; Table VI and Algorithms 1–3 come from the design and the code. The circuit is regenerated in [`bitslice/`] with [`rule_circuit.py`], [`optimize.py`] `25 1` (a 25-minute budget), [`optimize_more.py`] `6.5 7` and [`emit.py`], which also need `pip install yowasp-yosys python-sat`; the optimiser runs on a wall-clock budget, so a rerun does not reproduce the netlist gate for gate, and [`circuit.netlist`] is the artifact. The mixed universe of Table XXVI is the `--compose` string in [`composite_spec.txt`] (items `file@x,y[+pre-run gens][~perturbation seed]`). The three controllers that Section VI-G reports as failed were replaced in [`cmd_adapt.rs`] and cannot be rerun.
 
 CPU and Golly timings differ between the two days by more than between runs of one day, in both directions: Golly with the Hutton32 rules ran up to 17 % slower on the later day (the `32x32 movie` 26 % faster), its Life runs 4–18 % faster (up to 47 % on runs shorter than 0.1 s), and its runs of the sparse universe at step 16, and over $2^{20}$ generations at step 1024, twice as fast; the CPU reference engine ran between 6 % faster and 16 % slower, and the single-thread byte-table loops of `rom-kernels` and `lut-kernel` 20–40 % slower. The clock (3.5 GHz) and the power plan were the same on both days; on the later day other programs kept about one of the host's four cores busy. The cause was not isolated, so CPU and Golly rates carry an uncertainty of this order across days, and ratios near 1, those of Table XXII and the recursion rows of Table XI, lie within it.
 
 ## Appendix B. The Rule Tables
 
-Each rule has one authoritative definition (Table XXXV). The harness's CPU rule implementation and the circuit of Section IV-C equal the Hutton32 and Hutton32b tables on all $2^{25}$ neighbourhoods; the circuit was built and checked against the Hutton32b table. Hutton32 and Hutton32b differ in 74,854 neighbourhoods, all with an excited special transmission state, a confluent state or a crossing in the centre.
+Each rule has one authoritative definition (Table XXXVII). The harness's CPU rule implementation and the circuit of Section IV-C equal the Hutton32 and Hutton32b tables on all $2^{25}$ neighbourhoods; the circuit was built and checked against the Hutton32b table. Hutton32 and Hutton32b differ in 74,854 neighbourhoods, all with an excited special transmission state, a confluent state or a crossing in the centre.
 
-**TABLE XXXV.** Canonical rule tables
+**TABLE XXXVII.** Canonical rule tables
 
 | Rule | Canonical table | Verified identical to it: 0 of $2^{25}$ neighbourhoods differ |
 |---|---|---|
@@ -1013,6 +1088,9 @@ Each rule has one authoritative definition (Table XXXV). The harness's CPU rule 
 | [`cmd_bitslice.rs`] | the plain bit-plane kernel (`gpu-bitslice`), the shared-tile kernel (`gpu-tile`) and the one-thread-per-window kernel (`gpu-window`) |
 | [`bitslice/`] | the rule as a gate network: [`rule_circuit.py`], [`resub.py`], [`abc_flow.py`], [`xag.py`], [`optimize.py`], [`emit.py`]; artifacts [`circuit.netlist`], [`step_planes.wgsl`], [`step_planes.rs`]; [`verify.py`]; [`scalar.py`] and [`tables.py`] (forms A and C); [`bench/`] (CPU benchmark on one or more threads) |
 | [`bitslice_series.sh`] | every GPU measurement of the bit-plane, window and shared-tile kernels |
+| [`ruletable2netlist/`], [`ca-rule/`] | the compiler of Section VI-I, outside the harness: the network built from the transitions ([`build.rs`]) after their simplification ([`simplify.rs`]), the check on every neighbourhood ([`check.rs`]), the rule's symmetry ([`symmetry.rs`]), the optimiser ([`resub.rs`]) and its restructuring of the network ([`recut.rs`]), gates and inverters ([`map.rs`]) and a command line; the table parser, its interpreter and the netlist type it shares with other crates ([`ca-rule/`]) |
+| [`compiled/`] | the compiled circuits of Hutton32b and Hutton32 that Section VI-I reports, as netlist, WGSL and Rust |
+| [`rule_circuits.sh`], [`rule_circuits_optimise.sh`], [`rule_circuits.py`] | those circuits read back and compared with their tables, and Golly's rule tables compiled as built; the time-bounded runs that make such circuits; the tables of Section VI-I from the log |
 | [`time_golly.py`] | `bgolly` timing: median of repeats per step size, peak working set, rate over the second half of the run |
 | [`head2head.py`] | `bgolly` against the CPU engine, both timed the same way and without output, final states compared in a separate run |
 | [`engine_choice.sh`] | engine-per-content table |
@@ -1069,6 +1147,8 @@ Each rule has one authoritative definition (Table XXXV). The harness's CPU rule 
 [`BIN2BCD`]: research/patterns/misc/BIN2BCD.rle
 [lotr1.PPMd-244K.rle]: research/patterns/misc/extra/lotr1.PPMd-244K.rle
 [counter]: research/patterns/advanced%20counter%20v2.rle
+[\[28\]]: #references
+[\[29\]]: #references
 [Hutton32b.rule]: research/rules/Hutton32b.rule
 [`Hutton32.table`]: research/rules/Hutton32.table
 [Unit Life Cell]: research/patterns/life/Unit-Life-Cell-512x512.rle
@@ -1093,6 +1173,7 @@ Each rule has one authoritative definition (Table XXXV). The harness's CPU rule 
 [component sheet]: research/patterns/component-basis.rle
 [replicator]: research/patterns/replicators/Hutton-replicator.rle
 [`logs/`]: research/logs/
+[`ruletable2netlist`]: ruletable2netlist/
 [`hl.rs`]: research/src/hl.rs
 [Hutton replicator]: research/patterns/replicators/Hutton-replicator.rle
 [lotr1.ANSI-1M.rle]: research/patterns/misc/extra/lotr1.ANSI-1M.rle
@@ -1122,6 +1203,11 @@ Each rule has one authoritative definition (Table XXXV). The harness's CPU rule 
 [`Segmented ROM`]: research/patterns/misc/Segmented%20ROM%20%28256k%29.mc
 [Mixed]: research/tools/composite_spec.txt
 [`bench/`]: research/bitslice/bench/
+[\[30\]]: #references
+[\[31\]]: #references
+[\[32\]]: #references
+[\[33\]]: #references
+[`compiled/`]: research/bitslice/compiled/
 [`ghashbase.h`]: https://sourceforge.net/p/golly/code/ci/53bdb74e48cd0792f87a2e3e6a5bb0c5d7d5af0e/tree/gollybase/ghashbase.h
 [`ghashbase.cpp`]: https://sourceforge.net/p/golly/code/ci/53bdb74e48cd0792f87a2e3e6a5bb0c5d7d5af0e/tree/gollybase/ghashbase.cpp
 [`hlifealgo.cpp`]: https://sourceforge.net/p/golly/code/ci/53bdb74e48cd0792f87a2e3e6a5bb0c5d7d5af0e/tree/gollybase/hlifealgo.cpp
@@ -1166,6 +1252,18 @@ Each rule has one authoritative definition (Table XXXV). The harness's CPU rule 
 [`scalar.py`]: research/bitslice/scalar.py
 [`tables.py`]: research/bitslice/tables.py
 [`bitslice_series.sh`]: research/tools/bitslice_series.sh
+[`ruletable2netlist/`]: ruletable2netlist/
+[`ca-rule/`]: ca-rule/
+[`build.rs`]: ruletable2netlist/src/build.rs
+[`simplify.rs`]: ruletable2netlist/src/simplify.rs
+[`check.rs`]: ruletable2netlist/src/check.rs
+[`symmetry.rs`]: ruletable2netlist/src/symmetry.rs
+[`resub.rs`]: ruletable2netlist/src/resub.rs
+[`recut.rs`]: ruletable2netlist/src/recut.rs
+[`map.rs`]: ruletable2netlist/src/map.rs
+[`rule_circuits.sh`]: research/tools/rule_circuits.sh
+[`rule_circuits_optimise.sh`]: research/tools/rule_circuits_optimise.sh
+[`rule_circuits.py`]: research/tools/rule_circuits.py
 [`time_golly.py`]: research/tools/time_golly.py
 [`head2head.py`]: research/tools/head2head.py
 [`engine_choice.sh`]: research/tools/engine_choice.sh

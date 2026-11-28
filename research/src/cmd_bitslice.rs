@@ -176,7 +176,7 @@ pub fn run(args: &[String]) {
   // the reference is the pattern's own rule; the circuit implements Hutton32b only
   let spec = cmd_stats::variant_for(args, if file_rule.is_empty() { "hutton32b" } else { &file_rule });
   let lut = crate::load_lut(&spec);
-  if spec.name() != "Hutton32b" {
+  if spec.name() != "Hutton32b" && opt(args, "--wgsl").is_none() {
     println!("note: the circuit implements Hutton32b; the CPU reference uses {}", spec.name());
   }
   let gpu = Gpu::new(opt(args, "--backend").as_deref());

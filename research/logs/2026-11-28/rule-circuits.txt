@@ -1,0 +1,21 @@
+=== rule-circuits     circuits compiled from the tables of Hutton32b and Hutton32, each read back and compared with its table (tools/rule_circuits.sh; Golly for the soups)
+=== circuits read back and compared with their rule tables
+netlist Hutton32b.netlist | rule Hutton32b, 32 states (5 bits), vonNeumann | 316 nodes | 353 gates (AND 155, OR 97, XOR 64, NOT 37), depth 69 | equal to the table on 33554432 neighbourhoods (all)
+lut lut_table_Hutton32b.bin: 33554432 entries, 0 differ
+golly: a 40x40 soup after 16 generations agrees (1390 live cells; table, netlist and Golly)
+netlist Hutton32.netlist | rule Hutton32, 32 states (5 bits), vonNeumann | 303 nodes | 344 gates (AND 157, OR 77, XOR 69, NOT 41), depth 81 | equal to the table on 33554432 neighbourhoods (all)
+lut lut_table_Hutton32.bin: 33554432 entries, 0 differ
+golly: a 40x40 soup after 16 generations agrees (1399 live cells; table, netlist and Golly)
+netlist Hutton32b-from367.netlist | rule Hutton32b, 32 states (5 bits), vonNeumann | 287 nodes | 318 gates (AND 133, OR 98, XOR 56, NOT 31), depth 57 | equal to the table on 33554432 neighbourhoods (all)
+lut lut_table_Hutton32b.bin: 33554432 entries, 0 differ
+golly: a 40x40 soup after 16 generations agrees (1390 live cells; table, netlist and Golly)
+netlist circuit.netlist | rule Hutton32b, 32 states (5 bits), vonNeumann | 316 nodes | 367 gates (AND 165, OR 137, XOR 14, NOT 51), depth 25 | equal to the table on 33554432 neighbourhoods (all)
+lut lut_table_Hutton32b.bin: 33554432 entries, 0 differ
+golly: a 40x40 soup after 16 generations agrees (1390 live cells; table, netlist and Golly)
+=== the two tables compiled as built, their transitions simplified first
+rule Hutton32b | 32 states (5 bits), vonNeumann, symmetries none | 315 transitions, 315 with symmetries, 226 after simplification | built: fold 838, fold 942, factor 1091, chain 1415, bits 1442, flat 3782 nodes | not optimised: 838 nodes (fold) | 955 gates (AND 509, OR 321, XOR 8, NOT 117), depth 31 | checked on 33554432 neighbourhoods (all) | 0 sweeps, 0 replacements, 0 checks, 0 refuted | 47.5 s
+symmetry Hutton32b: a turn of order 4 with the states relabelled; 26 centre states symmetric, 16 with an orientation; 36 transitions for orientation 0
+lut lut_table_Hutton32b.bin: 33554432 entries, 0 differ
+rule Hutton32 | 32 states (5 bits), vonNeumann, symmetries none | 296 transitions, 296 with symmetries, 218 after simplification | built: fold 914, fold 983, factor 1036, chain 1415, bits 1397, flat 3634 nodes | not optimised: 914 nodes (fold) | 1038 gates (AND 555, OR 349, XOR 10, NOT 124), depth 32 | checked on 33554432 neighbourhoods (all) | 0 sweeps, 0 replacements, 0 checks, 0 refuted | 39.3 s
+symmetry Hutton32: a turn of order 4 with the states relabelled; 26 centre states symmetric, 16 with an orientation; 36 transitions for orientation 0
+lut lut_table_Hutton32.bin: 33554432 entries, 0 differ

@@ -1,0 +1,11 @@
+=== circuit-kernels-verify  the bit-plane kernel with each compiled circuit: 2048^2 random states, 8 generations, every cell compared with the rule on the CPU
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+wiring self-test: centre and the four neighbours arrive in the right planes and bits
+circuit: bitslice/compiled/Hutton32b.wgsl (316 binary operations, 37 inversions in the source)
+rule Hutton32b | content: uniform random soup | 2048x2048 = 4194304 cells | ping-pong | 8x8 workgroups, 32 cells per invocation
+  bit-plane kernel: verify vs LUT on the CPU: 0 mismatching cells
+GPU: NVIDIA GeForce RTX 5060 Ti [Vulkan, driver 591.59] max_buffer=4094 MiB max_storage_binding=2047 MiB
+wiring self-test: centre and the four neighbours arrive in the right planes and bits
+circuit: bitslice/compiled/Hutton32.wgsl (303 binary operations, 41 inversions in the source)
+rule Hutton32 | content: uniform random soup | 2048x2048 = 4194304 cells | ping-pong | 8x8 workgroups, 32 cells per invocation
+  bit-plane kernel: verify vs LUT on the CPU: 0 mismatching cells

@@ -41,6 +41,11 @@ region-model      the region model against the three sweeps above: tables and Fi
 counter-work      work per generation of the counter, which sets the thresholds (adapt)
 forms             forms A and C, checked on all 2^25 neighbourhoods (pip installs numpy)
 circuit           the circuit vs the table on all 2^25 neighbourhoods (pip installs numpy)
+rule-circuits     circuits compiled from the tables of Hutton32b and Hutton32, each read back and compared with its table (tools/rule_circuits.sh; Golly for the soups)
+rule-tables       the rule tables Golly ships compiled as built and compared with the tables (tools/rule_circuits.sh; about ten minutes; needs the Rules folder of Golly)
+rule-circuits-optimise  makes such circuits anew: bounded by time, so they differ by run (tools/rule_circuits_optimise.sh; about 16 minutes)
+circuit-kernels-verify  the bit-plane kernel with each compiled circuit: 2048^2 random states, 8 generations, every cell compared with the rule on the CPU
+circuit-kernels   the bit-plane kernel with the compiled circuits of Hutton32b and Hutton32 (bitslice/compiled)
 bitplane-content  16384^2: bit-plane and byte-LUT kernels on the same content
 bitplane-sizes    bit-plane kernel at other sizes
 bitplane-limit    where the limit is: identity circuit, k chained evaluations
@@ -99,6 +104,19 @@ bgolly() {
   done
   [ -n "$b" ] || { echo "bgolly not found; set BGOLLY" >&2; exit 1; }
   "$b" "$@"
+}
+
+r2n() { # the compiler of rule tables, a crate of the workspace above research/; sets X ($R2N names a built one)
+  X=${R2N:-}
+  if [ -z "$X" ]; then
+    cargo build --release -q --manifest-path ../Cargo.toml -p ruletable2netlist || exit 1
+    X=../target/release/ruletable2netlist; [ -e $X.exe ] && X=$X.exe
+  fi
+}
+
+lutbin32() { # the tables of next states of both 32-state rules
+  lutbin
+  [ -e out/lut_table_Hutton32.bin ] || $R rulediff --a hutton32 --b table:rules/Hutton32.table >/dev/null
 }
 
 series() { REPEATS=5 bash tools/bitslice_series.sh $R "$1"; } # sections of the bit-plane kernel series, 5 runs each
@@ -241,6 +259,24 @@ run() {
   circuit)
     lutbin; venv
     (cd bitslice && "$VPY" verify.py) ;;
+  rule-circuits) r2n; lutbin32
+    bash tools/rule_circuits.sh "$X" circuits ;;
+  rule-tables) r2n
+    bash tools/rule_circuits.sh "$X" tables ;;
+  rule-circuits-optimise) r2n; lutbin32
+    bash tools/rule_circuits_optimise.sh "$X" ;;
+  circuit-kernels-verify) # correctness only: the rate of so short a run means nothing and is cut from the line
+    O=bitslice/compiled
+    for c in "$O/Hutton32b.wgsl" "$O/Hutton32.wgsl --rule hutton32"; do
+      $R gpu-bitslice --side 2048 --gens 8 --verify --wgsl $c | sed 's/bit-plane kernel:.*| verify/bit-plane kernel: verify/'
+    done ;;
+  circuit-kernels) # the 367-gate circuit, the compiled circuits, the byte-LUT kernel: one grid, one content
+    O=bitslice/compiled
+    $R gpu-bitslice --side 16384 --gens 64 --same-src --verify --repeats 5
+    $R gpu-bitslice --side 16384 --gens 64 --same-src --verify --repeats 5 --wgsl $O/Hutton32b.wgsl
+    $R gpu-bitslice --side 16384 --gens 64 --same-src --verify --repeats 5 --wgsl $O/Hutton32.wgsl --rule hutton32
+    $R gpu-brute2   --side 16384 --gens 64 --same-src --verify --repeats 5
+    $R gpu-brute2   --side 16384 --gens 64 --same-src --verify --repeats 5 --rule hutton32 ;;
   bitplane-content) series A ;;
   bitplane-sizes) series BCDS ;;
   bitplane-limit) series EFS ;;
