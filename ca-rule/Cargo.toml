@@ -1,0 +1,9 @@
+[package]
+name = "ca-rule"
+version = "0.1.0"
+edition = "2021"
+description = "Cellular-automaton rule formats shared by the GHL crates: neighbourhoods, Golly rule tables, gate netlists"
+license = "MIT OR Apache-2.0"
+
+# No dependencies: this is the bottom of the workspace.
+[dependencies]

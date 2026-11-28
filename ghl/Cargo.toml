@@ -1,0 +1,33 @@
+[package]
+name = "ghl"
+version = "0.1.0"
+edition = "2021"
+description = "GPU HashLife (GHL): HashLife for every rule of Golly's HashLife family, on the GPU through wgpu"
+readme = "README.md"
+
+[features]
+default = ["gpu"]
+# the GPU engines (wgpu); without it the library runs the host recursion only
+gpu = ["dep:wgpu", "dep:pollster"]
+# the archived application's palette PNG format
+png = ["dep:image"]
+# compile table rules into gate networks at run time (`Rule::compile_network`)
+compile = ["dep:ruletable2netlist"]
+
+[dependencies]
+ca-rule = { path = "../ca-rule" }
+ruletable2netlist = { path = "../ruletable2netlist", optional = true }
+bytemuck = { version = "1", features = ["derive"] }
+rustc-hash = "2"
+bitflags = "2"
+wgpu = { version = "30", optional = true }
+pollster = { version = "0.4", optional = true }
+image = { version = "0.25", default-features = false, features = ["png"], optional = true }
+
+[[example]]
+name = "overview"
+required-features = []
+
+[[bench]]
+name = "stages"
+harness = false

@@ -1,0 +1,12 @@
+[package]
+name = "ruletable2netlist"
+version = "0.1.0"
+edition = "2021"
+description = "Compiles a Golly rule table to a verified, optimised gate network for bit-sliced cellular-automaton kernels"
+license = "MIT OR Apache-2.0"
+
+# One dependency, the workspace's shared rule formats: the compiler, its optimiser and its checks
+# are plain Rust, so that a library that steps cellular automata can turn a rule file into a kernel
+# wherever it is built.
+[dependencies]
+ca-rule = { path = "../ca-rule" }

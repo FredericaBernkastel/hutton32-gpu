@@ -1,0 +1,31 @@
+# Golly 5.1's final states as fingerprints (tests/golly.rs); written by record_golly.py
+# pattern	rule	generations	step_log2	population	width	height	hash	golly_seconds
+misc/Segmented ROM (256k).mc	Hutton32b	16777216	10	288297	876	615	91bbac989131c75f	2.71
+16x16 movie/16x16 movie.mc	Hutton32	16777216	10	2111192	2182	2620	bdb3a031b785ebd6	5.00
+misc/serial display (32x32).mc	Hutton32b	16777216	10	1494860	938	1824	9216ae750dc02a77	0.20
+misc/BIN2BCD.rle	Hutton32b	16777216	10	9856	348	350	1a0077084a0fcfd1	0.07
+misc/parallel display (16x16).mc	Hutton32	16777216	10	375667	1141	537	db41d0a8b4097762	0.03
+misc/efficient_demultiplexer.mc	Hutton32	16777216	10	52750	948	610	03f1718b2cd8ad72	0.03
+misc/weird designs/cpu.mc	Hutton32	16777216	10	17499	384	430	aa55c7444e756be9	0.03
+32x32 movie/32x32 movie.mc	Hutton32b	65536	10	1085955	928	1513	aa63f34b65aa0267	6.97
+misc/squares.rle	Hutton32	65536	10	94847	650	423	a50ff6d0bfbe8b53	2.75
+replicators/Hutton-replicator.rle	Hutton32	65536	12	26070	4564	3187	eadb694516b6b5dd	3.47
+advanced counter v2.rle	Hutton32b	16384	10	24079	191	197	7a3d776391de0629	0.09
+advanced counter v2.rle	Hutton32b	1048576	10	24078	191	197	2422fc6e859d071a	1.87
+advanced counter v2.rle	Hutton32b	16777216	10	24081	191	197	aa91462ba8d28ec6	2.25
+misc/chaotic.rle	Hutton32b	16384	10	15979	151	132	e599a6cd2fde61d0	0.40
+misc/chaotic.rle	Hutton32b	1048576	10	15051	151	132	4ff22f63e0c093d9	4.02
+misc/chaotic.rle	Hutton32b	16777216	10	15051	151	132	dcdea1b3b60b84f8	7.36
+life/metapixel-galaxy.mc	B3/S23	16777216	10	7675465	30723	30720	91bb1e431b8a4c0e	0.75
+life/Unit-Life-Cell-512x512.rle	B3/S23	16777216	10	4810	8388313	8388403	bddb5d2bec577ce5	0.31
+life/ruler.mc	B3/S23	16777216	10	5060673	16777265	1398216	96ee1b1355cc270b	1.42
+life/wedge-grow.mc	B3/S23	16777216	10	62766153	8404453	8403469	4043f8b12386765e	3.27
+life/gotts-dots.mc	B3/S23	16777216	10	26326687	12582649	8388448	e590fb3bd3f1bacb	2.55
+life/metacatacryst.mc	B3/S23	16777216	10	17647153	8448022	8402926	488cd43d6bb27a48	3.16
+life/catacryst.mc	B3/S23	1048576	10	1655339	526625	525736	416ddaa1b5e453af	0.71
+life/mosquito5.mc	B3/S23	1048576	10	303277483	788936	524267	9479be91eb437a51	2.21
+life/jagged.mc	B3/S23	1048576	10	522153	1048701	524355	a058018a68bfab46	1.00
+life/totalperiodic.mc	B3/S23	1048576	10	1185660	786468	786478	d44b607986c0861c	2.43
+life/Unit-Life-Cell-512x512.rle	B3/S23	4096	10	4815	1753	1843	7d569e31e9ac3134	0.06
+misc/squares.rle	Hutton32	4096	10	94857	650	423	00d8d9738bce819f	0.08
+misc/chaotic.rle	Hutton32b	4096	10	15984	151	132	3fc137fc5433f07b	0.07

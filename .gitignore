@@ -4,3 +4,5 @@
 /sources/
 # local secrets, e.g. OPENROUTER_API_KEY for the schematic generator
 /.env
+# the ghl workspace build
+/target

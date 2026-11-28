@@ -1,0 +1,22 @@
+# Layers, bottom up: ca-rule (rule formats shared by all: neighbourhoods, Golly rule tables, gate
+# netlists; no dependencies), ruletable2netlist (rule table -> checked, optimised netlist; depends
+# on ca-rule only), ghl (the engines; on top of both). A user interface goes on top of ghl.
+[workspace]
+resolver = "2"
+members = ["ca-rule", "ruletable2netlist", "ghl"]
+# The measurement harness and the archived application build on their own: their scripts expect
+# their own target directories, and the archive pins wgpu 0.14.
+exclude = ["research", "archive"]
+
+[profile.release]
+opt-level = 3
+debug = false
+
+[profile.bench]
+opt-level = 3
+debug = false
+
+# the tests step real patterns for thousands of generations: optimise them
+[profile.test]
+opt-level = 3
+debug-assertions = true
